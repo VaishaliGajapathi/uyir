@@ -1,0 +1,95 @@
+export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+export const COMPONENT_TYPES = [
+  { value: "whole_blood", label: "Whole Blood", labelTa: "முழு இரத்தம்" },
+  { value: "platelets", label: "Platelets", labelTa: "தட்டுச்சல்" },
+  { value: "plasma", label: "Plasma", labelTa: "பிளாஸ்மா" },
+];
+
+export const EMERGENCY_LEVELS = [
+  { value: "green", label: "24 Hours", color: "emerald" },
+  { value: "orange", label: "8 Hours", color: "orange" },
+  { value: "red", label: "Immediate", color: "red" },
+];
+
+// Bilingual strings (ta = Tamil default, en = English).
+export const t = {
+  appName: { ta: "உயிர்", en: "UYIR" },
+  tagline: { ta: "தமிழ்நாடு இரத்த & தட்டுச்சல் அவசர வலையமைப்பு", en: "Tamil Nadu Blood & Platelet Network" },
+  needBlood: { ta: "இரத்தம் தேவை", en: "Need Blood" },
+  donateBlood: { ta: "இரத்தம் தானம்", en: "Donate Blood" },
+  nearbyEmergencies: { ta: "அருகிலுள்ள அவசரங்கள்", en: "Nearby Emergencies" },
+  activeToday: { ta: "இன்று செயலில்", en: "Active Requests Today" },
+  livesSaved: { ta: "காப்பாற்றப்பட்ட உயிர்கள்", en: "Lives Saved" },
+  home: { ta: "முகப்பு", en: "Home" },
+  requests: { ta: "கோரிக்கைகள்", en: "Requests" },
+  nearby: { ta: "அருகில்", en: "Nearby" },
+  impact: { ta: "தாக்கம்", en: "Impact" },
+  profile: { ta: "சுயவிவரம்", en: "Profile" },
+  mobileNumber: { ta: "மொபைல் எண்", en: "Mobile number" },
+  yourName: { ta: "உங்கள் பெயர்", en: "Your name" },
+  iWantTo: { ta: "நான் விரும்புகிறேன்", en: "I want to" },
+  sendOtp: { ta: "OTP அனுப்பு", en: "Send OTP" },
+  enterOtp: { ta: "OTP உள்ளிடவும்", en: "Enter OTP" },
+  verifyContinue: { ta: "சரிபார்த்து தொடரவும்", en: "Verify & Continue" },
+  changeNumber: { ta: "எண் மாற்றவும்", en: "Change number" },
+  requestBlood: { ta: "இரத்தம் கோரு", en: "Request blood" },
+  consentTitle: { ta: "ஒப்புதல் மற்றும் சட்ட ஒப்பந்தம்", en: "Consent & Legal Agreement" },
+  consentText: {
+    ta: "இரத்த தானம் இலவசமும் தன்னார்வமும் ஆகும். பணம் கேட்பது அல்லது கொடுப்பது தடைசெய்யப்பட்டுள்ளது. தொடர்வதன் மூலம், நீங்கள் UYIR விதிமுறைகளை ஏற்கிறீர்கள்.",
+    en: "Blood donation is voluntary and unpaid. Asking or paying money for blood is prohibited. By continuing, you agree to UYIR’s terms."
+  },
+  iAgree: { ta: "நான் ஒப்புக்கொள்கிறேன்", en: "I Agree" },
+  thirukkural: {
+    ta: ["பிறப்பொக்கும் எல்லா உயிர்க்கும்", "சிறப்பொவ்வாசெய்தொழில் வேற்றுமை யான்"],
+    en: ["The noblest of all noble deeds", "is to save a life"]
+  },
+  // Profile labels
+  profileAge: { ta: "வயது", en: "Age" },
+  profileGender: { ta: "பாலினம்", en: "Gender" },
+  profileBloodGroup: { ta: "இரத்த வகை", en: "Blood group" },
+  profileDistrict: { ta: "மாவட்டம்", en: "District" },
+  profileHemoglobin: { ta: "ஹீமோகுளோபின்", en: "Hemoglobin" },
+  profileSleepHours: { ta: "உறக்க நேரம்", en: "Sleep hours" },
+  profileDrinking: { ta: "குடிப்பழக்கம்", en: "Drinking" },
+  profileSmoking: { ta: "புகைப்பழக்கம்", en: "Smoking" },
+  profileLastDonation: { ta: "கடைசி இரத்த தானம்", en: "Last donation" },
+  profileDonations: { ta: "இரத்த தானங்கள்", en: "Donations" },
+  profileReputation: { ta: "நற்பெயர்", en: "Reputation" },
+  profileEdit: { ta: "சுயவிவரம் திருத்து", en: "Edit profile" },
+  profileSave: { ta: "சேமி", en: "Save" },
+  profileCancel: { ta: "ரத்து செய்", en: "Cancel" },
+  profilePlateletDonor: { ta: "பிளேட்லெட் தானம்", en: "Platelet donor" },
+  profileNightEmergency: { ta: "இரவு அவசரம்", en: "Night emergency" },
+  profileHemoglobinLabel: { ta: "ஹீமோகுளோபின் (g/dL)", en: "Hemoglobin (g/dL)" },
+  profileSleepHoursLabel: { ta: "உறக்க நேரம்/நாள்", en: "Sleep hours/day" },
+  profileDrinkingHabits: { ta: "குடிப்பழக்கம்", en: "Drinking habits" },
+  profileSmokingHabits: { ta: "புகைப்பழக்கம்", en: "Smoking habits" },
+  profileNotSet: { ta: "அமைக்கப்படவில்லை", en: "Not set" },
+  profileNever: { ta: "ஒருபோதுமில்லை", en: "Never" },
+  profileSelect: { ta: "தேர்வு", en: "Select" },
+  profileMale: { ta: "ஆண்", en: "Male" },
+  profileFemale: { ta: "பெண்", en: "Female" },
+  profileOther: { ta: "மற்றவை", en: "Other" },
+  profileNeverOption: { ta: "ஒருபோதுமில்லை", en: "Never" },
+  profileOccasional: { ta: "அவ்வப்போது", en: "Occasional" },
+  profileRegular: { ta: "தொடர்ந்து", en: "Regular" },
+  profileName: { ta: "பெயர்", en: "Name" },
+  healthTipsTitle: { ta: "ஆரோக்கிய குறிப்புகள்", en: "Health Tips" },
+  healthTips: { ta: "ஆரோக்கிய குறிப்புகள்", en: "Health Tips" },
+  healthPredictions: { ta: "ஆரோக்கிய கணிப்புகள்", en: "Health Predictions" },
+  postDonationRecovery: { ta: "தானம் தருவதற்கு பிந்தைய மீட்பு (அடுத்த 3 நாட்கள்)", en: "Post-Donation Recovery (Next 3 Days)" },
+  eligibleForDonation: { ta: "✓ தானம் தர தகுதி", en: "✓ Eligible for donation" },
+  notEligible: { ta: "⚠️ தகுதியற்றது", en: "⚠️ Not eligible" },
+  eligiblePercent: { ta: "% தகுதி", en: "% Eligible" },
+  badgesTitle: { ta: "பதக்கங்கள்", en: "Badges" },
+  noBadges: { ta: "பதக்கங்கள் இல்லை. பதக்கம் பெற தானம் தாருங்கள்!", en: "No badges yet. Donate to earn badges!" },
+  contactSupport: { ta: "ஆதரவைத் தொடர்பு கொள்ளவும்", en: "Contact Support" },
+  reportBug: { ta: "பிழையைப் புகாரளிக்கவும்", en: "Report a Bug" },
+  signOut: { ta: "வெளியேறு", en: "Sign out" },
+};
+
+export type Lang = "ta" | "en";
+export function tr(key: keyof typeof t, lang: Lang) {
+  return t[key][lang];
+}

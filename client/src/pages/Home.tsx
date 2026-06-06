@@ -1,0 +1,94 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Droplet, HeartHandshake, ChevronRight, Quote } from "lucide-react";
+import { api, type BloodRequest } from "../lib/api";
+import { useApp } from "../contexts/AppContext";
+import { Card } from "../components/ui";
+import { emergencyMeta, timeAgo } from "../lib/utils";
+import { t } from "../lib/constants";
+
+export function Home() {
+  const { user, lang } = useApp();
+  const nav = useNavigate();
+  const [nearby, setNearby] = useState<BloodRequest[]>([]);
+
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (user?.district) params.district = user.district;
+    api.listRequests(params).then((r) => setNearby(r.slice(0, 4))).catch(() => {});
+  }, [user?.district]);
+
+  return (
+    <div className="space-y-5 px-4 py-4">
+      <Card className="bg-gradient-to-r from-uyir-100 to-emerald-50 p-4">
+        <div className="flex items-start gap-3">
+          <Quote className="mt-1 h-5 w-5 flex-shrink-0 text-uyir-600" />
+          <div>
+            <p className={`text-sm font-semibold text-slate-800 ${lang === "ta" ? "ta" : ""}`}>
+              {t.thirukkural[lang][0]}
+            </p>
+            <p className={`text-sm font-semibold text-slate-800 ${lang === "ta" ? "ta" : ""}`}>
+              {t.thirukkural[lang][1]}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">- Thirukkural</p>
+          </div>
+        </div>
+      </Card>
+      <header className="flex items-center justify-between pt-4">
+        <div>
+          <h1 className={`text-2xl font-extrabold text-uyir-700 ${lang === "ta" ? "ta" : ""}`}>
+            {lang === "ta" ? "உயிர்" : "UYIR"}
+          </h1>
+          <p className="text-xs text-slate-500">{lang === "ta" ? "வணக்கம்" : "Hi"}, {user?.name?.split(" ")[0]}</p>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-uyir-50 text-lg font-bold text-uyir-700">
+          {user?.bloodGroup || "?"}
+        </div>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => nav("/new-request")}
+          className="flex flex-col items-start gap-2 rounded-2xl bg-uyir-600 p-4 text-left text-white shadow-lg shadow-uyir-600/30 active:scale-[0.98] transition">
+          <Droplet className="h-7 w-7" fill="white" />
+          <span className="text-lg font-bold leading-tight">{lang === "ta" ? "இரத்தம் தேவை" : "Need Blood"}</span>
+          <span className="text-xs text-white/80">{lang === "ta" ? "சரிபார்க்கப்பட்ட கோரிக்கை உருவாக்கு" : "Create verified request"}</span>
+        </button>
+        <button onClick={() => nav("/nearby")}
+          className="flex flex-col items-start gap-2 rounded-2xl bg-uyir-600 p-4 text-left text-white shadow-lg shadow-uyir-600/30 active:scale-[0.98] transition">
+          <HeartHandshake className="h-7 w-7" />
+          <span className="text-lg font-bold leading-tight">{lang === "ta" ? "இரத்தம் தானம்" : "Donate Blood"}</span>
+          <span className="text-xs text-white/80">{lang === "ta" ? "யாருக்கு தேவை என்று பார்" : "See who needs you"}</span>
+        </button>
+      </div>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-bold text-slate-800">{lang === "ta" ? "அருகிலுள்ள அவசரங்கள்" : "Nearby Emergencies"}</h2>
+          <button onClick={() => nav("/requests")} className="flex items-center text-sm font-medium text-uyir-600">
+            {lang === "ta" ? "அனைத்தும்" : "All"} <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {nearby.length === 0 && <p className="rounded-xl bg-white py-8 text-center text-sm text-slate-400">{lang === "ta" ? "அருகில் செயலில் உள்ள கோரிக்கைகள் இல்லை" : "No active requests nearby."}</p>}
+          {nearby.map((r) => {
+            const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
+            return (
+              <Card key={r.id} className="flex items-center gap-3 p-3" >
+                <button className="flex w-full items-center gap-3 text-left" onClick={() => nav(`/request/${r.id}`)}>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-uyir-50 text-lg font-extrabold text-uyir-700">{r.bloodGroup}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-800">{r.hospitalName}</p>
+                    <p className="truncate text-xs text-slate-500">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ")} · {r.district}</p>
+                    <p className="text-[11px] text-slate-400">{timeAgo(r.createdAt)}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${em.color}`}>{em.label}</span>
+                </button>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+export default Home;
