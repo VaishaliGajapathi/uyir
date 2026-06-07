@@ -27,6 +27,14 @@ app.use("/api/ai", aiRouter);
 app.use("/api/impact", impactRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/admin", adminRouter);
+app.use("/auth", authRouter);
+app.use("/users", usersRouter);
+app.use("/requests", requestsRouter);
+app.use("/responses", responsesRouter);
+app.use("/ai", aiRouter);
+app.use("/impact", impactRouter);
+app.use("/stream", streamRouter);
+app.use("/admin", adminRouter);
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("[error]", err);
