@@ -15,6 +15,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 
+app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server. Frontend is hosted on Netlify." }));
 app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
 app.get("/api/districts", (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
 
