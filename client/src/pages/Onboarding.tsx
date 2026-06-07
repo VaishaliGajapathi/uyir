@@ -73,10 +73,10 @@ export function Onboarding() {
           {step === "mobile" ? (
             <div className="space-y-2">
               <Input label={tr("mobileNumber", lang)} inputMode="numeric" placeholder="10-digit mobile" value={mobile}
-                onChange={(e) => setMobile(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))} maxLength={10} />
+                onChange={(e) => setMobile(String(e.target.value))} maxLength={10} />
               {!userExists && (
                 <>
-                  <Input label={tr("yourName", lang)} placeholder="Name" value={name} onChange={(e) => setName(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))} />
+                  <Input label={tr("yourName", lang)} placeholder="Name" value={name} onChange={(e) => setName(String(e.target.value))} />
                   <div>
                     <span className="mb-1 block text-xs font-medium text-slate-600">{tr("iWantTo", lang)}</span>
                     <div className="grid grid-cols-2 gap-2">
@@ -115,7 +115,7 @@ export function Onboarding() {
                   <p className="text-xs text-emerald-600">{existingUser.role === "donor" ? "Donor" : "Requester"}</p>
                 </div>
               )}
-              <Input label={tr("enterOtp", lang)} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))} />
+              <Input label={tr("enterOtp", lang)} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(String(e.target.value))} />
               {devOtp && <p className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700">Demo OTP: <b>{devOtp}</b> (SMS gateway not wired for MVP)</p>}
               <Button className="w-full" size="md" loading={loading} disabled={code.length < 6} onClick={verify}>
                 <ShieldCheck className="h-3 w-3" /> {userExists ? "Login" : tr("verifyContinue", lang)}

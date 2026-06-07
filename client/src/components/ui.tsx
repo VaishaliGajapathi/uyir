@@ -31,12 +31,13 @@ export function Card({ className, children }: { className?: string; children: Re
   return <div className={cn("rounded-2xl bg-white shadow-sm ring-1 ring-slate-100", className)}>{children}</div>;
 }
 
-export function Input({ className, label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label?: string }) {
+export function Input({ className, label, onChange, ...props }: InputHTMLAttributes<HTMLInputElement> & { label?: string }) {
   return (
     <label className="block">
       {label && <span className="mb-1 block text-sm font-medium text-slate-600">{label}</span>}
       <input
         className={cn("h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] outline-none transition focus:border-uyir-500 focus:ring-2 focus:ring-uyir-100", className)}
+        onChange={(e) => onChange && onChange(e)}
         {...props}
       />
     </label>

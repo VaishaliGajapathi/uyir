@@ -1,6 +1,6 @@
 import { Phone, Mail, MapPin, Clock, Send, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
 
-export function ContactUs() {
+export default function ContactUs() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Hero Section */}
