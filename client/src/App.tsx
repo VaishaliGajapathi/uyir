@@ -25,43 +25,6 @@ const Ratings = lazy(() => import("./pages/Ratings"));
 
 function Inner() {
   const { user, loading } = useApp();
-  
-  // Request permissions on app load
-  useEffect(() => {
-    async function requestPermissions() {
-      try {
-        // Request notification permission
-        if ('Notification' in window && Notification.permission === 'default') {
-          await Notification.requestPermission();
-        }
-        
-        // Request location permission
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            () => console.log('Location permission granted'),
-            (err) => console.log('Location permission denied:', err),
-            { timeout: 10000 }
-          );
-        }
-        
-        // Request microphone permission (for voice input)
-        if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
-          try {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Immediately close the stream since we just wanted permission
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
-          } catch (err) {
-            console.log('Microphone permission denied:', err);
-          }
-        }
-      } catch (err) {
-        console.log('Permission request error:', err);
-      }
-    }
-    
-    requestPermissions();
-  }, []);
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50"><Spinner /></div>;
   return (

@@ -22,6 +22,36 @@ export function Onboarding() {
   const [userExists, setUserExists] = useState(false);
   const [existingUser, setExistingUser] = useState<any>(null);
 
+  async function requestPermissions() {
+    try {
+      // Request notification permission
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
+      // Request location permission
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          () => console.log('Location permission granted'),
+          (err) => console.log('Location permission denied:', err),
+          { timeout: 10000 }
+        );
+      }
+
+      // Request microphone permission (for voice input)
+      if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+        } catch (err) {
+          console.log('Microphone permission denied:', err);
+        }
+      }
+    } catch (err) {
+      console.log('Permission request error:', err);
+    }
+  }
+
   async function sendOtp() {
     setErr(""); setLoading(true);
     try {
@@ -35,7 +65,7 @@ export function Onboarding() {
       if (r.exists && r.user) {
         const loginResult = await api.login(mobile);
         login(loginResult.token, loginResult.user);
-        if ("Notification" in window) Notification.requestPermission();
+        await requestPermissions();
         return;
       }
 
@@ -49,7 +79,7 @@ export function Onboarding() {
     try {
       const r = await api.verifyOtp({ mobile, code, name: userExists ? existingUser?.name : name, role: userExists ? existingUser?.role : role, language: lang });
       login(r.token, r.user);
-      if ("Notification" in window) Notification.requestPermission();
+      await requestPermissions();
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
