@@ -125,7 +125,9 @@ export function NewRequest() {
   async function createRequest() {
     setErr(""); setBusy(true);
     try {
-      const r = await api.createRequest({ ...form, unitsRequired: Number(form.unitsRequired) });
+      const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
+      const payload = { ...form, patientName, unitsRequired: Number(form.unitsRequired) };
+      const r = await api.createRequest(payload);
       setRequestId(r.id);
       setPhase("documents");
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
