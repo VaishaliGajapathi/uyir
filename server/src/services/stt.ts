@@ -1,16 +1,34 @@
-import { openai, MODELS, completeJSON } from "../lib/ai.js";
+import { replicate, MODELS, completeJSON } from "../lib/ai.js";
 
-// Speech-to-text via OpenAI Whisper. Accepts an audio buffer.
+// Speech-to-text via Replicate (OpenAI Whisper hosted). Accepts an audio buffer.
 export async function transcribeAudio(buffer: Buffer, filename = "audio.webm", language?: string): Promise<string> {
-  if (!openai) throw new Error("OPENAI_API_KEY not configured for Whisper STT");
-  const uint8Array = new Uint8Array(buffer);
-  const file = new File([uint8Array], filename, { type: "audio/webm" });
-  const res = await openai.audio.transcriptions.create({
-    file,
-    model: MODELS.stt,
-    language: language === "ta" ? "ta" : undefined,
-  });
-  return res.text;
+  if (!replicate) throw new Error("REPLICATE_API_TOKEN not configured for Whisper STT");
+  
+  // Convert buffer to base64 for Replicate
+  const base64 = buffer.toString("base64");
+  const dataUri = `data:audio/webm;base64,${base64}`;
+  
+  try {
+    // Use OpenAI Whisper Large v3 hosted on Replicate (best accuracy for Tamil)
+    const output = await replicate.run(
+      "openai/whisper-large-v3:434f6958e324d427d4f5e3f73f4bb0eb88d856f2b2682d8e5c0c0d1f8c5e0f8",
+      {
+        input: {
+          audio: dataUri,
+          language: language === "ta" ? "tamil" : "english",
+          task: "transcribe",
+          timestamp_granularities: ["segment"],
+        }
+      }
+    );
+    
+    // Replicate returns an object with text field
+    const result = typeof output === 'string' ? output : (output as any).text || output;
+    return typeof result === 'string' ? result : JSON.stringify(result);
+  } catch (e) {
+    console.error("[STT] Replicate Whisper failed:", (e as Error).message);
+    throw new Error("Speech-to-text failed. Please try again.");
+  }
 }
 
 export interface ParsedRequest {

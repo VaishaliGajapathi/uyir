@@ -15,7 +15,7 @@ export const gemini = GEMINI_KEY ? new GoogleGenerativeAI(GEMINI_KEY) : null;
 export const replicate = REPLICATE_TOKEN ? new Replicate({ auth: REPLICATE_TOKEN }) : null;
 
 export const MODELS = {
-  stt: process.env.OPENAI_STT_MODEL || "whisper-1",
+  stt: "openai/whisper-large-v3", // Hosted on Replicate for better Tamil support
   text: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
   gemini: process.env.GEMINI_MODEL || "gemini-1.5-pro",
 };
