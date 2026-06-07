@@ -7,12 +7,49 @@ import { emergencyMeta } from "../lib/utils";
 
 export function Nearby() {
   const { user, refreshUser } = useApp();
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   async function load() {
-    try { setAlerts(await api.myAlerts()); } finally { setLoading(false); }
+    setLoading(true);
+    try {
+      const [requests, alerts] = await Promise.all([
+        api.listRequests(),
+        api.myAlerts(),
+      ]);
+
+      const alertByRequestId = new Map(alerts.map((a: any) => [a.requestId || a.request?.id, a]));
+
+      const merged = requests.map((request: any) => {
+        const existingAlert = alertByRequestId.get(request.id);
+        return {
+          id: existingAlert?.id || request.id,
+          request,
+          status: existingAlert?.status || "available",
+          matchScore: existingAlert?.matchScore ?? null,
+          distanceKm: existingAlert?.distanceKm ?? null,
+          etaMinutes: existingAlert?.etaMinutes ?? null,
+          responseId: existingAlert?.id ?? null,
+        };
+      });
+
+      const completedAlerts = alerts
+        .filter((a: any) => a.status === "completed" && !merged.some((m: any) => m.responseId === a.id))
+        .map((a: any) => ({
+          id: a.id,
+          request: a.request,
+          status: a.status,
+          matchScore: a.matchScore ?? null,
+          distanceKm: a.distanceKm ?? null,
+          etaMinutes: a.etaMinutes ?? null,
+          responseId: a.id,
+        }));
+
+      setItems([...merged, ...completedAlerts]);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -29,8 +66,8 @@ export function Nearby() {
     try { await fn(); await load(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
-  const active = alerts.filter((a) => !["declined", "completed"].includes(a.status));
-  const done = alerts.filter((a) => a.status === "completed");
+  const active = items.filter((a) => !["declined", "completed"].includes(a.status));
+  const done = items.filter((a) => a.status === "completed");
 
   return (
     <div className="px-4 py-4">
@@ -68,7 +105,7 @@ export function Nearby() {
               <Card key={a.id} className={`overflow-hidden ring-2 ${em.ring} ring-opacity-40`}>
                 <div className={`flex items-center justify-between px-4 py-1.5 text-xs font-bold ${em.color}`}>
                   <span>URGENT · {em.label}</span>
-                  <span className="font-semibold">match {a.matchScore}</span>
+                  <span className="font-semibold">{a.matchScore != null ? `match ${a.matchScore}` : "nearby"}</span>
                 </div>
                 <div className="p-4">
                   <div className="flex items-center gap-3">
@@ -83,19 +120,25 @@ export function Nearby() {
                     </div>
                   </div>
 
-                  {a.status === "alerted" && (
+                  {a.status === "available" && (
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptResponse(a.id))}><Check className="h-4 w-4" /> Accept</Button>
-                      <Button variant="outline" loading={busy === a.id} onClick={() => act(a.id, () => api.declineResponse(a.id))}><X className="h-4 w-4" /> Decline</Button>
+                      <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptRequestAsDonor(r.id))}><Check className="h-4 w-4" /> I can donate</Button>
+                      <Button variant="outline" loading={busy === a.id} onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${r.hospitalName}, ${r.district}`)}`, "_blank")}><Navigation className="h-4 w-4" /> Navigate</Button>
                     </div>
                   )}
-                  {a.status === "accepted" && (
+                  {a.status === "alerted" && a.responseId && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptResponse(a.responseId))}><Check className="h-4 w-4" /> Accept</Button>
+                      <Button variant="outline" loading={busy === a.id} onClick={() => act(a.id, () => api.declineResponse(a.responseId))}><X className="h-4 w-4" /> Decline</Button>
+                    </div>
+                  )}
+                  {a.status === "accepted" && a.responseId && (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                         <span>You accepted · contact {r.contactPerson}</span>
                         <a href={`tel:${r.contactNumber}`} className="font-bold underline">Call</a>
                       </div>
-                      <Button className="w-full" loading={busy === a.id} onClick={() => act(a.id, async () => { const res = await api.completeResponse(a.id); if (res.newBadge) alert(`Donation complete! New badge: ${res.newBadge}`); })}>
+                      <Button className="w-full" loading={busy === a.id} onClick={() => act(a.id, async () => { const res = await api.completeResponse(a.responseId); if (res.newBadge) alert(`Donation complete! New badge: ${res.newBadge}`); })}>
                         <Droplet className="h-4 w-4" /> Mark donation complete
                       </Button>
                     </div>

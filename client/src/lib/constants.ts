@@ -1,7 +1,7 @@
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export const COMPONENT_TYPES = [
-  { value: "whole_blood", label: "Whole Blood", labelTa: "முழு இரத்தம்" },
+  { value: "whole_blood", label: "Blood", labelTa: "இரத்தம்" },
   { value: "platelets", label: "Platelets", labelTa: "தட்டுச்சல்" },
   { value: "plasma", label: "Plasma", labelTa: "பிளாஸ்மா" },
 ];

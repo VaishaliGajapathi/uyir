@@ -270,7 +270,11 @@ export function RequestDetail() {
             >
               <Navigation className="h-4 w-4" /> Navigate
             </Button>
-            <Button className="w-full" loading={busy} onClick={() => act(() => api.acceptResponse(r.id), "Response submitted! You'll be contacted.")}>
+            <Button
+              className="w-full"
+              loading={busy}
+              onClick={() => act(() => api.acceptRequestAsDonor(r.id), "Response submitted! You'll be contacted.")}
+            >
               <Droplet className="h-4 w-4" /> I can donate
             </Button>
           </div>

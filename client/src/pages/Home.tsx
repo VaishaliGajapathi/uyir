@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Droplet, HeartHandshake, ChevronRight, Quote } from "lucide-react";
+import { Droplet, HeartHandshake, ChevronRight, Quote, ToggleLeft, ToggleRight } from "lucide-react";
 import { api, type BloodRequest } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card } from "../components/ui";
@@ -11,12 +11,24 @@ export function Home() {
   const { user, lang } = useApp();
   const nav = useNavigate();
   const [nearby, setNearby] = useState<BloodRequest[]>([]);
+  const [available, setAvailable] = useState(user?.notificationsEnabled ?? true);
 
   useEffect(() => {
     const params: Record<string, string> = {};
     if (user?.district) params.district = user.district;
     api.listRequests(params).then((r) => setNearby(r.slice(0, 4))).catch(() => {});
   }, [user?.district]);
+
+  async function toggleAvailability() {
+    const newValue = !available;
+    setAvailable(newValue);
+    try {
+      await api.updateMe({ notificationsEnabled: newValue });
+    } catch (e: any) {
+      console.error("Failed to update availability:", e);
+      setAvailable(!newValue);
+    }
+  }
 
   return (
     <div className="space-y-5 px-4 py-4">
@@ -45,6 +57,24 @@ export function Home() {
           {user?.bloodGroup || "?"}
         </div>
       </header>
+
+      {user?.role === "donor" && (
+        <Card className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-3">
+            {available ? <ToggleRight className="h-6 w-6 text-uyir-600" /> : <ToggleLeft className="h-6 w-6 text-slate-400" />}
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{lang === "ta" ? "இரத்தம் தானம் செய்ய தயாராக உள்ளேன்" : "I'm available to donate"}</p>
+              <p className="text-xs text-slate-500">{lang === "ta" ? "அருகிலுள்ள அவசரங்களுக்கு அறிவிப்பு பெறுங்கள்" : "Get alerts for nearby emergencies"}</p>
+            </div>
+          </div>
+          <button
+            onClick={toggleAvailability}
+            className={`h-6 w-11 rounded-full p-1 transition-colors ${available ? "bg-uyir-600" : "bg-slate-300"}`}
+          >
+            <div className={`h-4 w-4 rounded-full bg-white transition-transform ${available ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => nav("/new-request")}

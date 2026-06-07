@@ -25,6 +25,52 @@ responsesRouter.get("/mine", requireAuth, async (req: AuthedRequest, res: any) =
   res.json(responses);
 });
 
+// Donor manually accepts a request from the request detail page (no prior alert record).
+responsesRouter.post("/for-request/:requestId/accept", requireAuth, async (req: AuthedRequest, res: any) => {
+  const request = await prisma.bloodRequest.findUnique({
+    where: { id: req.params.requestId },
+    include: { responses: true },
+  });
+  if (!request) return res.status(404).json({ error: "Request not found" });
+  if (["completed", "closed"].includes(request.status)) {
+    return res.status(400).json({ error: "Request is already closed or completed" });
+  }
+
+  // Check if this donor already has a response for this request
+  let resp = await prisma.donorResponse.findFirst({
+    where: { requestId: req.params.requestId, donorId: req.userId },
+  });
+
+  if (resp) {
+    // If an existing response is present, mark it as accepted
+    if (resp.status !== "accepted") {
+      resp = await prisma.donorResponse.update({
+        where: { id: resp.id },
+        data: { status: "accepted", acceptedAt: new Date() },
+      });
+    }
+  } else {
+    // Create a new donor response marked as accepted
+    resp = await prisma.donorResponse.create({
+      data: {
+        requestId: req.params.requestId,
+        donorId: req.userId!,
+        status: "accepted",
+        acceptedAt: new Date(),
+        matchScore: 100,
+      },
+    });
+  }
+
+  await prisma.bloodRequest.update({
+    where: { id: request.id },
+    data: { status: "donor_accepted" },
+  });
+
+  emitRequestUpdate(request.id, { responseId: resp.id, donorStatus: "accepted" });
+  res.json(resp);
+});
+
 async function setStatus(req: AuthedRequest, res: any, status: string, stamp: string) {
   const resp = await prisma.donorResponse.findUnique({ where: { id: req.params.id } });
   if (!resp) return res.status(404).json({ error: "Not found" });

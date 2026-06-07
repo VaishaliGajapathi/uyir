@@ -10,9 +10,11 @@ import { tr, t } from "../lib/constants";
 export function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
-  const [step, setStep] = useState<"mobile" | "otp">("mobile");
+  const [step, setStep] = useState<"mobile" | "otp" | "password">("mobile");
+  const [mode, setMode] = useState<"login" | "signup">("signup");
   const [mobile, setMobile] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("donor");
   const [devOtp, setDevOtp] = useState("");
@@ -20,6 +22,7 @@ export function Onboarding() {
   const [err, setErr] = useState("");
   const [consent, setConsent] = useState(false);
   const [userExists, setUserExists] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
   const [existingUser, setExistingUser] = useState<any>(null);
 
   async function requestPermissions() {
@@ -59,25 +62,32 @@ export function Onboarding() {
       setDevOtp(r.devOtp || "");
       setCode(r.devOtp || "");
       setUserExists(r.exists || false);
+      setHasPassword(r.hasPassword || false);
       setExistingUser(r.user || null);
-
-      // If user exists, login directly without OTP
-      if (r.exists && r.user) {
-        const loginResult = await api.login(mobile);
-        login(loginResult.token, loginResult.user);
-        await requestPermissions();
-        return;
+      
+      if (r.exists && r.hasPassword) {
+        setStep("password");
+      } else if (r.exists && !r.hasPassword) {
+        setStep("otp");
+      } else {
+        setStep("otp");
       }
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+  }
 
-      // New user - send OTP
-      setStep("otp");
+  async function handleLogin() {
+    setErr(""); setLoading(true);
+    try {
+      const r = await api.login(mobile, password);
+      login(r.token, r.user);
+      await requestPermissions();
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
   async function verify() {
     setErr(""); setLoading(true);
     try {
-      const r = await api.verifyOtp({ mobile, code, name: userExists ? existingUser?.name : name, role: userExists ? existingUser?.role : role, language: lang });
+      const r = await api.verifyOtp({ mobile, code, name: userExists ? existingUser?.name : name, role: userExists ? existingUser?.role : role, language: lang, password: userExists ? undefined : password });
       login(r.token, r.user);
       await requestPermissions();
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
@@ -100,13 +110,48 @@ export function Onboarding() {
             ))}
           </div>
 
+          <div className="mb-3 flex gap-2">
+            <button
+              onClick={() => { setMode("login"); setStep("mobile"); setErr(""); }}
+              className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${mode === "login" ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}
+            >
+              {lang === "ta" ? "உள்நுழை" : "Login"}
+            </button>
+            <button
+              onClick={() => { setMode("signup"); setStep("mobile"); setErr(""); }}
+              className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${mode === "signup" ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}
+            >
+              {lang === "ta" ? "புதிய பதிவு" : "Sign up"}
+            </button>
+          </div>
+
           {step === "mobile" ? (
-            <div className="space-y-2">
-              <Input label={tr("mobileNumber", lang)} inputMode="numeric" placeholder="10-digit mobile" value={mobile}
-                onChange={(e) => setMobile(String(e.target.value))} maxLength={10} />
-              {!userExists && (
+            mode === "login" ? (
+              <div className="space-y-2">
+                <Input
+                  label={String(tr("mobileNumber", lang))}
+                  inputMode="numeric"
+                  placeholder="10-digit mobile"
+                  value={mobile}
+                  onChange={(e) => setMobile(String(e.target.value))}
+                  maxLength={10}
+                />
+                <Button
+                  className="w-full"
+                  size="md"
+                  loading={loading}
+                  disabled={mobile.length < 10}
+                  onClick={sendOtp}
+                >
+                  <Phone className="h-3 w-3" /> {lang === "ta" ? "தொடரவும்" : "Continue"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Input label={String(tr("mobileNumber", lang))} inputMode="numeric" placeholder="10-digit mobile" value={mobile}
+                  onChange={(e) => setMobile(String(e.target.value))} maxLength={10} />
                 <>
-                  <Input label={tr("yourName", lang)} placeholder="Name" value={name} onChange={(e) => setName(String(e.target.value))} />
+                  <Input label={String(tr("yourName", lang))} placeholder="Name" value={name} onChange={(e) => setName(String(e.target.value))} />
                   <div>
                     <span className="mb-1 block text-xs font-medium text-slate-600">{tr("iWantTo", lang)}</span>
                     <div className="grid grid-cols-2 gap-2">
@@ -133,9 +178,37 @@ export function Onboarding() {
                     </div>
                   </label>
                 </>
-              )}
-              <Button className="w-full" size="md" loading={loading} disabled={mobile.length < 10 || (!userExists && (!name || !consent))}
-                onClick={sendOtp}><Phone className="h-3 w-3" /> {userExists ? "Login" : tr("sendOtp", lang)}</Button>
+                <Button
+                  className="w-full"
+                  size="md"
+                  loading={loading}
+                  disabled={mobile.length < 10 || !name || !consent}
+                  onClick={sendOtp}
+                >
+                  <Phone className="h-3 w-3" /> {tr("sendOtp", lang)}
+                </Button>
+              </div>
+            )
+          ) : step === "password" ? (
+            <div className="space-y-2">
+              <p className="text-center text-sm text-slate-600">{lang === "ta" ? "உங்கள் கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}</p>
+              <Input
+                label={lang === "ta" ? "கடவுச்சொல்" : "Password"}
+                type="password"
+                placeholder="••••"
+                value={password}
+                onChange={(e) => setPassword(String(e.target.value))}
+              />
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={password.length < 4}
+                onClick={handleLogin}
+              >
+                <ShieldCheck className="h-3 w-3" /> {lang === "ta" ? "உள்நுழை" : "Login"}
+              </Button>
+              <button className="w-full text-xs text-slate-400" onClick={() => { setStep("mobile"); setPassword(""); }}>{tr("changeNumber", lang)}</button>
             </div>
           ) : (
             <div className="space-y-2">
@@ -145,12 +218,21 @@ export function Onboarding() {
                   <p className="text-xs text-emerald-600">{existingUser.role === "donor" ? "Donor" : "Requester"}</p>
                 </div>
               )}
-              <Input label={tr("enterOtp", lang)} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(String(e.target.value))} />
+              <Input label={String(tr("enterOtp", lang))} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(String(e.target.value))} />
+              {!userExists && (
+                <Input
+                  label={lang === "ta" ? "கடவுச்சொல்லை அமைக்கவும் (முதல் முறை)" : "Set a password (first time)"}
+                  type="password"
+                  placeholder="••••"
+                  value={password}
+                  onChange={(e) => setPassword(String(e.target.value))}
+                />
+              )}
               {devOtp && <p className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700">Demo OTP: <b>{devOtp}</b> (SMS gateway not wired for MVP)</p>}
-              <Button className="w-full" size="md" loading={loading} disabled={code.length < 6} onClick={verify}>
+              <Button className="w-full" size="md" loading={loading} disabled={code.length < 6 || (!userExists && password.length < 4)} onClick={verify}>
                 <ShieldCheck className="h-3 w-3" /> {userExists ? "Login" : tr("verifyContinue", lang)}
               </Button>
-              <button className="w-full text-xs text-slate-400" onClick={() => { setStep("mobile"); setUserExists(false); setExistingUser(null); }}>{tr("changeNumber", lang)}</button>
+              <button className="w-full text-xs text-slate-400" onClick={() => { setStep("mobile"); setUserExists(false); setExistingUser(null); setPassword(""); }}>{tr("changeNumber", lang)}</button>
             </div>
           )}
           {err && <p className="mt-2 text-center text-xs text-uyir-600">{err}</p>}

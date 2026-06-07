@@ -86,14 +86,15 @@ export interface BloodRequest {
 
 export const api = {
   // auth
-  requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; devOtp: string; exists: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
+  requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; devOtp: string; exists: boolean; hasPassword?: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),
-  login: (mobile: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile }) }),
+  login: (mobile: string, password: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile, password }) }),
   hospitalLogin: (data: { hospitalName: string; hospitalRegistrationId: string; mobile?: string }) => req<{ token: string; user: User }>("/auth/hospital/login", { method: "POST", body: JSON.stringify(data) }),
   // users
   me: () => req<User>("/users/me"),
   updateMe: (data: Partial<User>) => req<User>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
   setLocation: (lat: number, lng: number) => req("/users/me/location", { method: "POST", body: JSON.stringify({ lat, lng }) }),
+  registerFcmToken: (token: string) => req("/users/me/fcm-token", { method: "POST", body: JSON.stringify({ token }) }),
   getDocuments: () => req<DonorDocument[]>("/users/me/documents"),
   uploadDonorDocument: (data: { documentType: "aadhar" | "driving_license" | "passport"; fileUrl: string; documentNumber?: string }) => req<DonorDocument>("/users/me/documents", { method: "POST", body: JSON.stringify(data) }),
   deleteDocument: (id: string) => req("/users/me/documents/" + id, { method: "DELETE" }),
@@ -111,6 +112,7 @@ export const api = {
   myAlerts: () => req<any[]>("/responses/mine"),
   acceptResponse: (id: string) => req(`/responses/${id}/accept`, { method: "POST" }),
   declineResponse: (id: string) => req(`/responses/${id}/decline`, { method: "POST" }),
+  acceptRequestAsDonor: (requestId: string) => req<any>(`/responses/for-request/${requestId}/accept`, { method: "POST" }),
   completeResponse: (id: string) => req<{ ok: boolean; donationCount: number; newBadge: string | null }>(`/responses/${id}/complete`, { method: "POST" }),
   markLifeSaved: (id: string) => req(`/responses/${id}/life-saved`, { method: "POST" }),
   rateDonor: (id: string, data: { rating: number; testimonial?: string }) => req<DonationRating>(`/responses/${id}/rate`, { method: "POST", body: JSON.stringify(data) }),

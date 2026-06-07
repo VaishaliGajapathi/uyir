@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { api, setToken, getToken, type User, streamUrl } from "../lib/api";
 import type { Lang } from "../lib/constants";
+import { syncNativePush } from "../lib/nativeMobile";
 
 interface IncomingAlert {
   responseId?: string;
@@ -59,6 +60,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (getToken()) refreshUser().finally(() => setLoading(false));
     else setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void syncNativePush(user);
+  }, [user]);
 
   // Real-time alert stream (SSE) for the logged-in donor.
   useEffect(() => {

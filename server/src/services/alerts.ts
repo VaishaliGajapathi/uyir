@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { rankDonors, DonorCandidate } from "./matching.js";
 import { districtsForRadius, RADIUS_LADDER } from "../lib/districts.js";
 import { evaluateEscalation, executeEscalation } from "./escalation.js";
+import { sendPushNotification } from "../lib/firebase.js";
 
 // In-memory pub/sub for real-time donor alerts (SSE). Production: FCM + Redis pub/sub.
 export const bus = new EventEmitter();
@@ -39,6 +40,18 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
       role: "donor",
       banned: false,
       district: { in: districts },
+    },
+    select: {
+      id: true,
+      bloodGroup: true,
+      district: true,
+      lat: true,
+      lng: true,
+      lastDonationDate: true,
+      donationCount: true,
+      isPlateletDonor: true,
+      reputationScore: true,
+      fcmToken: true,
     },
   });
 
@@ -98,6 +111,25 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
         etaMinutes: d.etaMinutes,
       },
     });
+
+    const donor = donors.find((donor) => donor.id === d.donorId);
+    if (donor?.fcmToken) {
+      try {
+        await sendPushNotification(donor.fcmToken, {
+          requestId,
+          bloodGroup: req.bloodGroup,
+          componentType: req.componentType,
+          unitsRequired: req.unitsRequired,
+          hospitalName: req.hospitalName,
+          district: req.district,
+          emergencyLevel: req.emergencyLevel,
+          distanceKm: d.distanceKm ?? undefined,
+          etaMinutes: d.etaMinutes ?? undefined,
+        });
+      } catch (error) {
+        console.error(`[alerts] Failed to send push to donor ${d.donorId}:`, error);
+      }
+    }
   }
 
   await prisma.alertLog.create({ data: { requestId, radiusKm, donorCount: fresh.length } });

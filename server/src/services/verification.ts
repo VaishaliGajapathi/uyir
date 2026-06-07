@@ -71,12 +71,28 @@ Return ONLY JSON: {"authenticityScore": 0-100, "notes": "short reason", "looksRe
 }
 
 // Vision-based document verification (hospital slip / prescription) via Gemini or Replicate.
-export async function verifyDocument(base64: string, mimeType: string, documentType: string, patientName?: string): Promise<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }> {
-  const nameCheck = patientName ? `Verify that the patient name in the document matches "${patientName}".` : "";
-  const prompt = `This image should be a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement.
-Verify it looks like a genuine medical document (hospital name, patient, blood group, doctor, stamp/letterhead).
+// Returns a score + notes explaining WHY verification passed/failed (e.g. name mismatch, low clarity).
+export async function verifyDocument(
+  base64: string,
+  mimeType: string,
+  documentType: string,
+  patientName?: string
+): Promise<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }> {
+  const nameCheck = patientName
+    ? `Check carefully if the PATIENT NAME in the document matches "${patientName}" and set nameMatch accordingly.`
+    : "";
+
+  const prompt = `You are verifying a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement.
+- First, describe briefly what you see (hospital letterhead, stamps, signatures, handwriting, etc.).
+- Check if it looks like a genuine medical document (not a random image or spam).
+- Check if the text is clear or blurry/cropped.
 ${nameCheck}
-Return ONLY JSON: {"score":0-100,"verified":true/false,"notes":"what you see, any red flags","nameMatch":true/false}`;
+
+Return ONLY JSON with this shape:
+{"score":0-100,
+ "verified":true/false,
+ "notes":"very short explanation of WHY: mention if patient name matches/mismatches, if image is blurry or low clarity, if hospital/doctor details look real or missing",
+ "nameMatch":true/false}`;
 
   // Try Gemini first
   if (gemini) {
@@ -87,7 +103,13 @@ Return ONLY JSON: {"score":0-100,"verified":true/false,"notes":"what you see, an
         { text: prompt },
       ]);
       const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(res.response.text());
-      if (out) return out;
+      if (out) {
+        // If the model detected a name mismatch, make sure that is visible in notes.
+        if (patientName && out.nameMatch === false && !out.notes.toLowerCase().includes("name")) {
+          out.notes = `${out.notes} (Patient name on document does NOT match request name "${patientName}")`;
+        }
+        return out;
+      }
     } catch (e) {
       console.warn("[verification] Gemini vision failed:", (e as Error).message);
     }
@@ -113,13 +135,26 @@ Return ONLY JSON: {"score":0-100,"verified":true/false,"notes":"what you see, an
       // Parse Replicate output
       const text = typeof output === 'string' ? output : JSON.stringify(output);
       const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(text);
-      if (out) return out;
+      if (out) {
+        if (patientName && out.nameMatch === false && !out.notes.toLowerCase().includes("name")) {
+          out.notes = `${out.notes} (Patient name on document does NOT match request name "${patientName}")`;
+        }
+        return out;
+      }
     } catch (e) {
       console.warn("[verification] Replicate vision failed:", (e as Error).message);
     }
   }
 
-  return { score: 0, verified: false, notes: "Verification failed" };
+  // If we reach here, both Gemini and Replicate vision either failed or are not configured.
+  // This does NOT mean the document is fake – only that automatic AI checking could not run.
+  return {
+    score: 0,
+    verified: false,
+    notes:
+      "Automatic document verification could not run (AI vision not available or image unreadable). " +
+      "Please check the document manually: confirm patient name matches the request and that the slip is clear and from a real hospital.",
+  };
 }
 
 // AI-powered health tips and eligibility check for blood donors

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { signToken } from "../middleware/auth.js";
 import { sendOTP as sendMsg91OTP } from "../lib/msg91.js";
+import bcrypt from "bcryptjs";
 
 export const authRouter = Router();
 
@@ -34,9 +35,14 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({ where: { mobile } });
 
-  // If user exists, don't send OTP - they can login directly
-  if (existingUser) {
-    return res.json({ ok: true, exists: true, user: existingUser, message: "User already exists" });
+  // If user exists with password, they should use password login
+  if (existingUser && existingUser.password) {
+    return res.json({ ok: true, exists: true, hasPassword: true, message: "User already exists with password" });
+  }
+
+  // If user exists without password, allow OTP for first-time setup
+  if (existingUser && !existingUser.password) {
+    return res.json({ ok: true, exists: true, hasPassword: false, user: existingUser, message: "User exists, set password" });
   }
 
   // New user - send OTP for signup
@@ -48,7 +54,6 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
   try {
     await sendSms(mobile, code, name);
   } catch (e: any) {
-    // If SMS fails, still return devOtp for testing
     console.log(`[otp] SMS failed, returning devOtp: ${code}`);
     return res.json({ ok: true, devOtp: code, exists: false, user: null });
   }
@@ -63,23 +68,36 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
   }
 });
 
-// Direct login for existing users (no OTP required)
+// Direct login for existing users with password
 authRouter.post("/login", async (req: any, res: any) => {
-  const schema = z.object({ mobile: z.string().min(10).max(15) });
+  const schema = z.object({
+    mobile: z.string().min(10).max(15),
+    password: z.string().min(4),
+  });
   const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
+  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+  const password = parse.data.password;
 
   const user = await prisma.user.findUnique({ where: { mobile } });
   if (!user) {
     return res.status(404).json({ error: "User not found. Please sign up first." });
   }
 
+  if (!user.password) {
+    return res.status(400).json({ error: "Please set up your password first using OTP verification." });
+  }
+
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    return res.status(401).json({ error: "Invalid password" });
+  }
+
   const token = signToken(user.id, user.role);
   res.json({ token, user });
 });
 
-// Verify OTP -> create/login user, return JWT.
+// Verify OTP -> create/login user, set password if provided, return JWT.
 authRouter.post("/otp/verify", async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10),
@@ -87,10 +105,11 @@ authRouter.post("/otp/verify", async (req: any, res: any) => {
     name: z.string().optional(),
     role: z.enum(["donor", "requester", "verifier", "admin"]).optional(),
     language: z.enum(["ta", "en"]).optional(),
+    password: z.string().min(4).optional(),
   });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
-  const { code, name, role, language } = parse.data;
+  const { code, name, role, language, password } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
 
   const otp = await prisma.otpCode.findFirst({
@@ -100,6 +119,8 @@ authRouter.post("/otp/verify", async (req: any, res: any) => {
   if (!otp) return res.status(400).json({ error: "Invalid or expired OTP" });
 
   let user = await prisma.user.findUnique({ where: { mobile } });
+  const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+
   if (!user) {
     user = await prisma.user.create({
       data: {
@@ -107,7 +128,13 @@ authRouter.post("/otp/verify", async (req: any, res: any) => {
         name: name || "UYIR User",
         role: role || "donor",
         language: language || "ta",
+        password: hashedPassword,
       },
+    });
+  } else if (!user.password && hashedPassword) {
+    user = await prisma.user.update({
+      where: { mobile },
+      data: { password: hashedPassword },
     });
   }
   await prisma.otpCode.deleteMany({ where: { mobile } });

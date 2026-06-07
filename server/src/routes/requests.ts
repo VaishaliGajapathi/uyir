@@ -5,8 +5,10 @@ import { requireAuth, optionalAuth, AuthedRequest } from "../middleware/auth.js"
 import { verifyRequest, verifyDocument } from "../services/verification.js";
 import { runAlertCycle, escalateRadius, emitRequestUpdate } from "../services/alerts.js";
 import { evaluateEscalation, executeEscalation, checkEscalationForAllRequests } from "../services/escalation.js";
+import { haversineKm, TN_DISTRICTS } from "../lib/districts.js";
 
 export const requestsRouter = Router();
+const MIN_DOCUMENT_VERIFY_SCORE = 70;
 
 const createSchema = z.object({
   patientName: z.string().min(2),
@@ -37,7 +39,7 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
 });
 
 // List requests with filters (public-ish; auth optional for personalization).
-requestsRouter.get("/", optionalAuth, async (req: Request, res: any) => {
+requestsRouter.get("/", optionalAuth, async (req: AuthedRequest, res: any) => {
   const { district, bloodGroup, status, componentType } = req.query as Record<string, string>;
   const where: any = {};
   if (district) where.district = district;
@@ -52,6 +54,45 @@ requestsRouter.get("/", optionalAuth, async (req: Request, res: any) => {
     take: 100,
     include: { _count: { select: { responses: true } } },
   });
+
+  const viewer = req.userId
+    ? await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { role: true, district: true, lat: true, lng: true },
+      })
+    : null;
+
+  if (viewer?.role === "donor") {
+    const emergencyRank: Record<string, number> = { red: 0, orange: 1, green: 2 };
+    const viewerLat = viewer.lat ?? (viewer.district ? TN_DISTRICTS[viewer.district]?.lat : null) ?? null;
+    const viewerLng = viewer.lng ?? (viewer.district ? TN_DISTRICTS[viewer.district]?.lng : null) ?? null;
+
+    const distanceFor = (request: typeof requests[number]) => {
+      const requestLat = request.lat ?? TN_DISTRICTS[request.district]?.lat ?? null;
+      const requestLng = request.lng ?? TN_DISTRICTS[request.district]?.lng ?? null;
+      if (viewerLat == null || viewerLng == null || requestLat == null || requestLng == null) return Number.POSITIVE_INFINITY;
+      return haversineKm(viewerLat, viewerLng, requestLat, requestLng);
+    };
+
+    const prioritized = [...requests].sort((a, b) => {
+      const aSameDistrict = viewer.district && a.district === viewer.district ? 1 : 0;
+      const bSameDistrict = viewer.district && b.district === viewer.district ? 1 : 0;
+      if (aSameDistrict !== bSameDistrict) return bSameDistrict - aSameDistrict;
+
+      const aDistance = distanceFor(a);
+      const bDistance = distanceFor(b);
+      if (aDistance !== bDistance) return aDistance - bDistance;
+
+      const aEmergency = emergencyRank[a.emergencyLevel] ?? 99;
+      const bEmergency = emergencyRank[b.emergencyLevel] ?? 99;
+      if (aEmergency !== bEmergency) return aEmergency - bEmergency;
+
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return res.json(prioritized);
+  }
+
   res.json(requests);
 });
 
@@ -97,6 +138,21 @@ requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: 
     include: { documents: true },
   });
   if (!request) return res.status(404).json({ error: "Not found" });
+
+  const latestDocument = request.documents.reduce((latest: any, doc: any) => {
+    if (!latest) return doc;
+    return new Date(doc.uploadedAt).getTime() > new Date(latest.uploadedAt).getTime() ? doc : latest;
+  }, null as any);
+
+  if (!latestDocument) {
+    return res.status(400).json({ error: "Please upload a hospital document before verification." });
+  }
+
+  if (!latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE) {
+    return res.status(400).json({
+      error: `Document verification failed. Upload a clearer valid hospital document (minimum score ${MIN_DOCUMENT_VERIFY_SCORE}%). Latest result: ${latestDocument.aiScore}%${latestDocument.aiNotes ? ` - ${latestDocument.aiNotes}` : ""}`,
+    });
+  }
 
   const result = await verifyRequest(request, request.documents.length > 0);
   const status = result.verified ? "verified" : "pending_verification";

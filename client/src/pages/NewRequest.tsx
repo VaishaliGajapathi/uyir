@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, ShieldCheck, FileCheck2, Radio, CheckCircle2, Share2, MapPin, Mic, Camera } from "lucide-react";
+import { ArrowLeft, Upload, ShieldCheck, FileCheck2, Radio, CheckCircle2, Share2, MapPin, Camera } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Input, Select, Card, Badge } from "../components/ui";
@@ -9,6 +9,7 @@ import { HospitalAutocomplete } from "../components/HospitalAutocomplete";
 import { BLOOD_GROUPS, COMPONENT_TYPES, EMERGENCY_LEVELS } from "../lib/constants";
 
 type Phase = "form" | "documents" | "verifying" | "result";
+const MIN_DOCUMENT_VERIFY_SCORE = 70;
 
 export function NewRequest() {
   const nav = useNavigate();
@@ -22,7 +23,6 @@ export function NewRequest() {
   const [err, setErr] = useState("");
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [showVoice, setShowVoice] = useState(false);
   const [form, setForm] = useState<any>({
     patientFirstName: "", patientLastName: "", patientAge: null, patientGender: null, bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
     hospitalName: "", district: "", contactPerson: "", contactNumber: "",
@@ -184,6 +184,12 @@ export function NewRequest() {
 
   async function runVerify() {
     if (!requestId) return;
+    if (!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) {
+      setErr(lang === "ta"
+        ? `ஆவணம் சரிபார்க்கப்படவில்லை. தெளிவான மருத்துவமனை ஆவணத்தை மீண்டும் பதிவேற்றவும் (${MIN_DOCUMENT_VERIFY_SCORE}% அல்லது அதற்கு மேல் தேவை).`
+        : `Document verification has not passed yet. Please upload a clearer valid hospital document (${MIN_DOCUMENT_VERIFY_SCORE}% or above required).`);
+      return;
+    }
     setPhase("verifying"); setBusy(true);
     try {
       const res: any = await api.verifyRequest(requestId);
@@ -231,26 +237,24 @@ export function NewRequest() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-4">
-      <header className="flex items-center gap-3 py-4">
-        <button onClick={() => nav(-1)}><ArrowLeft className="h-6 w-6 text-slate-700" /></button>
-        <h1 className="text-lg font-bold text-slate-800">{lang === "ta" ? "இரத்த கோரிக்கை" : "New Blood Request"}</h1>
+      <header className="flex items-center justify-between gap-3 py-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => nav(-1)}><ArrowLeft className="h-6 w-6 text-slate-700" /></button>
+          <h1 className="text-lg font-bold text-slate-800">{lang === "ta" ? "இரத்த கோரிக்கை" : "New Blood Request"}</h1>
+        </div>
+        <VoiceButton
+          mode="request"
+          language={lang}
+          onResult={applyVoice}
+          hideLabel
+          className="h-10 w-10 rounded-full bg-uyir-600 text-white shadow-md hover:bg-uyir-700"
+        />
       </header>
 
-      <Steps phase={phase} verification={verification} lang={lang} onSpeakClick={() => setShowVoice(true)} />
+      <Steps phase={phase} verification={verification} lang={lang} />
 
       {phase === "form" && (
         <div className="space-y-3">
-          {showVoice && (
-            <div className="flex justify-center">
-              <VoiceButton
-                mode="request"
-                language={lang}
-                onResult={applyVoice}
-                label={lang === "ta" ? "பேசுங்கள்" : "Speak"}
-                className="rounded-xl bg-uyir-600 text-white shadow-lg hover:bg-uyir-700 transition"
-              />
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-3">
             <Input label={lang === "ta" ? "நோயாளியின் முதல் பெயர் *" : "Patient first name *"} value={form.patientFirstName} onChange={(e) => set("patientFirstName", e.target.value)} />
             <Input label={lang === "ta" ? "நோயாளியின் கடைசி பெயர் *" : "Patient last name *"} value={form.patientLastName} onChange={(e) => set("patientLastName", e.target.value)} />
@@ -312,30 +316,36 @@ export function NewRequest() {
             <Input label={lang === "ta" ? "தொடர்பு நபர் *" : "Contact person *"} value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
             <Input label={lang === "ta" ? "தொடர்பு எண் *" : "Contact number *"} inputMode="numeric" value={form.contactNumber} onChange={(e) => set("contactNumber", e.target.value)} />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "இடம்" : "Location"}</label>
-            <button
-              type="button"
-              onClick={captureLocation}
-              disabled={capturingLocation}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 hover:border-uyir-500 hover:bg-uyir-50 disabled:opacity-50"
-            >
-              {capturingLocation ? (
-                <span className="animate-spin">⏳</span>
-              ) : form.lat && form.lng ? (
-                <>
-                  <MapPin className="h-4 w-4 text-emerald-500" />
-                  {lang === "ta" ? "இடம் பெறப்பட்டது" : "Location captured"}
-                </>
-              ) : (
-                <>
-                  <MapPin className="h-4 w-4 text-slate-400" />
-                  {lang === "ta" ? "இடத்தைப் பெறுங்கள்" : "Capture location"}
-                </>
-              )}
-            </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "இடம்" : "Location"}</label>
+              <button
+                type="button"
+                onClick={captureLocation}
+                disabled={capturingLocation}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 hover:border-uyir-500 hover:bg-uyir-50 disabled:opacity-50"
+              >
+                {capturingLocation ? (
+                  <span className="animate-spin">⏳</span>
+                ) : form.lat && form.lng ? (
+                  <>
+                    <MapPin className="h-4 w-4 text-emerald-500" />
+                    {lang === "ta" ? "இடம் பெறப்பட்டது" : "Location captured"}
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 text-slate-400" />
+                    {lang === "ta" ? "இடத்தைப் பெறுங்கள்" : "Capture location"}
+                  </>
+                )}
+              </button>
+            </div>
+            <Input
+              label={lang === "ta" ? "பரிந்துரைக்கப்பட்ட மருத்துவர் பெயர்" : "Referred doctor name"}
+              value={form.doctorReference}
+              onChange={(e) => set("doctorReference", e.target.value)}
+            />
           </div>
-          <Input label={lang === "ta" ? "பரிந்துரைக்கப்பட்ட மருத்துவர் பெயர்" : "Referred doctor name"} value={form.doctorReference} onChange={(e) => set("doctorReference", e.target.value)} />
           {form.lat && form.lng && (
             <>
               <div className="rounded-xl overflow-hidden border border-slate-200">
@@ -401,9 +411,22 @@ export function NewRequest() {
                 <p className="mt-1 text-xs">{docResult.notes}</p>
               </div>
             )}
+            {(!docResult || !docResult.verified || Number(docResult.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && (
+              <p className="mt-3 text-xs text-amber-700">
+                {lang === "ta"
+                  ? `அடுத்த படிக்கு செல்ல ஆவணம் AI மூலம் சரிபார்க்கப்பட்டு குறைந்தது ${MIN_DOCUMENT_VERIFY_SCORE}% மதிப்பெண் பெற வேண்டும்.`
+                  : `To continue, the uploaded document must be AI-verified and score at least ${MIN_DOCUMENT_VERIFY_SCORE}%.`}
+              </p>
+            )}
           </Card>
           {err && <p className="text-sm text-uyir-600">{err}</p>}
-          <Button className="w-full" size="lg" loading={busy} onClick={runVerify}>
+          <Button
+            className="w-full"
+            size="lg"
+            loading={busy}
+            disabled={!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE}
+            onClick={runVerify}
+          >
             <ShieldCheck className="h-4 w-4" /> Verify & Continue
           </Button>
         </div>
@@ -486,26 +509,24 @@ export function NewRequest() {
   );
 }
 
-function Steps({ phase, verification, lang, onSpeakClick }: { phase: Phase; verification: any; lang: string; onSpeakClick?: () => void }) {
+function Steps({ phase, verification, lang }: { phase: Phase; verification: any; lang: string }) {
   const order = ["form", "documents", "result"];
   const idx = phase === "verifying" ? 2 : order.indexOf(phase === "result" ? "result" : phase);
-  const labels = lang === "ta" ? ["விவரங்கள்", "ஆவணம்", "சரிபார்ப்பு", "பகிர்வு", "பேசு"] : ["Details", "Proof", "Verify", "Share", "Speak"];
+  const labels = lang === "ta" ? ["விவரங்கள்", "ஆவணம்", "சரிபார்ப்பு", "பகிர்வு"] : ["Details", "Proof", "Verify", "Share"];
   // Share step (index 3) is only active when verification is successful
   const shareActive = phase === "result" && verification?.verified;
   return (
     <div className="mb-5 flex items-center justify-center gap-2">
       {labels.map((l, i) => {
-        const isActive = i <= idx || (i === 3 && shareActive) || (i === 4 && phase === "form");
-        const isSpeak = i === 4;
-        const lineActive = isActive && (i < idx || (i === 2 && shareActive) || (i === 3 && phase === "form"));
+        const isActive = i <= idx || (i === 3 && shareActive);
+        const lineActive = isActive && (i < idx || (i === 2 && shareActive));
         return (
           <div key={l} className="flex flex-1 items-center gap-2">
-            <button
-              onClick={isSpeak && onSpeakClick ? onSpeakClick : undefined}
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${isActive ? "bg-uyir-600 text-white" : "bg-slate-200 text-slate-400"} ${isSpeak ? "cursor-pointer hover:bg-uyir-700" : ""}`}
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${isActive ? "bg-uyir-600 text-white" : "bg-slate-200 text-slate-400"}`}
             >
-              {isSpeak ? <Mic className="h-4 w-4" /> : i + 1}
-            </button>
+              {i + 1}
+            </div>
             <span className={`text-xs font-medium ${isActive ? "text-slate-700" : "text-slate-400"}`}>{l}</span>
             {i < labels.length - 1 && <div className={`h-0.5 flex-1 ${lineActive ? "bg-uyir-600" : "bg-slate-200"}`} />}
           </div>

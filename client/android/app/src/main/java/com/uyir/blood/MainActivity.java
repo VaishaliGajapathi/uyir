@@ -1,0 +1,5 @@
+package com.uyir.blood;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
