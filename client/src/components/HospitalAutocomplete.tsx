@@ -306,7 +306,10 @@ const TAMIL_NADU_HOSPITALS = [
 export function HospitalAutocomplete({ value, onChange, district, userLocation }: HospitalAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suppressNextSuggestions, setSuppressNextSuggestions] = useState(false);
+  // Track whether user is actively typing in the input; we only show
+  // suggestions in that mode. After a selection, we disable this so
+  // the dropdown stays closed.
+  const [enableSuggestions, setEnableSuggestions] = useState(false);
 
   // Calculate distance between two coordinates (Haversine formula)
   function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -369,14 +372,7 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
   }
 
   useEffect(() => {
-    if (suppressNextSuggestions) {
-      // Skip one suggestions recalculation right after a selection,
-      // so the dropdown stays closed when user picks a hospital.
-      setSuppressNextSuggestions(false);
-      return;
-    }
-
-    if (value.length < 1) {
+    if (!enableSuggestions || value.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -424,19 +420,21 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
         return { hospital, distance: Infinity };
       }).sort((a, b) => a.distance - b.distance).map(item => item.hospital);
     }
-
     setSuggestions(filtered.slice(0, 8));
     setShowSuggestions(true);
-  }, [value, district, userLocation, suppressNextSuggestions]);
+  }, [value, district, userLocation, enableSuggestions]);
 
   function selectHospital(hospital: string) {
     onChange(hospital);
+    // User picked a value explicitly: update the input and keep the
+    // dropdown closed until they start typing again.
+    setEnableSuggestions(false);
     setShowSuggestions(false);
-    setSuppressNextSuggestions(true);
   }
 
   function clearSelection() {
     onChange("");
+    setEnableSuggestions(false);
     setShowSuggestions(false);
   }
 
@@ -447,7 +445,10 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
         <input
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            setEnableSuggestions(true);
+            onChange(e.target.value);
+          }}
           placeholder="Hospital name"
           className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-10 text-sm placeholder:text-slate-400 focus:border-uyir-500 focus:outline-none focus:ring-2 focus:ring-uyir-500/20"
         />
