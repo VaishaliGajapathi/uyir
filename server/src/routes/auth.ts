@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { signToken } from "../middleware/auth.js";
@@ -21,7 +21,7 @@ async function sendSms(mobile: string, code: string, name?: string) {
 }
 
 // Request OTP - only for new users (signup)
-authRouter.post("/otp/request", async (req, res) => {
+authRouter.post("/otp/request", async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10).max(15),
     name: z.string().optional(),

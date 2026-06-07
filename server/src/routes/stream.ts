@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { bus, AlertEvent } from "../services/alerts.js";
 
 export const streamRouter = Router();

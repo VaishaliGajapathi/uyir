@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../db.js";
 import { requireAuth, requireAdminOrHospitalApprover } from "../middleware/auth.js";
 
@@ -8,7 +8,7 @@ export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
 // Get all donors with stats
-adminRouter.get("/donors", async (req, res) => {
+adminRouter.get("/donors", async (req: Request, res: any) => {
   const donors = await prisma.user.findMany({
     where: { role: "donor" },
     orderBy: { createdAt: "desc" },
@@ -21,7 +21,7 @@ adminRouter.get("/donors", async (req, res) => {
 });
 
 // Get all requests with details
-adminRouter.get("/requests", async (req, res) => {
+adminRouter.get("/requests", async (req: Request, res: any) => {
   const requests = await prisma.bloodRequest.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -34,7 +34,7 @@ adminRouter.get("/requests", async (req, res) => {
 });
 
 // Get pending verification requests
-adminRouter.get("/pending-verification", async (req, res) => {
+adminRouter.get("/pending-verification", async (req: Request, res: any) => {
   const pending = await prisma.bloodRequest.findMany({
     where: { status: "pending_verification" },
     orderBy: { createdAt: "asc" },
@@ -44,7 +44,7 @@ adminRouter.get("/pending-verification", async (req, res) => {
 });
 
 // Get fraud reports
-adminRouter.get("/fraud-reports", async (req, res) => {
+adminRouter.get("/fraud-reports", async (req: Request, res: any) => {
   const reports = await prisma.fraudReport.findMany({
     orderBy: { createdAt: "desc" },
     include: { againstUser: true },
@@ -53,7 +53,7 @@ adminRouter.get("/fraud-reports", async (req, res) => {
 });
 
 // Get hospitals
-adminRouter.get("/hospitals", async (req, res) => {
+adminRouter.get("/hospitals", async (req: Request, res: any) => {
   const hospitals = await prisma.hospital.findMany({
     orderBy: { name: "asc" },
   });
@@ -61,11 +61,11 @@ adminRouter.get("/hospitals", async (req, res) => {
 });
 
 // Manual verification approval (for both admin and hospital approver)
-adminRouter.post("/verify-request/:id", requireAdminOrHospitalApprover, async (req, res) => {
+adminRouter.post("/verify-request/:id", requireAdminOrHospitalApprover, async (req: Request, res: any) => {
   const { id } = req.params;
   const { approved, notes } = req.body;
   const userId = (req as any).userId;
-  
+
   // Get user to determine verification type
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: "User not found" });
@@ -87,7 +87,7 @@ adminRouter.post("/verify-request/:id", requireAdminOrHospitalApprover, async (r
 });
 
 // Ban user
-adminRouter.post("/ban-user/:id", async (req, res) => {
+adminRouter.post("/ban-user/:id", async (req: Request, res: any) => {
   const { id } = req.params;
   const user = await prisma.user.update({
     where: { id },
@@ -97,7 +97,7 @@ adminRouter.post("/ban-user/:id", async (req, res) => {
 });
 
 // Get dashboard stats
-adminRouter.get("/stats", async (req, res) => {
+adminRouter.get("/stats", async (req: Request, res: any) => {
   const [totalDonors, totalRequests, pendingVerifications, activeRequests, fraudReports, livesSaved] = await Promise.all([
     prisma.user.count({ where: { role: "donor" } }),
     prisma.bloodRequest.count(),
