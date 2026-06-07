@@ -53,11 +53,13 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
     return res.json({ ok: true, devOtp: code, exists: false, user: null });
   }
 
-  // In production, don't return devOtp
-  if (process.env.NODE_ENV === "production") {
-    res.json({ ok: true, exists: false, user: null });
-  } else {
+  const allowDevOtpInProd = process.env.ALLOW_DEV_OTP_IN_PROD === "true";
+  const includeDevOtp = allowDevOtpInProd || process.env.NODE_ENV !== "production";
+
+  if (includeDevOtp) {
     res.json({ ok: true, devOtp: code, exists: false, user: null });
+  } else {
+    res.json({ ok: true, exists: false, user: null });
   }
 });
 
