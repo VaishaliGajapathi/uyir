@@ -18,6 +18,10 @@ app.use(express.json({ limit: "30mb" }));
 app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server. Frontend is hosted on Netlify." }));
 app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
 app.get("/api/districts", (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
+app.get("/api/outbound-ip", async (_req: Request, res: Response) => {
+  const ip = await fetch("https://api.ipify.org?format=json").then((r) => r.json());
+  res.json(ip);
+});
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
