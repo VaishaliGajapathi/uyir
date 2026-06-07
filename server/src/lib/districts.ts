@@ -46,11 +46,11 @@ export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: numb
 export function districtsForRadius(origin: string, radiusKm: number): string[] {
   const base = TN_DISTRICTS[origin];
   if (!base) return [origin];
-  if (radiusKm <= 10) return [origin]; // 5-10 km: only local district (distance filter applied in alert cycle)
-  if (radiusKm <= 20) return [origin]; // 20 km: still local district
-  if (radiusKm <= 60) return [origin, ...base.neighbours]; // 60 km: district + neighbours
+  if (radiusKm <= 25) return [origin]; // 25 km: entire town/city within district (distance filter applied in alert cycle)
+  if (radiusKm <= 50) return [origin]; // 50 km: entire district
+  if (radiusKm <= 100) return [origin, ...base.neighbours]; // 100 km: district + neighbouring districts
   return TN_DISTRICT_NAMES; // entire Tamil Nadu
 }
 
-// Radius escalation ladder (km). 5 -> 10 -> 20 -> 60(neighbours) -> 9999(TN)
-export const RADIUS_LADDER = [5, 10, 20, 60, 9999];
+// Radius escalation ladder (km). 25(town) -> 50(district) -> 100(neighbours) -> 9999(TN)
+export const RADIUS_LADDER = [25, 50, 100, 9999];

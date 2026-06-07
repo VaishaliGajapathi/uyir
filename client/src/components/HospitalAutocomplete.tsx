@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Building2 } from "lucide-react";
+import { MapPin, Building2, X } from "lucide-react";
 import { api } from "../lib/api";
 
 interface HospitalAutocompleteProps {
@@ -24,7 +24,6 @@ const TAMIL_NADU_HOSPITALS = [
   "Vijaya Hospital, Chennai",
   "Vijaya Health Centre, Chennai",
   "Billroth Hospital, Chennai",
-  "Billroth Hospitals, Chennai",
   "SIMS Hospital, Chennai",
   "SIMS Hospital of Excellence, Chennai",
   "Gleneagles Global Health City, Chennai",
@@ -42,9 +41,7 @@ const TAMIL_NADU_HOSPITALS = [
   "Prashanth Hospital, Chennai",
   "Prashanth Super Speciality Hospital, Chennai",
   "Deepam Hospital, Chennai",
-  "Deepam Hospitals, Chennai",
   "Global Hospitals, Chennai",
-  "Global Health City, Chennai",
   "Sankara Nethralaya, Chennai",
   "Aravind Eye Hospital, Chennai",
   "K.G. Hospital, Chennai",
@@ -224,6 +221,33 @@ const TAMIL_NADU_HOSPITALS = [
   "Government Hospital, Dharmapuri",
   "Government Hospital, Tiruppur",
   "Government Hospital, Pollachi",
+  // Tiruppur - Private Hospitals
+  "Kauvery Hospital, Tiruppur",
+  "Sri Ramakrishna Hospital, Tiruppur",
+  "Sri Lakshmi Hospital, Tiruppur",
+  "Sri Krishna Hospital, Tiruppur",
+  "Sri Venkateswara Hospital, Tiruppur",
+  "Sri Sai Hospital, Tiruppur",
+  "Sri Chakra Hospital, Tiruppur",
+  "Sri Balaji Hospital, Tiruppur",
+  "Sri Murugan Hospital, Tiruppur",
+  "Sri Ganesan Hospital, Tiruppur",
+  "Sri Kumaran Hospital, Tiruppur",
+  "Sri Ranganathan Hospital, Tiruppur",
+  "Sri Rajalakshmi Hospital, Tiruppur",
+  "Sri Meenakshi Hospital, Tiruppur",
+  "Sri Andal Hospital, Tiruppur",
+  "Sri Durga Hospital, Tiruppur",
+  "Sri Saraswathi Hospital, Tiruppur",
+  "Sri Vishnu Hospital, Tiruppur",
+  "Sri Shiva Hospital, Tiruppur",
+  "Sri Brahma Hospital, Tiruppur",
+  "Nallam Hospital, Tiruppur",
+  "Nallam Multi Speciality Hospital, Tiruppur",
+  "Vetri Hospital, Tiruppur",
+  "Vetri Multi Speciality Hospital, Tiruppur",
+  "Aringar Anna Hospital, Tiruppur",
+  "Aringar Anna Memorial Hospital, Tiruppur",
   "Government Hospital, Ooty",
   "Government Hospital, Coonoor",
   "Government Hospital, Mettupalayam",
@@ -344,16 +368,35 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
   }
 
   useEffect(() => {
-    if (value.length < 2) {
+    if (value.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    let filtered = TAMIL_NADU_HOSPITALS.filter(hospital =>
-      hospital.toLowerCase().includes(value.toLowerCase()) &&
-      (district === "" || hospital.toLowerCase().includes(district.toLowerCase()))
-    );
+    let filtered = TAMIL_NADU_HOSPITALS.filter(hospital => {
+      const hospitalLower = hospital.toLowerCase();
+      const valueLower = value.toLowerCase();
+      const districtLower = district.toLowerCase();
+      
+      // If district is selected, prioritize hospitals from that district
+      if (district && hospitalLower.includes(districtLower)) {
+        // Show all hospitals from the district that match the search term
+        return hospitalLower.includes(valueLower);
+      }
+      
+      // Otherwise, show hospitals that match the search term
+      return hospitalLower.includes(valueLower);
+    });
+
+    // If district is selected, also add hospitals from that district even if they don't match the search term
+    if (district && filtered.length < 8) {
+      const districtHospitals = TAMIL_NADU_HOSPITALS.filter(hospital =>
+        hospital.toLowerCase().includes(district.toLowerCase()) &&
+        !filtered.includes(hospital)
+      );
+      filtered = [...filtered, ...districtHospitals];
+    }
 
     // If user location is available, sort by distance
     if (userLocation) {
@@ -383,6 +426,11 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
     setShowSuggestions(false);
   }
 
+  function clearSelection() {
+    onChange("");
+    setShowSuggestions(false);
+  }
+
   return (
     <div className="relative">
       <div className="relative">
@@ -392,8 +440,17 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Hospital name"
-          className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-uyir-500 focus:outline-none focus:ring-2 focus:ring-uyir-500/20"
+          className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-10 text-sm placeholder:text-slate-400 focus:border-uyir-500 focus:outline-none focus:ring-2 focus:ring-uyir-500/20"
         />
+        {value && (
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
       {showSuggestions && suggestions.length > 0 && (
         <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">

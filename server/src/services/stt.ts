@@ -3,7 +3,8 @@ import { openai, MODELS, completeJSON } from "../lib/ai.js";
 // Speech-to-text via OpenAI Whisper. Accepts an audio buffer.
 export async function transcribeAudio(buffer: Buffer, filename = "audio.webm", language?: string): Promise<string> {
   if (!openai) throw new Error("OPENAI_API_KEY not configured for Whisper STT");
-  const file = new File([buffer], filename, { type: "audio/webm" });
+  const uint8Array = new Uint8Array(buffer);
+  const file = new File([uint8Array], filename, { type: "audio/webm" });
   const res = await openai.audio.transcriptions.create({
     file,
     model: MODELS.stt,

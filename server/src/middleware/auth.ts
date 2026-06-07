@@ -6,6 +6,8 @@ const SECRET = process.env.JWT_SECRET || "change-this-secret";
 export interface AuthedRequest extends Request {
   userId?: string;
   role?: string;
+  params: any;
+  body: any;
 }
 
 export function signToken(userId: string, role: string): string {

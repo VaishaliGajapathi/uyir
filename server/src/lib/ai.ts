@@ -17,7 +17,7 @@ export const replicate = REPLICATE_TOKEN ? new Replicate({ auth: REPLICATE_TOKEN
 export const MODELS = {
   stt: process.env.OPENAI_STT_MODEL || "whisper-1",
   text: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
-  gemini: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+  gemini: process.env.GEMINI_MODEL || "gemini-1.5-pro",
 };
 
 // Extract first JSON object from an LLM text response.

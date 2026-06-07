@@ -1,4 +1,4 @@
-import { gemini, MODELS, completeJSON, extractJson } from "../lib/ai.js";
+import { gemini, replicate, MODELS, completeJSON, extractJson } from "../lib/ai.js";
 
 export interface VerificationResult {
   score: number; // 0-100
@@ -70,25 +70,56 @@ Return ONLY JSON: {"authenticityScore": 0-100, "notes": "short reason", "looksRe
   };
 }
 
-// Vision-based document verification (hospital slip / prescription) via Gemini.
+// Vision-based document verification (hospital slip / prescription) via Gemini or Replicate.
 export async function verifyDocument(base64: string, mimeType: string, documentType: string, patientName?: string): Promise<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }> {
-  if (!gemini) return { score: 0, verified: false, notes: "Gemini not configured" };
-  try {
-    const model = gemini.getGenerativeModel({ model: MODELS.gemini });
-    const nameCheck = patientName ? `Verify that the patient name in the document matches "${patientName}".` : "";
-    const prompt = `This image should be a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement.
+  const nameCheck = patientName ? `Verify that the patient name in the document matches "${patientName}".` : "";
+  const prompt = `This image should be a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement.
 Verify it looks like a genuine medical document (hospital name, patient, blood group, doctor, stamp/letterhead).
 ${nameCheck}
 Return ONLY JSON: {"score":0-100,"verified":true/false,"notes":"what you see, any red flags","nameMatch":true/false}`;
-    const res = await model.generateContent([
-      { inlineData: { data: base64, mimeType } },
-      { text: prompt },
-    ]);
-    const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(res.response.text());
-    return out || { score: 0, verified: false, notes: "Could not parse document" };
-  } catch (e) {
-    return { score: 0, verified: false, notes: "Vision check failed: " + (e as Error).message };
+
+  // Try Gemini first
+  if (gemini) {
+    try {
+      const model = gemini.getGenerativeModel({ model: MODELS.gemini });
+      const res = await model.generateContent([
+        { inlineData: { data: base64, mimeType } },
+        { text: prompt },
+      ]);
+      const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(res.response.text());
+      if (out) return out;
+    } catch (e) {
+      console.warn("[verification] Gemini vision failed:", (e as Error).message);
+    }
   }
+
+  // Fallback to Replicate
+  if (replicate) {
+    try {
+      // Convert base64 to data URI for Replicate
+      const dataUri = `data:${mimeType};base64,${base64}`;
+      
+      // Use a vision model from Replicate (e.g., LLaVA or similar)
+      const output = await replicate.run(
+        "yorickvp/llava-13b:2facb4a710fb1bc6292e96081a4c6388a52e17e42bf7bc0e6e7d67f8ddc5706b",
+        {
+          input: {
+            image: dataUri,
+            prompt: prompt,
+          }
+        }
+      );
+      
+      // Parse Replicate output
+      const text = typeof output === 'string' ? output : JSON.stringify(output);
+      const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(text);
+      if (out) return out;
+    } catch (e) {
+      console.warn("[verification] Replicate vision failed:", (e as Error).message);
+    }
+  }
+
+  return { score: 0, verified: false, notes: "Verification failed" };
 }
 
 // AI-powered health tips and eligibility check for blood donors

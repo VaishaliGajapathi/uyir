@@ -2,61 +2,79 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { signToken } from "../middleware/auth.js";
+import { sendOTP as sendMsg91OTP } from "../lib/msg91.js";
 
 export const authRouter = Router();
 
-// Twilio SMS client (if configured)
-let twilioClient: any = null;
-if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-  // @ts-ignore
-  const twilio = require("twilio");
-  twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-}
-
-async function sendSms(mobile: string, code: string) {
-  if (twilioClient) {
-    try {
-      await twilioClient.messages.create({
-        body: `Your UYIR verification code is ${code}. Valid for 5 minutes.`,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: `+91${mobile}`,
-      });
-      console.log(`[sms] Sent to ${mobile}`);
-    } catch (e: any) {
-      console.error(`[sms] Failed: ${e.message}`);
-      throw e;
+async function sendSms(mobile: string, code: string, name?: string) {
+  // Try MSG91 first (cheaper for India)
+  if (process.env.MSG91_AUTH_KEY) {
+    const success = await sendMsg91OTP(mobile, code, name);
+    if (success) {
+      console.log(`[msg91] OTP sent to ${mobile}`);
+      return;
     }
-  } else {
-    console.log(`[otp] ${mobile} -> ${code} (SMS not configured, using dev mode)`);
   }
+
+  // Fallback to dev mode if MSG91 not configured
+  console.log(`[otp] ${mobile} -> ${code} (SMS not configured, using dev mode)`);
 }
 
-// Request OTP.
+// Request OTP - only for new users (signup)
 authRouter.post("/otp/request", async (req, res) => {
-  const schema = z.object({ mobile: z.string().min(10).max(15) });
+  const schema = z.object({
+    mobile: z.string().min(10).max(15),
+    name: z.string().optional(),
+  });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+  const name = parse.data.name;
 
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({ where: { mobile } });
+
+  // If user exists, don't send OTP - they can login directly
+  if (existingUser) {
+    return res.json({ ok: true, exists: true, user: existingUser, message: "User already exists" });
+  }
+
+  // New user - send OTP for signup
   const code = String(Math.floor(100000 + Math.random() * 900000));
   await prisma.otpCode.create({
     data: { mobile, code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
   });
 
   try {
-    await sendSms(mobile, code);
+    await sendSms(mobile, code, name);
   } catch (e: any) {
     // If SMS fails, still return devOtp for testing
     console.log(`[otp] SMS failed, returning devOtp: ${code}`);
-    return res.json({ ok: true, devOtp: code });
+    return res.json({ ok: true, devOtp: code, exists: false, user: null });
   }
 
   // In production, don't return devOtp
   if (process.env.NODE_ENV === "production") {
-    res.json({ ok: true });
+    res.json({ ok: true, exists: false, user: null });
   } else {
-    res.json({ ok: true, devOtp: code });
+    res.json({ ok: true, devOtp: code, exists: false, user: null });
   }
+});
+
+// Direct login for existing users (no OTP required)
+authRouter.post("/login", async (req, res) => {
+  const schema = z.object({ mobile: z.string().min(10).max(15) });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
+  const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+
+  const user = await prisma.user.findUnique({ where: { mobile } });
+  if (!user) {
+    return res.status(404).json({ error: "User not found. Please sign up first." });
+  }
+
+  const token = signToken(user.id, user.role);
+  res.json({ token, user });
 });
 
 // Verify OTP -> create/login user, return JWT.

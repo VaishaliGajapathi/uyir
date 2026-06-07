@@ -603,6 +603,9 @@ export function Profile() {
 
       <Card className="space-y-2 p-4">
         <h3 className="mb-2 font-bold text-slate-800">Support</h3>
+        <Button variant="outline" className="w-full" onClick={() => nav("/rate-us")}>
+          <Award className="h-4 w-4" /> {lang === "ta" ? "எங்களை மதிப்பிடுங்கள்" : "Rate Us"}
+        </Button>
         <Button variant="outline" className="w-full" onClick={contactSupport}>
           <MessageCircle className="h-4 w-4" /> {t.contactSupport[lang]} (WhatsApp)
         </Button>

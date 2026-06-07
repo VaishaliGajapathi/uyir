@@ -1,12 +1,12 @@
 // UYIR — Tamil Nadu Verified Blood & Platelet Emergency Network
-// SQLite locally; for Render set provider = "postgresql" and DATABASE_URL accordingly.
+// PostgreSQL (Neon cloud database)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -101,7 +101,7 @@ model BloodRequest {
   status            String   @default("pending_verification") // draft|pending_verification|verified|alert_sent|donor_accepted|completed|closed|rejected|life_saved
   verificationScore Int      @default(0)
   verificationNotes String?
-  alertRadiusKm     Int      @default(5)
+  alertRadiusKm     Int      @default(25)
   escalationLevel   Int      @default(0) // 0=initial, 1=expanded, 2=district-wide
   escalatedAt       DateTime?
   createdById       String

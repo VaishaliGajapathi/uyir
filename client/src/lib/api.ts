@@ -71,12 +71,14 @@ export interface BloodRequest {
   verificationNotes?: string; alertRadiusKm: number; createdAt: string;
   lat?: number; lng?: number; _count?: { responses: number };
   documents?: any[]; responses?: any[]; alerts?: any[];
+  createdById?: string;
 }
 
 export const api = {
   // auth
-  requestOtp: (mobile: string) => req<{ ok: boolean; devOtp: string }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile }) }),
+  requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; devOtp: string; exists: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),
+  login: (mobile: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile }) }),
   hospitalLogin: (data: { hospitalName: string; hospitalRegistrationId: string; mobile?: string }) => req<{ token: string; user: User }>("/auth/hospital/login", { method: "POST", body: JSON.stringify(data) }),
   // users
   me: () => req<User>("/users/me"),

@@ -191,8 +191,8 @@ responsesRouter.post("/:id/life-saved", requireAuth, async (req: AuthedRequest, 
 });
 
 // Submit rating and testimonial for donor
-responsesRouter.post("/:id/rate", requireAuth, async (req: AuthedRequest, res) => {
-  const resp = await prisma.donorResponse.findUnique({ 
+responsesRouter.post("/:id/rate", requireAuth, async (req: AuthedRequest, res: any) => {
+  const resp = await prisma.donorResponse.findUnique({
     where: { id: req.params.id },
     include: { request: true }
   });
@@ -231,7 +231,7 @@ responsesRouter.post("/:id/rate", requireAuth, async (req: AuthedRequest, res) =
 });
 
 // Report abuse on a request/donor; AI screens the report text.
-responsesRouter.post("/report", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/report", requireAuth, async (req: AuthedRequest, res: any) => {
   const { againstUserId, requestId, reason } = req.body as { againstUserId: string; requestId?: string; reason: string };
   if (!againstUserId || !reason) return res.status(400).json({ error: "againstUserId + reason required" });
 

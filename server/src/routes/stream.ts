@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { bus, AlertEvent } from "../services/alerts.js";
 
@@ -7,7 +7,7 @@ const SECRET = process.env.JWT_SECRET || "change-this-secret";
 
 // Server-Sent Events stream for real-time donor alerts.
 // Token passed as query param because EventSource cannot set headers.
-streamRouter.get("/alerts", (req, res) => {
+streamRouter.get("/alerts", (req: Request, res: Response) => {
   const token = req.query.token as string;
   let userId: string;
   try {
@@ -39,7 +39,7 @@ streamRouter.get("/alerts", (req, res) => {
 });
 
 // Per-request live updates (status changes) for requesters watching their request.
-streamRouter.get("/request/:id", (req, res) => {
+streamRouter.get("/request/:id", (req: Request, res: Response) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",

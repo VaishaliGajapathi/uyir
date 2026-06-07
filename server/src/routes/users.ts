@@ -4,7 +4,7 @@ import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 
 export const usersRouter = Router();
 
-usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
     include: { badges: true },
@@ -13,7 +13,7 @@ usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   res.json(user);
 });
 
-usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   const allowed = [
     "name", "language", "district", "taluk", "bloodGroup", "gender",
     "isPlateletDonor", "nightEmergency", "shareLocation", "role",
@@ -29,7 +29,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // Update live location (opt-in donors only).
-usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res: any) => {
   const { lat, lng } = req.body;
   if (typeof lat !== "number" || typeof lng !== "number") {
     return res.status(400).json({ error: "lat/lng required" });
@@ -41,13 +41,13 @@ usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res) =>
   res.json({ ok: true, lat: user.lat, lng: user.lng });
 });
 
-usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: any) => {
   await prisma.user.update({ where: { id: req.userId }, data: { fcmToken: req.body.token } });
   res.json({ ok: true });
 });
 
 // Get donor documents
-usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res: any) => {
   const documents = await prisma.donorDocument.findMany({
     where: { donorId: req.userId },
     orderBy: { uploadedAt: "desc" },
@@ -56,7 +56,7 @@ usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res) =>
 });
 
 // Upload donor document
-usersRouter.post("/me/documents", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.post("/me/documents", requireAuth, async (req: AuthedRequest, res: any) => {
   const { documentType, fileUrl, documentNumber } = req.body as {
     documentType: "aadhar" | "driving_license" | "passport";
     fileUrl: string;
@@ -72,6 +72,10 @@ usersRouter.post("/me/documents", requireAuth, async (req: AuthedRequest, res) =
     return res.status(400).json({ error: "Invalid document type" });
   }
 
+  if (!req.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const document = await prisma.donorDocument.create({
     data: {
       donorId: req.userId,
@@ -85,7 +89,7 @@ usersRouter.post("/me/documents", requireAuth, async (req: AuthedRequest, res) =
 });
 
 // Delete donor document
-usersRouter.delete("/me/documents/:id", requireAuth, async (req: AuthedRequest, res) => {
+usersRouter.delete("/me/documents/:id", requireAuth, async (req: AuthedRequest, res: any) => {
   const document = await prisma.donorDocument.findUnique({
     where: { id: req.params.id },
   });

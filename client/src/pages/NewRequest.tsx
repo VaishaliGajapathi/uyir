@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, ShieldCheck, FileCheck2, Sparkles, Radio, CheckCircle2, Share2 } from "lucide-react";
+import { ArrowLeft, Upload, ShieldCheck, FileCheck2, Radio, CheckCircle2, Share2, MapPin, Mic, Camera } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Input, Select, Card, Badge } from "../components/ui";
@@ -20,10 +20,14 @@ export function NewRequest() {
   const [docResult, setDocResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [capturingLocation, setCapturingLocation] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
   const [form, setForm] = useState<any>({
-    patientName: "", bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
+    patientFirstName: "", patientLastName: "", patientAge: null, patientGender: null, bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
     hospitalName: "", district: "", contactPerson: "", contactNumber: "",
-    doctorReference: "", emergencyLevel: "orange",
+    doctorReference: "", emergencyLevel: "orange", lat: null, lng: null,
+    location: "", area: "", city: "", pincode: "",
   });
 
   useEffect(() => { api.districts().then(setDistricts).catch(() => {}); }, []);
@@ -34,6 +38,88 @@ export function NewRequest() {
     const map: any = { ...parsed };
     if (map.unitsRequired) map.unitsRequired = Number(map.unitsRequired);
     setForm((f: any) => ({ ...f, ...Object.fromEntries(Object.entries(map).filter(([, v]) => v != null)) }));
+  }
+
+  async function captureLocation() {
+    if (!('geolocation' in navigator)) {
+      alert(lang === "ta" ? "உங்கள் உலாவி இடம் கண்டறியலை ஆதரிக்கவில்லை" : "Geolocation is not supported by your browser");
+      return;
+    }
+    setCapturingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve, 
+          (error) => {
+            console.error("Geolocation error:", error);
+            let errorMsg = error.message;
+            if (error.code === 1) {
+              errorMsg = lang === "ta" ? "இடம் அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் இடம் அனுமதியை இயக்கவும்." : "Location permission denied. Please enable location in browser settings.";
+            } else if (error.code === 2) {
+              errorMsg = lang === "ta" ? "இடம் கிடைக்கவில்லை" : "Location unavailable";
+            } else if (error.code === 3) {
+              errorMsg = lang === "ta" ? "இடம் கண்டறிய நேரம் முடிந்தது" : "Location request timeout";
+            }
+            reject(new Error(errorMsg));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        );
+      });
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      set("lat", lat);
+      set("lng", lng);
+      console.log("Location captured:", lat, lng);
+
+      // Reverse geocoding to get address
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const addr = data.address;
+        console.log("Geocoded address:", addr);
+
+        // Extract location details
+        let location = addr.road || addr.street || addr.footway || addr.path || "";
+        let area = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.township || "";
+        let city = addr.city || addr.town || addr.locality || "";
+        let district = addr.county || addr.state_district || "";
+        let pincode = addr.postcode || "";
+
+        // For Tamil Nadu, try to match district from our list
+        const tnDistricts = districts;
+        const matchedDistrict = tnDistricts.find((d: string) =>
+          (district && district.toLowerCase().includes(d.toLowerCase())) ||
+          (addr.display_name && addr.display_name.toLowerCase().includes(d.toLowerCase()))
+        );
+        if (matchedDistrict) {
+          district = matchedDistrict;
+        }
+
+        // Fallback for city
+        if (!city && addr.state) {
+          city = addr.state;
+        }
+
+        // Set form fields
+        if (location) set("location", location);
+        if (area) set("area", area);
+        if (city) set("city", city);
+        if (district) set("district", district);
+        if (pincode) set("pincode", pincode);
+
+        console.log("Parsed location:", { location, area, city, district });
+      }
+    } catch (e: any) {
+      console.error("Failed to capture location:", e);
+      alert(e.message || (lang === "ta" ? "இடத்தைப் பெற முடியவில்லை" : "Failed to capture location"));
+    } finally {
+      setCapturingLocation(false);
+    }
   }
 
   async function createRequest() {
@@ -60,6 +146,40 @@ export function NewRequest() {
     reader.readAsDataURL(file);
   }
 
+  async function capturePhoto() {
+    if (!requestId) return;
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+
+      await new Promise((resolve) => {
+        video.onloadedmetadata = resolve;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(video, 0, 0);
+
+      stream.getTracks().forEach(track => track.stop());
+      setShowCamera(false);
+
+      const base64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      setBusy(true);
+      try {
+        const res: any = await api.uploadDocument(requestId, base64, 'image/jpeg', 'requirement_slip');
+        setDocResult(res.ai);
+      } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      setErr(e.message);
+      setShowCamera(false);
+    }
+  }
+
   async function runVerify() {
     if (!requestId) return;
     setPhase("verifying"); setBusy(true);
@@ -76,20 +196,26 @@ export function NewRequest() {
     try {
       const res = await api.alertRequest(requestId);
       alert(`Alerted ${res.alerted} eligible donors within ${res.radiusKm === 9999 ? "all Tamil Nadu" : res.radiusKm + " km"}. The system will automatically expand the search radius if no donor accepts within 30 minutes.`);
+      setBusy(false);
       nav(`/request/${requestId}`);
-    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    } catch (e: any) { 
+      setErr(e.message); 
+      setBusy(false);
+    }
   }
 
   function shareToWhatsApp() {
     if (!requestId) return;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${form.patientName}\nBlood Group: ${form.bloodGroup}\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
 
   function shareToFacebook() {
     if (!requestId) return;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${form.patientName}\nBlood Group: ${form.bloodGroup}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
@@ -108,73 +234,146 @@ export function NewRequest() {
         <h1 className="text-lg font-bold text-slate-800">{lang === "ta" ? "இரத்த கோரிக்கை" : "New Blood Request"}</h1>
       </header>
 
-      <Steps phase={phase} />
+      <Steps phase={phase} verification={verification} lang={lang} onSpeakClick={() => setShowVoice(true)} />
 
       {phase === "form" && (
         <div className="space-y-3">
-          <Card className="space-y-2 p-3">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-violet-700"><Sparkles className="h-4 w-4" /> {lang === "ta" ? "தமிழில் பேசி நிரப்பவும்" : "Fill by speaking (Tamil/English)"}</p>
-            <VoiceButton mode="request" language={lang} className="w-full"
-              label={lang === "ta" ? "பேசுங்கள்: எங்களுக்கு 3 யூனிட் B+ தேவை" : "Speak your request"}
-              onResult={applyVoice} />
-          </Card>
-
-          <Input label="Patient name *" value={form.patientName} onChange={(e) => set("patientName", e.target.value)} />
+          {showVoice && (
+            <div className="flex justify-center">
+              <VoiceButton
+                mode="request"
+                language={lang}
+                onResult={applyVoice}
+                label={lang === "ta" ? "பேசுங்கள்" : "Speak"}
+                className="rounded-xl bg-uyir-600 text-white shadow-lg hover:bg-uyir-700 transition"
+              />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Patient age *" type="number" value={form.patientAge || ""} onChange={(e) => set("patientAge", Number(e.target.value))} />
-            <Select label="Patient gender *" value={form.patientGender || ""} onChange={(e) => set("patientGender", e.target.value)}>
-              <option value="">Select</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
+            <Input label={lang === "ta" ? "நோயாளியின் முதல் பெயர் *" : "Patient first name *"} value={form.patientFirstName} onChange={(e) => set("patientFirstName", e.target.value)} />
+            <Input label={lang === "ta" ? "நோயாளியின் கடைசி பெயர் *" : "Patient last name *"} value={form.patientLastName} onChange={(e) => set("patientLastName", e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label={lang === "ta" ? "நோயாளியின் வயது *" : "Patient age *"} type="number" value={form.patientAge || ""} onChange={(e) => set("patientAge", Number(e.target.value))} />
+            <Select label={lang === "ta" ? "நோயாளியின் பாலினம் *" : "Patient gender *"} value={form.patientGender || ""} onChange={(e) => set("patientGender", e.target.value)}>
+              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
+              <option value="male">{lang === "ta" ? "ஆண்" : "Male"}</option>
+              <option value="female">{lang === "ta" ? "பெண்" : "Female"}</option>
+              <option value="other">{lang === "ta" ? "மற்றவை" : "Other"}</option>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Blood group *" value={form.bloodGroup} onChange={(e) => set("bloodGroup", e.target.value)}>
+            <Select label={lang === "ta" ? "இரத்த வகை *" : "Blood group *"} value={form.bloodGroup} onChange={(e) => set("bloodGroup", e.target.value)}>
               {BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}
             </Select>
-            <Select label="Component" value={form.componentType} onChange={(e) => set("componentType", e.target.value)}>
+            <Select label={lang === "ta" ? "கூறு" : "Component"} value={form.componentType} onChange={(e) => set("componentType", e.target.value)}>
               {COMPONENT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Units required" type="number" min={1} value={form.unitsRequired} onChange={(e) => set("unitsRequired", e.target.value)} />
-            <Select label="District *" value={form.district} onChange={(e) => set("district", e.target.value)}>
-              <option value="">Select</option>
+            <Input label={lang === "ta" ? "தேவையான யூனிட்கள்" : "Units required"} type="number" min={1} value={form.unitsRequired} onChange={(e) => set("unitsRequired", e.target.value)} />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">{lang === "ta" ? "அவசராதி நிலை" : "Emergency level"}</label>
+              <div className="grid grid-cols-3 gap-2">
+                {EMERGENCY_LEVELS.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => set("emergencyLevel", l.value)}
+                    className={`rounded-lg border-2 px-3 py-2 text-center text-sm font-semibold transition ${
+                      form.emergencyLevel === l.value
+                        ? "border-uyir-600 bg-uyir-50 text-uyir-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "மருத்துவமனை *" : "Hospital *"}</label>
+              <HospitalAutocomplete
+                value={form.hospitalName}
+                onChange={(val) => set("hospitalName", val)}
+                district={form.district}
+              />
+            </div>
+            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
+              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
               {districts.map((d) => <option key={d}>{d}</option>)}
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Hospital *" value={form.hospitalName} onChange={(e) => set("hospitalName", e.target.value)} />
-            <Input label="Referred doctor name" value={form.doctorReference} onChange={(e) => set("doctorReference", e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Contact person *" value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
-            <Input label="Contact number *" inputMode="numeric" value={form.contactNumber} onChange={(e) => set("contactNumber", e.target.value)} />
+            <Input label={lang === "ta" ? "தொடர்பு நபர் *" : "Contact person *"} value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
+            <Input label={lang === "ta" ? "தொடர்பு எண் *" : "Contact number *"} inputMode="numeric" value={form.contactNumber} onChange={(e) => set("contactNumber", e.target.value)} />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Emergency level</label>
-            <div className="grid grid-cols-3 gap-2">
-              {EMERGENCY_LEVELS.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => set("emergencyLevel", l.value)}
-                  className={`rounded-lg border-2 px-3 py-2 text-center text-sm font-semibold transition ${
-                    form.emergencyLevel === l.value
-                      ? "border-uyir-600 bg-uyir-50 text-uyir-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "இடம்" : "Location"}</label>
+            <button
+              type="button"
+              onClick={captureLocation}
+              disabled={capturingLocation}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 hover:border-uyir-500 hover:bg-uyir-50 disabled:opacity-50"
+            >
+              {capturingLocation ? (
+                <span className="animate-spin">⏳</span>
+              ) : form.lat && form.lng ? (
+                <>
+                  <MapPin className="h-4 w-4 text-emerald-500" />
+                  {lang === "ta" ? "இடம் பெறப்பட்டது" : "Location captured"}
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  {lang === "ta" ? "இடத்தைப் பெறுங்கள்" : "Capture location"}
+                </>
+              )}
+            </button>
           </div>
+          <Input label={lang === "ta" ? "பரிந்துரைக்கப்பட்ட மருத்துவர் பெயர்" : "Referred doctor name"} value={form.doctorReference} onChange={(e) => set("doctorReference", e.target.value)} />
+          {form.lat && form.lng && (
+            <>
+              <div className="rounded-xl overflow-hidden border border-slate-200">
+                <iframe
+                  width="100%"
+                  height="200"
+                  frameBorder="0"
+                  scrolling="no"
+                  marginHeight={0}
+                  marginWidth={0}
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${form.lng - 0.01}%2C${form.lat - 0.01}%2C${form.lng + 0.01}%2C${form.lat + 0.01}&layer=mapnik&marker=${form.lat}%2C${form.lng}`}
+                  style={{ border: 0 }}
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <Input label={lang === "ta" ? "இடம் (தெரு)" : "Location (Street)"} value={form.location} onChange={(e) => set("location", e.target.value)} />
+                <Input label={lang === "ta" ? "பகுதி" : "Area"} value={form.area} onChange={(e) => set("area", e.target.value)} />
+                <Input label={lang === "ta" ? "நகரம்" : "City"} value={form.city} onChange={(e) => set("city", e.target.value)} />
+                <Input label={lang === "ta" ? "அஞ்சல் குறியீடு" : "Pincode"} value={form.pincode} onChange={(e) => set("pincode", e.target.value)} />
+              </div>
+            </>
+          )}
           {err && <p className="text-sm text-uyir-600">{err}</p>}
           <Button className="w-full" size="lg" loading={busy}
-            disabled={!form.patientName || !form.patientAge || !form.patientGender || !form.bloodGroup || !form.hospitalName || !form.district || !form.contactPerson || form.contactNumber.length < 10}
-            onClick={createRequest}>Continue to verification</Button>
+            disabled={
+              !form.patientFirstName || 
+              !form.patientLastName || 
+              !form.patientAge || 
+              !form.patientGender || 
+              !form.bloodGroup || 
+              !form.hospitalName || 
+              !form.district || 
+              !form.contactPerson || 
+              !form.contactNumber || 
+              form.contactNumber.length < 10
+            }
+            onClick={() => {
+              console.log("Form values:", form);
+              createRequest();
+            }}>{lang === "ta" ? "சரிபார்ப்புக்குத் தொடரவும்" : "Continue to verification"}</Button>
         </div>
       )}
 
@@ -182,12 +381,18 @@ export function NewRequest() {
         <div className="space-y-3">
           <Card className="p-4">
             <h3 className="font-bold text-slate-800">Upload hospital proof</h3>
-            <p className="mt-1 text-sm text-slate-500">A requirement slip or prescription. AI (Gemini Vision) checks authenticity before alerts go out.</p>
-            <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500">
-              <Upload className="h-7 w-7" />
-              <span className="text-sm font-medium">{busy ? "Analysing…" : "Tap to upload image"}</span>
-              <input type="file" accept="image/*" className="hidden" onChange={uploadDoc} />
-            </label>
+            <p className="mt-1 text-sm text-slate-500">A requirement slip or prescription. AI checks authenticity before alerts go out.</p>
+            <div className="mt-3 flex gap-3">
+              <label className="flex-1 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500">
+                <Upload className="h-7 w-7" />
+                <span className="text-sm font-medium">{busy ? "Analysing…" : "Upload file"}</span>
+                <input type="file" accept=".pdf,image/jpeg,image/jpg,image/png" className="hidden" onChange={uploadDoc} />
+              </label>
+              <button type="button" onClick={capturePhoto} disabled={busy} className="flex-1 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
+                <Camera className="h-7 w-7" />
+                <span className="text-sm font-medium">{busy ? "Capturing…" : "Take photo"}</span>
+              </button>
+            </div>
             {docResult && (
               <div className={`mt-3 rounded-xl p-3 text-sm ${docResult.verified ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                 <p className="flex items-center gap-1.5 font-semibold"><FileCheck2 className="h-4 w-4" /> Document score: {docResult.score}%</p>
@@ -279,19 +484,31 @@ export function NewRequest() {
   );
 }
 
-function Steps({ phase }: { phase: Phase }) {
+function Steps({ phase, verification, lang, onSpeakClick }: { phase: Phase; verification: any; lang: string; onSpeakClick?: () => void }) {
   const order = ["form", "documents", "result"];
   const idx = phase === "verifying" ? 2 : order.indexOf(phase === "result" ? "result" : phase);
-  const labels = ["Details", "Proof", "Verify"];
+  const labels = lang === "ta" ? ["விவரங்கள்", "ஆவணம்", "சரிபார்ப்பு", "பகிர்வு", "பேசு"] : ["Details", "Proof", "Verify", "Share", "Speak"];
+  // Share step (index 3) is only active when verification is successful
+  const shareActive = phase === "result" && verification?.verified;
   return (
-    <div className="mb-5 flex items-center gap-2">
-      {labels.map((l, i) => (
-        <div key={l} className="flex flex-1 items-center gap-2">
-          <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${i <= idx ? "bg-uyir-600 text-white" : "bg-slate-200 text-slate-400"}`}>{i + 1}</div>
-          <span className={`text-xs font-medium ${i <= idx ? "text-slate-700" : "text-slate-400"}`}>{l}</span>
-          {i < labels.length - 1 && <div className={`h-0.5 flex-1 ${i < idx ? "bg-uyir-600" : "bg-slate-200"}`} />}
-        </div>
-      ))}
+    <div className="mb-5 flex items-center justify-center gap-2">
+      {labels.map((l, i) => {
+        const isActive = i <= idx || (i === 3 && shareActive) || (i === 4 && phase === "form");
+        const isSpeak = i === 4;
+        const lineActive = isActive && (i < idx || (i === 2 && shareActive) || (i === 3 && phase === "form"));
+        return (
+          <div key={l} className="flex flex-1 items-center gap-2">
+            <button
+              onClick={isSpeak && onSpeakClick ? onSpeakClick : undefined}
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${isActive ? "bg-uyir-600 text-white" : "bg-slate-200 text-slate-400"} ${isSpeak ? "cursor-pointer hover:bg-uyir-700" : ""}`}
+            >
+              {isSpeak ? <Mic className="h-4 w-4" /> : i + 1}
+            </button>
+            <span className={`text-xs font-medium ${isActive ? "text-slate-700" : "text-slate-400"}`}>{l}</span>
+            {i < labels.length - 1 && <div className={`h-0.5 flex-1 ${lineActive ? "bg-uyir-600" : "bg-slate-200"}`} />}
+          </div>
+        );
+      })}
     </div>
   );
 }

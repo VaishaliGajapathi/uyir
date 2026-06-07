@@ -26,30 +26,49 @@ export function RequestDetail() {
 
   async function load() {
     if (!id) return;
-    try { setR(await api.getRequest(id)); } finally { setLoading(false); }
+    try { 
+      console.log("Loading request with ID:", id);
+      const data = await api.getRequest(id);
+      console.log("Request data loaded:", data);
+      setR(data); 
+    } catch (e: any) {
+      console.error("Failed to load request:", e);
+      alert("Failed to load request: " + e.message);
+    } finally { 
+      setLoading(false); 
+    }
   }
   useEffect(() => { load(); }, [id]);
 
   // Live updates for this request via SSE.
   useEffect(() => {
     if (!id) return;
-    const es = new EventSource(`${location.origin}/api/stream/request/${id}`);
-    es.addEventListener("update", () => load());
-    return () => es.close();
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`${location.origin}/api/stream/request/${id}`);
+      es.addEventListener("update", () => {
+        console.log("SSE update received, reloading request");
+        load();
+      });
+      es.onerror = (e) => {
+        console.error("SSE error:", e);
+        if (es) {
+          es.close();
+          es = null;
+        }
+      };
+    } catch (e) {
+      console.error("Failed to create SSE connection:", e);
+    }
+    return () => {
+      if (es) es.close();
+    };
   }, [id]);
-
-  if (loading) return <Spinner />;
-  if (!r) return <div className="p-10 text-center text-slate-400">Request not found.</div>;
-
-  const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
-  const sm = statusMeta[r.status];
-  const isOwner = user?.role === "requester" || user?.role === "admin";
-  const isDonor = user?.role === "donor";
-  const accepted = (r.responses || []).filter((x: any) => ["accepted", "arrived", "completed"].includes(x.status));
-  const myResponse = (r.responses || []).find((x: any) => x.donorId === user?.id);
 
   // Start GPS tracking when donor starts navigation
   useEffect(() => {
+    if (!r) return;
+    const myResponse = (r.responses || []).find((x: any) => x.donorId === user?.id);
     if (!myResponse || myResponse.status !== "accepted" || !myResponse.navigationStarted) {
       if (locationWatchId !== null) {
         navigator.geolocation.clearWatch(locationWatchId);
@@ -81,7 +100,17 @@ export function RequestDetail() {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [myResponse?.id, myResponse?.status, myResponse?.navigationStarted]);
+  }, [r, user?.id, locationWatchId]);
+
+  if (loading) return <Spinner />;
+  if (!r) return <div className="p-10 text-center text-slate-400">Request not found.</div>;
+
+  const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
+  const sm = statusMeta[r.status];
+  const isOwner = user?.role === "requester" || user?.role === "admin" || r.createdById === user?.id;
+  const isDonor = user?.role === "donor" && r.createdById !== user?.id;
+  const accepted = (r.responses || []).filter((x: any) => ["accepted", "arrived", "completed"].includes(x.status));
+  const myResponse = (r.responses || []).find((x: any) => x.donorId === user?.id);
 
   async function act(fn: () => Promise<any>, msg?: string) {
     setBusy(true);

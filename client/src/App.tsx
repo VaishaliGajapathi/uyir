@@ -20,6 +20,8 @@ const HospitalDashboard = lazy(() => import("./pages/HospitalDashboard"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const DonateRequest = lazy(() => import("./pages/DonateRequest"));
 const ContactUs = lazy(() => import("./pages/ContactUs"));
+const RateUs = lazy(() => import("./pages/RateUs"));
+const Ratings = lazy(() => import("./pages/Ratings"));
 
 function Inner() {
   const { user, loading } = useApp();
@@ -70,24 +72,27 @@ function Inner() {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/donate-request" element={<DonateRequest />} />
         <Route path="/contact" element={<ContactUs />} />
+        <Route path="/rate-us" element={<RateUs />} />
       </Routes>
       {!user ? (
         <Onboarding />
       ) : (
         <div className="min-h-screen bg-slate-50 flex">
           <BottomNav />
-          <div className="flex-1 ml-20">
+          <div className="flex-1 ml-20 md:ml-20 pb-16 md:pb-0">
             <LiveAlertBanner />
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/requests" element={<Requests />} />
               <Route path="/new-request" element={<NewRequest />} />
+              <Route path="/request" element={<Navigate to="/requests" replace />} />
               <Route path="/request/:id" element={<RequestDetail />} />
               <Route path="/nearby" element={<Nearby />} />
               <Route path="/impact" element={<Impact />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/hospital-dashboard" element={<HospitalDashboard />} />
+              <Route path="/ratings" element={<Ratings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
