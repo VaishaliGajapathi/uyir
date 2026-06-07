@@ -25,6 +25,7 @@ export const t = {
   requests: { ta: "கோரிக்கைகள்", en: "Requests" },
   nearby: { ta: "அருகில்", en: "Nearby" },
   impact: { ta: "தாக்கம்", en: "Impact" },
+  ratings: { ta: "மதிப்பீடுகள்", en: "Ratings" },
   profile: { ta: "சுயவிவரம்", en: "Profile" },
   mobileNumber: { ta: "மொபைல் எண்", en: "Mobile number" },
   yourName: { ta: "உங்கள் பெயர்", en: "Your name" },
