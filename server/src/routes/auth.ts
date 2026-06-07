@@ -62,7 +62,7 @@ authRouter.post("/otp/request", async (req, res) => {
 });
 
 // Direct login for existing users (no OTP required)
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
@@ -78,7 +78,7 @@ authRouter.post("/login", async (req, res) => {
 });
 
 // Verify OTP -> create/login user, return JWT.
-authRouter.post("/otp/verify", async (req, res) => {
+authRouter.post("/otp/verify", async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10),
     code: z.string().length(6),
@@ -115,7 +115,7 @@ authRouter.post("/otp/verify", async (req, res) => {
 });
 
 // Hospital approver login using hospital name and registration ID
-authRouter.post("/hospital/login", async (req, res) => {
+authRouter.post("/hospital/login", async (req: any, res: any) => {
   const schema = z.object({
     hospitalName: z.string().min(2),
     hospitalRegistrationId: z.string().min(2),

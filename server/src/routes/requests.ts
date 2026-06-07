@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireAuth, optionalAuth, AuthedRequest } from "../middleware/auth.js";
@@ -25,7 +25,7 @@ const createSchema = z.object({
 });
 
 // Create a new blood request (status starts pending_verification).
-requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
   const parse = createSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const d = parse.data;
@@ -37,7 +37,7 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // List requests with filters (public-ish; auth optional for personalization).
-requestsRouter.get("/", optionalAuth, async (req, res) => {
+requestsRouter.get("/", optionalAuth, async (req: Request, res: any) => {
   const { district, bloodGroup, status, componentType } = req.query as Record<string, string>;
   const where: any = {};
   if (district) where.district = district;
@@ -55,7 +55,7 @@ requestsRouter.get("/", optionalAuth, async (req, res) => {
   res.json(requests);
 });
 
-requestsRouter.get("/:id", optionalAuth, async (req, res) => {
+requestsRouter.get("/:id", optionalAuth, async (req: Request, res: any) => {
   const request = await prisma.bloodRequest.findUnique({
     where: { id: req.params.id },
     include: {
@@ -69,7 +69,7 @@ requestsRouter.get("/:id", optionalAuth, async (req, res) => {
 });
 
 // Upload a document (base64) and run AI vision verification on it.
-requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, res: any) => {
   const { base64, mimeType, documentType } = req.body as { base64: string; mimeType: string; documentType: string };
   if (!base64 || !mimeType) return res.status(400).json({ error: "base64 + mimeType required" });
 
@@ -91,7 +91,7 @@ requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, re
 });
 
 // Run AI verification on the request -> sets verificationScore + status.
-requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: any) => {
   const request = await prisma.bloodRequest.findUnique({
     where: { id: req.params.id },
     include: { documents: true },
@@ -109,7 +109,7 @@ requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res) 
 });
 
 // Manual approve by verifier/admin (human-in-the-loop).
-requestsRouter.post("/:id/approve", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/approve", requireAuth, async (req: AuthedRequest, res: any) => {
   if (!["verifier", "admin"].includes(req.role || "")) return res.status(403).json({ error: "Verifier only" });
   const updated = await prisma.bloodRequest.update({ where: { id: req.params.id }, data: { status: "verified" } });
   emitRequestUpdate(updated.id, { status: "verified" });
@@ -117,19 +117,19 @@ requestsRouter.post("/:id/approve", requireAuth, async (req: AuthedRequest, res)
 });
 
 // Trigger the alert cycle for the current radius.
-requestsRouter.post("/:id/alert", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/alert", requireAuth, async (req: AuthedRequest, res: any) => {
   const result = await runAlertCycle(req.params.id);
   res.json(result);
 });
 
 // Escalate to next radius tier (manual).
-requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res: any) => {
   const radiusKm = await escalateRadius(req.params.id);
   res.json({ radiusKm });
 });
 
 // AI-powered escalation check for a specific request.
-requestsRouter.post("/:id/check-escalation", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/check-escalation", requireAuth, async (req: AuthedRequest, res: any) => {
   const decision = await evaluateEscalation(req.params.id);
   if (!decision) return res.json({ shouldEscalate: false, reason: "Request not eligible for escalation" });
   
@@ -141,12 +141,12 @@ requestsRouter.post("/:id/check-escalation", requireAuth, async (req: AuthedRequ
 });
 
 // Automated escalation check for all active requests (called by cron job).
-requestsRouter.post("/check-escalation-all", async (req, res) => {
+requestsRouter.post("/check-escalation-all", async (req: Request, res: any) => {
   const result = await checkEscalationForAllRequests();
   res.json(result);
 });
 
-requestsRouter.post("/:id/close", requireAuth, async (req: AuthedRequest, res) => {
+requestsRouter.post("/:id/close", requireAuth, async (req: AuthedRequest, res: any) => {
   const updated = await prisma.bloodRequest.update({
     where: { id: req.params.id },
     data: { status: "closed", closedAt: new Date() },

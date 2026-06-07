@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../db.js";
 import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 import { emitRequestUpdate } from "../services/alerts.js";
@@ -8,7 +8,7 @@ import { scheduleHealthReminders } from "../services/healthFollowup.js";
 export const responsesRouter = Router();
 
 // Alerts/responses addressed to the logged-in donor.
-responsesRouter.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.get("/mine", requireAuth, async (req: AuthedRequest, res: any) => {
   const responses = await prisma.donorResponse.findMany({
     where: { donorId: req.userId },
     orderBy: { createdAt: "desc" },
@@ -41,12 +41,12 @@ async function setStatus(req: AuthedRequest, res: any, status: string, stamp: st
   res.json(updated);
 }
 
-responsesRouter.post("/:id/accept", requireAuth, (req: AuthedRequest, res) => setStatus(req, res, "accepted", "acceptedAt"));
-responsesRouter.post("/:id/decline", requireAuth, (req: AuthedRequest, res) => setStatus(req, res, "declined", "createdAt"));
-responsesRouter.post("/:id/arrive", requireAuth, (req: AuthedRequest, res) => setStatus(req, res, "arrived", "arrivedAt"));
+responsesRouter.post("/:id/accept", requireAuth, (req: AuthedRequest, res: any) => setStatus(req, res, "accepted", "acceptedAt"));
+responsesRouter.post("/:id/decline", requireAuth, (req: AuthedRequest, res: any) => setStatus(req, res, "declined", "createdAt"));
+responsesRouter.post("/:id/arrive", requireAuth, (req: AuthedRequest, res: any) => setStatus(req, res, "arrived", "arrivedAt"));
 
 // Donation tracking endpoints
-responsesRouter.post("/:id/start-navigation", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/start-navigation", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await prisma.donorResponse.findUnique({ where: { id: req.params.id } });
   if (!resp) return res.status(404).json({ error: "Not found" });
   if (resp.donorId !== req.userId) return res.status(403).json({ error: "Not your response" });
@@ -55,7 +55,7 @@ responsesRouter.post("/:id/start-navigation", requireAuth, async (req: AuthedReq
 });
 
 // Update donor location for real-time ETA tracking
-responsesRouter.post("/:id/update-location", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/update-location", requireAuth, async (req: AuthedRequest, res: any) => {
   const { lat, lng } = req.body as { lat: number; lng: number };
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     return res.status(400).json({ error: "lat and lng required" });
@@ -105,7 +105,7 @@ responsesRouter.post("/:id/update-location", requireAuth, async (req: AuthedRequ
   res.json(updated);
 });
 
-responsesRouter.post("/:id/meet-person", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/meet-person", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await prisma.donorResponse.findUnique({ where: { id: req.params.id } });
   if (!resp) return res.status(404).json({ error: "Not found" });
   if (resp.donorId !== req.userId) return res.status(403).json({ error: "Not your response" });
@@ -113,7 +113,7 @@ responsesRouter.post("/:id/meet-person", requireAuth, async (req: AuthedRequest,
   res.json(updated);
 });
 
-responsesRouter.post("/:id/start-donation", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/start-donation", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await prisma.donorResponse.findUnique({ where: { id: req.params.id } });
   if (!resp) return res.status(404).json({ error: "Not found" });
   if (resp.donorId !== req.userId) return res.status(403).json({ error: "Not your response" });
@@ -122,7 +122,7 @@ responsesRouter.post("/:id/start-donation", requireAuth, async (req: AuthedReque
 });
 
 // Complete donation -> award reputation, badges, update donation count.
-responsesRouter.post("/:id/complete", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/complete", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await prisma.donorResponse.findUnique({ where: { id: req.params.id } });
   if (!resp) return res.status(404).json({ error: "Not found" });
 
@@ -156,7 +156,7 @@ responsesRouter.post("/:id/complete", requireAuth, async (req: AuthedRequest, re
 });
 
 // Mark request as "life_saved" after successful donation (requester confirms)
-responsesRouter.post("/:id/life-saved", requireAuth, async (req: AuthedRequest, res) => {
+responsesRouter.post("/:id/life-saved", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await prisma.donorResponse.findUnique({ 
     where: { id: req.params.id },
     include: { request: true, donor: true }

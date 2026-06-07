@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../db.js";
 
 export const impactRouter = Router();
 
 // Headline stats for Home + Impact screens.
-impactRouter.get("/stats", async (_req, res) => {
+impactRouter.get("/stats", async (_req: Request, res: Response) => {
   const [activeRequests, livesSaved, donors, today] = await Promise.all([
     prisma.bloodRequest.count({ where: { status: { in: ["verified", "alert_sent", "donor_accepted"] } } }),
     prisma.donorResponse.count({ where: { status: "completed" } }),
@@ -15,7 +15,7 @@ impactRouter.get("/stats", async (_req, res) => {
 });
 
 // District heat-map: active request count per district.
-impactRouter.get("/heatmap", async (_req, res) => {
+impactRouter.get("/heatmap", async (_req: Request, res: Response) => {
   const rows = await prisma.bloodRequest.groupBy({
     by: ["district"],
     where: { status: { in: ["verified", "alert_sent", "donor_accepted"] } },
@@ -25,7 +25,7 @@ impactRouter.get("/heatmap", async (_req, res) => {
 });
 
 // Donor leaderboard.
-impactRouter.get("/leaderboard", async (_req, res) => {
+impactRouter.get("/leaderboard", async (_req: Request, res: Response) => {
   const donors = await prisma.user.findMany({
     where: { role: "donor", donationCount: { gt: 0 } },
     orderBy: [{ donationCount: "desc" }, { reputationScore: "desc" }],
