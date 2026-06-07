@@ -20,7 +20,16 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `Request failed (${res.status})`);
+    let message: string;
+    if (typeof err.error === "string") {
+      message = err.error;
+    } else if (err.error) {
+      // Backend sometimes sends structured validation errors (e.g. zod flatten result)
+      message = JSON.stringify(err.error);
+    } else {
+      message = `Request failed (${res.status})`;
+    }
+    throw new Error(message);
   }
   return res.status === 204 ? (null as any) : res.json();
 }
