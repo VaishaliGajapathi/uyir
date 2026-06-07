@@ -306,6 +306,7 @@ const TAMIL_NADU_HOSPITALS = [
 export function HospitalAutocomplete({ value, onChange, district, userLocation }: HospitalAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suppressNextSuggestions, setSuppressNextSuggestions] = useState(false);
 
   // Calculate distance between two coordinates (Haversine formula)
   function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -368,6 +369,13 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
   }
 
   useEffect(() => {
+    if (suppressNextSuggestions) {
+      // Skip one suggestions recalculation right after a selection,
+      // so the dropdown stays closed when user picks a hospital.
+      setSuppressNextSuggestions(false);
+      return;
+    }
+
     if (value.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -419,11 +427,12 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
 
     setSuggestions(filtered.slice(0, 8));
     setShowSuggestions(true);
-  }, [value, district, userLocation]);
+  }, [value, district, userLocation, suppressNextSuggestions]);
 
   function selectHospital(hospital: string) {
     onChange(hospital);
     setShowSuggestions(false);
+    setSuppressNextSuggestions(true);
   }
 
   function clearSelection() {

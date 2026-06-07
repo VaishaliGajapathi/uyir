@@ -295,6 +295,10 @@ export function NewRequest() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
+              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
+              {districts.map((d) => <option key={d}>{d}</option>)}
+            </Select>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "மருத்துவமனை *" : "Hospital *"}</label>
               <HospitalAutocomplete
@@ -303,10 +307,6 @@ export function NewRequest() {
                 district={form.district}
               />
             </div>
-            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
-              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-              {districts.map((d) => <option key={d}>{d}</option>)}
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label={lang === "ta" ? "தொடர்பு நபர் *" : "Contact person *"} value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
