@@ -10,3 +10,6 @@ server/uploads/
 .DS_Store
 .vite/
 coverage/
+client/node_modules/
+client/dist/
+client/.vite/
