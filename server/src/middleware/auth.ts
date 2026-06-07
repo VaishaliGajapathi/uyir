@@ -8,6 +8,7 @@ export interface AuthedRequest extends Request {
   role?: string;
   params: any;
   body: any;
+  headers: any;
 }
 
 export function signToken(userId: string, role: string): string {

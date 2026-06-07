@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
@@ -15,8 +15,8 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "uyir-api" }));
-app.get("/api/districts", (_req, res) => res.json(TN_DISTRICT_NAMES));
+app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
+app.get("/api/districts", (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
@@ -27,7 +27,7 @@ app.use("/api/impact", impactRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/admin", adminRouter);
 
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("[error]", err);
   res.status(500).json({ error: err?.message || "Internal error" });
 });
