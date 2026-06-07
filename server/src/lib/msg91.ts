@@ -11,8 +11,8 @@ export async function sendOTP(mobile: string, otp: string, name?: string): Promi
   }
 
   try {
-    // Format mobile number (remove +91 or 91 prefix if present)
-    const cleanMobile = mobile.replace(/^(\+91|91)/, "");
+    // Format mobile number with India country code for MSG91
+    const cleanMobile = `91${mobile.replace(/\D/g, "").slice(-10)}`;
 
     // Build URL with optional name parameter for personalized OTP
     let url = `https://control.msg91.com/api/v5/otp?authkey=${authKey}&template_id=${templateId}&mobile=${cleanMobile}&otp=${otp}`;
@@ -53,8 +53,8 @@ export async function verifyOTP(mobile: string, otp: string): Promise<boolean> {
   }
 
   try {
-    // Format mobile number
-    const cleanMobile = mobile.replace(/^(\+91|91)/, "");
+    // Format mobile number with India country code for MSG91
+    const cleanMobile = `91${mobile.replace(/\D/g, "").slice(-10)}`;
 
     const response = await fetch(
       `https://control.msg91.com/api/v5/otp/verify?authkey=${authKey}&mobile=${cleanMobile}&otp=${otp}`,

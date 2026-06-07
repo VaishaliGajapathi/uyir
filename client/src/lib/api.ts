@@ -1,4 +1,5 @@
-const BASE = import.meta.env.VITE_API_URL || "/api";
+const configuredBase = import.meta.env.VITE_API_URL || "/api";
+const BASE = configuredBase.endsWith("/api") || configuredBase === "/api" ? configuredBase : `${configuredBase.replace(/\/$/, "")}/api`;
 
 let token: string | null = localStorage.getItem("uyir_token");
 
