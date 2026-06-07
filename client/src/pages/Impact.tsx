@@ -37,11 +37,36 @@ export function Impact() {
 
   // Calculate blood group distribution
   const bloodGroupDistribution = [
-    { group: "A+", count: Math.floor(stats?.donors * 0.35 || 35) },
-    { group: "B+", count: Math.floor(stats?.donors * 0.25 || 25) },
-    { group: "O+", count: Math.floor(stats?.donors * 0.30 || 30) },
-    { group: "AB+", count: Math.floor(stats?.donors * 0.10 || 10) },
+    { group: "A+", count: Math.floor((stats?.donors || 100) * 0.35) },
+    { group: "B+", count: Math.floor((stats?.donors || 100) * 0.25) },
+    { group: "O+", count: Math.floor((stats?.donors || 100) * 0.30) },
+    { group: "AB+", count: Math.floor((stats?.donors || 100) * 0.10) },
   ];
+
+  const totalBloodGroupCount = Math.max(
+    bloodGroupDistribution.reduce((sum, bg) => sum + bg.count, 0),
+    1
+  );
+
+  const bloodGroupColors: Record<string, string> = {
+    "A+": "#ef4444", // red
+    "B+": "#3b82f6", // blue
+    "O+": "#22c55e", // green
+    "AB+": "#8b5cf6", // violet
+  };
+
+  // Build conic-gradient string for donut chart
+  let cumulativeAngle = 0;
+  const donutGradient = bloodGroupDistribution
+    .map((bg) => {
+      const angle = (bg.count / totalBloodGroupCount) * 360;
+      const start = cumulativeAngle;
+      const end = cumulativeAngle + angle;
+      cumulativeAngle = end;
+      const color = bloodGroupColors[bg.group] || "#e5e7eb";
+      return `${color} ${start}deg ${end}deg`;
+    })
+    .join(", ");
 
   return (
     <div className="px-4 py-4 bg-white min-h-screen">
@@ -66,24 +91,48 @@ export function Impact() {
           {lang === "ta" ? "இரத்த வகை பகிர்வு" : "Blood Group Distribution"}
         </h2>
         <Card className="p-4">
-          <div className="space-y-3">
-            {bloodGroupDistribution.map((bg) => {
-              const percentage = (bg.count / stats?.donors) * 100;
-              return (
-                <div key={bg.group}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-slate-700">{bg.group}</span>
-                    <span className="text-slate-500">{bg.count} ({percentage.toFixed(1)}%)</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-uyir-600 rounded-full"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="flex items-center justify-center md:w-1/3">
+              <div
+                className="relative h-32 w-32 rounded-full"
+                style={{ backgroundImage: `conic-gradient(${donutGradient})` }}
+              >
+                <div className="absolute inset-4 rounded-full bg-white flex flex-col items-center justify-center text-center">
+                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Total</span>
+                  <span className="text-sm font-bold text-slate-700">{totalBloodGroupCount}</span>
+                  <span className="text-[10px] text-slate-400">donors</span>
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-3">
+              {bloodGroupDistribution.map((bg) => {
+                const percentage = (bg.count / totalBloodGroupCount) * 100;
+                const color = bloodGroupColors[bg.group] || "#0ea5e9";
+                return (
+                  <div key={bg.group}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-3 w-3 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="font-semibold text-slate-700">{bg.group}</span>
+                      </div>
+                      <span className="text-slate-500">
+                        {bg.count} ({percentage.toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${percentage}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </Card>
       </section>
