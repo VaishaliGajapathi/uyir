@@ -56,8 +56,8 @@ export function Onboarding() {
     setErr(""); setLoading(true);
     try {
       const r = await api.requestOtp(mobile, name);
-      setDevOtp(r.devOtp);
-      setCode(r.devOtp); // prefilled for demo
+      setDevOtp(r.devOtp || "");
+      setCode(r.devOtp || "");
       setUserExists(r.exists || false);
       setExistingUser(r.user || null);
 
