@@ -86,6 +86,14 @@ export function HospitalLogin() {
             >
               ← Back to main app
             </button>
+            <div className="mt-3">
+              <button
+                onClick={() => nav("/hospital-register")}
+                className="text-sm font-semibold text-uyir-600 hover:underline"
+              >
+                New hospital? Register here
+              </button>
+            </div>
           </div>
         </div>
       </Card>

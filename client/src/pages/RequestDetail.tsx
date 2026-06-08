@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, Radio, MapPin, Flag, X, Clock, ShieldCheck, ChevronsUp, Share2, Navigation, UserCheck, Droplet, Star, Heart, MessageSquare } from "lucide-react";
+import { ArrowLeft, Phone, Radio, MapPin, Flag, X, Clock, ShieldCheck, ChevronsUp, Share2, Navigation, UserCheck, Droplet, Star, Heart, MessageSquare, Award } from "lucide-react";
 import { api, type BloodRequest, type DonationRating } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Card, Spinner, Sheet, Badge } from "../components/ui";
 import { emergencyMeta, statusMeta, timeAgo } from "../lib/utils";
 import { MapView } from "../components/MapView";
+import { DonationCertificate } from "../components/DonationCertificate";
 
 export function RequestDetail() {
   const { id } = useParams();
@@ -23,6 +24,8 @@ export function RequestDetail() {
   const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
   const [donorLocation, setDonorLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const [certificateData, setCertificateData] = useState<any>(null);
 
   async function load() {
     if (!id) return;
@@ -305,7 +308,7 @@ Request link: ${shareLink}`;
           )}
         </div>
 
-        <MapView hospitalAddress={`${r.hospitalName}, ${r.district}`} showNavigation={false} />
+        <MapView hospitalAddress={`${r.hospitalName}, ${r.district}`} hospitalLat={r.lat} hospitalLng={r.lng} showNavigation={false} />
 
         {isDonor && !["completed", "closed"].includes(r.status) && !myResponse && (
           <div className="grid grid-cols-2 gap-3">
@@ -350,7 +353,20 @@ Request link: ${shareLink}`;
                   </Button>
                 )}
                 {myResponse.status === "arrived" && (
-                  <Button size="sm" className="bg-emerald-600" loading={busy} onClick={() => act(() => api.completeResponse(myResponse.id), "Thank you for donating!")}>
+                  <Button size="sm" className="bg-emerald-600" loading={busy} onClick={() => act(async () => {
+                    const res = await api.completeResponse(myResponse.id);
+                    if (res.newBadge) alert(`Donation complete! New badge: ${res.newBadge}`);
+                    // Show certificate
+                    setCertificateData({
+                      donorName: user?.name || "Donor",
+                      bloodGroup: user?.bloodGroup || "Unknown",
+                      donationDate: new Date().toISOString(),
+                      hospitalName: r.hospitalName,
+                      district: r.district,
+                      certificateId: `UYIR-${Date.now()}-${user?.id?.slice(-6)}`,
+                    });
+                    setCertificateOpen(true);
+                  }, "Thank you for donating!")}>
                     Complete donation
                   </Button>
                 )}
@@ -464,6 +480,24 @@ Request link: ${shareLink}`;
           className="mb-3 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-uyir-500"
         />
         <Button className="w-full" loading={busy} onClick={submitRating}>Submit Rating</Button>
+      </Sheet>
+
+      <Sheet open={certificateOpen} onClose={() => setCertificateOpen(false)}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">Your Donation Certificate</h3>
+          <button onClick={() => setCertificateOpen(false)}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        {certificateData && (
+          <DonationCertificate
+            donorName={certificateData.donorName}
+            bloodGroup={certificateData.bloodGroup}
+            donationDate={certificateData.donationDate}
+            hospitalName={certificateData.hospitalName}
+            district={certificateData.district}
+            certificateId={certificateData.certificateId}
+            onClose={() => setCertificateOpen(false)}
+          />
+        )}
       </Sheet>
     </div>
   );

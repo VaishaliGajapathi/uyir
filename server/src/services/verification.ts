@@ -1,4 +1,4 @@
-import { gemini, replicate, MODELS, completeJSON, extractJson } from "../lib/ai.js";
+import { gemini, openai, MODELS, completeJSON, extractJson, hasGemini, hasFal, hasOpenAI, callFalAI, GEMINI_VISION_MODELS } from "../lib/ai.js";
 
 export interface VerificationResult {
   score: number; // 0-100
@@ -19,6 +19,127 @@ export interface HealthTipsResult {
 }
 
 const VALID_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const ALLOW_MOCK_DOCUMENTS = process.env.ALLOW_MOCK_DOCUMENTS === "true";
+
+type DocumentVerificationResult = {
+  score: number;
+  verified: boolean;
+  notes: string;
+  nameMatch?: boolean;
+  hospitalNameFound?: boolean;
+  dateRecent?: boolean;
+  documentKind?: string;
+  documentDate?: string;
+  doctorRegistrationFound?: boolean;
+  hospitalRegistrationFound?: boolean;
+  gstNumberFound?: boolean;
+};
+
+function normalizeDocumentResult(out: DocumentVerificationResult): DocumentVerificationResult {
+  const normalized: DocumentVerificationResult = {
+    ...out,
+    score: Number.isFinite(Number(out.score)) ? Math.max(0, Math.min(100, Math.round(Number(out.score)))) : 0,
+    verified: !!out.verified,
+    notes: String(out.notes || "").trim() || "Document analyzed.",
+  };
+
+  if (normalized.nameMatch === false) normalized.score = Math.min(normalized.score, 35);
+  if (normalized.hospitalNameFound === false) normalized.score = Math.min(normalized.score, 45);
+  if (normalized.dateRecent === false) normalized.score = Math.min(normalized.score, 55);
+
+  if (["prescription", "referral_letter"].includes(String(normalized.documentKind || "")) && normalized.doctorRegistrationFound === false) {
+    normalized.score = Math.min(normalized.score, 60);
+  }
+
+  if (["bill", "receipt"].includes(String(normalized.documentKind || "")) && normalized.gstNumberFound === false && normalized.hospitalRegistrationFound === false) {
+    normalized.score = Math.min(normalized.score, 55);
+  }
+
+  normalized.verified =
+    normalized.score >= 70 &&
+    normalized.nameMatch !== false &&
+    normalized.hospitalNameFound !== false &&
+    normalized.dateRecent !== false;
+
+  const noteParts = [normalized.notes];
+  if (normalized.nameMatch === false && !normalized.notes.toLowerCase().includes("name")) noteParts.push("Patient name does not match the request.");
+  if (normalized.hospitalNameFound === false && !normalized.notes.toLowerCase().includes("hospital")) noteParts.push("Hospital identity is missing or unclear.");
+  if (normalized.dateRecent === false && !normalized.notes.toLowerCase().includes("date")) noteParts.push("Document date is missing or not recent.");
+  if (["prescription", "referral_letter"].includes(String(normalized.documentKind || "")) && normalized.doctorRegistrationFound === false && !normalized.notes.toLowerCase().includes("registration")) {
+    noteParts.push("Doctor registration ID is missing or unclear.");
+  }
+  if (["bill", "receipt"].includes(String(normalized.documentKind || "")) && normalized.gstNumberFound === false && normalized.hospitalRegistrationFound === false && !normalized.notes.toLowerCase().includes("gst")) {
+    noteParts.push("GST number or hospital registration number is missing or unclear.");
+  }
+  normalized.notes = noteParts.join(" ").trim();
+
+  return normalized;
+}
+
+function extractPdfText(base64: string): string {
+  try {
+    const raw = Buffer.from(base64, "base64").toString("latin1");
+    const decoded = raw
+      .replace(/\r/g, "\n")
+      .replace(/\(([^()]*)\)/g, " $1 ")
+      .replace(/\\n/g, " ")
+      .replace(/\\r/g, " ")
+      .replace(/\\t/g, " ")
+      .replace(/\\\(/g, "(")
+      .replace(/\\\)/g, ")");
+
+    const printable = decoded
+      .replace(/[^\x20-\x7E\n]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return printable;
+  } catch {
+    return "";
+  }
+}
+
+async function verifyPdfDocument(text: string, documentType: string, patientName?: string): Promise<DocumentVerificationResult | null> {
+  if (!text || text.length < 20) return null;
+
+  const nameCheck = patientName
+    ? `Check carefully if the PATIENT NAME in the document text matches "${patientName}" and set nameMatch accordingly.`
+    : "";
+
+  const prompt = `You are verifying extracted text from a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement in Tamil Nadu.
+Read the extracted PDF text and determine whether it appears to be a real medical document.
+
+Check these signals:
+- patient name match with the request
+- whether a hospital/clinic name is visible
+- whether the document date is visible and recent enough for an active admission/request
+- if it is a prescription, referral, or doctor note: check for doctor registration / medical council number
+- if it is a bill, receipt, or invoice: check for GST number and/or hospital registration/license number
+
+${nameCheck}
+
+Extracted document text:
+"""
+${text.slice(0, 12000)}
+"""
+
+Return ONLY JSON with this exact shape:
+{"score":0-100,
+ "verified":true/false,
+ "notes":"short reason mentioning the strongest positive/negative checks",
+ "documentKind":"prescription|referral_letter|bill|receipt|admission_slip|discharge_summary|unknown",
+ "nameMatch":true/false,
+ "hospitalNameFound":true/false,
+ "documentDate":"string or empty",
+ "dateRecent":true/false,
+ "doctorRegistrationFound":true/false,
+ "hospitalRegistrationFound":true/false,
+ "gstNumberFound":true/false}`;
+
+  const out = await completeJSON(prompt);
+  if (!out) return null;
+  return normalizeDocumentResult(out as DocumentVerificationResult);
+}
 
 // Rule-based completeness checks (deterministic, always runs).
 function baseChecks(req: any) {
@@ -77,73 +198,155 @@ export async function verifyDocument(
   mimeType: string,
   documentType: string,
   patientName?: string
-): Promise<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }> {
+): Promise<DocumentVerificationResult> {
+  if (ALLOW_MOCK_DOCUMENTS) {
+    console.warn("[verification] Using testing-only mock document bypass");
+    return {
+      score: 85,
+      verified: true,
+      notes: "Testing mode: mock document accepted for local verification.",
+      nameMatch: true,
+      hospitalNameFound: true,
+      dateRecent: true,
+      documentKind: "admission_slip",
+      documentDate: "testing-mode",
+      doctorRegistrationFound: true,
+      hospitalRegistrationFound: true,
+      gstNumberFound: true,
+    };
+  }
+
+  if (/pdf/i.test(mimeType)) {
+    console.log("[verification] Attempting PDF text verification");
+    const pdfText = extractPdfText(base64);
+    const pdfResult = await verifyPdfDocument(pdfText, documentType, patientName);
+    if (pdfResult) {
+      console.log("[verification] PDF text verification success:", pdfResult);
+      return pdfResult;
+    }
+    console.warn("[verification] PDF text verification could not extract sufficient text");
+  }
+
   const nameCheck = patientName
     ? `Check carefully if the PATIENT NAME in the document matches "${patientName}" and set nameMatch accordingly.`
     : "";
 
-  const prompt = `You are verifying a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement.
-- First, describe briefly what you see (hospital letterhead, stamps, signatures, handwriting, etc.).
-- Check if it looks like a genuine medical document (not a random image or spam).
-- Check if the text is clear or blurry/cropped.
+  const prompt = `You are verifying a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement in Tamil Nadu.
+Inspect the uploaded image carefully and extract whether it looks like a real medical document.
+
+Check these signals:
+- patient name match with the request
+- whether a hospital/clinic name is visible
+- whether the document date is visible and recent enough for an active admission/request
+- whether the document is clear, readable, and not badly cropped
+- if it is a prescription, referral, or doctor note: check for doctor name and registration / medical council number
+- if it is a bill, receipt, or invoice: check for GST number and/or hospital registration/license number
+- if it is an admission slip/discharge summary: check hospital identity and recent admission date
+
 ${nameCheck}
 
-Return ONLY JSON with this shape:
+Return ONLY JSON with this exact shape:
 {"score":0-100,
  "verified":true/false,
- "notes":"very short explanation of WHY: mention if patient name matches/mismatches, if image is blurry or low clarity, if hospital/doctor details look real or missing",
- "nameMatch":true/false}`;
+ "notes":"short reason mentioning the strongest positive/negative checks",
+ "documentKind":"prescription|referral_letter|bill|receipt|admission_slip|discharge_summary|unknown",
+ "nameMatch":true/false,
+ "hospitalNameFound":true/false,
+ "documentDate":"string or empty",
+ "dateRecent":true/false,
+ "doctorRegistrationFound":true/false,
+ "hospitalRegistrationFound":true/false,
+ "gstNumberFound":true/false}`;
 
   // Try Gemini first
-  if (gemini) {
-    try {
-      const model = gemini.getGenerativeModel({ model: MODELS.gemini });
-      const res = await model.generateContent([
-        { inlineData: { data: base64, mimeType } },
-        { text: prompt },
-      ]);
-      const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(res.response.text());
-      if (out) {
-        // If the model detected a name mismatch, make sure that is visible in notes.
-        if (patientName && out.nameMatch === false && !out.notes.toLowerCase().includes("name")) {
-          out.notes = `${out.notes} (Patient name on document does NOT match request name "${patientName}")`;
+  if (gemini && hasGemini) {
+    for (const modelName of GEMINI_VISION_MODELS) {
+      try {
+        console.log("[verification] Attempting Gemini vision with model:", modelName);
+        const model = gemini.getGenerativeModel({ model: modelName });
+        const res = await model.generateContent([
+          { inlineData: { data: base64, mimeType } },
+          { text: prompt },
+        ]);
+        const text = res.response.text();
+        console.log("[verification] Gemini vision response:", text.substring(0, 200));
+        const out = extractJson<DocumentVerificationResult>(text);
+        if (out) {
+          const normalized = normalizeDocumentResult(out);
+          console.log("[verification] Gemini vision success:", normalized);
+          return normalized;
         }
-        return out;
+        console.warn(`[verification] Gemini vision model ${modelName} could not parse JSON from response`);
+      } catch (e) {
+        console.error(`[verification] Gemini vision model ${modelName} failed:`, (e as Error).message);
       }
+    }
+  } else {
+    console.warn("[verification] Gemini not configured for vision");
+  }
+
+  if (openai && hasOpenAI) {
+    try {
+      console.log("[verification] Attempting OpenAI vision with model:", MODELS.vision);
+      const dataUri = `data:${mimeType};base64,${base64}`;
+      const res = await openai.chat.completions.create({
+        model: MODELS.vision,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: dataUri } },
+            ],
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      });
+      const text = res.choices[0]?.message?.content || "";
+      console.log("[verification] OpenAI vision response:", text.substring(0, 200));
+      const out = extractJson<DocumentVerificationResult>(text);
+      if (out) {
+        const normalized = normalizeDocumentResult(out);
+        console.log("[verification] OpenAI vision success:", normalized);
+        return normalized;
+      }
+      console.warn("[verification] OpenAI vision could not parse JSON from response");
     } catch (e) {
-      console.warn("[verification] Gemini vision failed:", (e as Error).message);
+      console.error("[verification] OpenAI vision failed:", (e as Error).message);
     }
   }
 
-  // Fallback to Replicate
-  if (replicate) {
+  // Fallback to fal.ai
+  if (hasFal) {
     try {
-      // Convert base64 to data URI for Replicate
+      console.log("[verification] Attempting fal.ai vision fallback");
+      // Convert base64 to data URI for fal.ai
       const dataUri = `data:${mimeType};base64,${base64}`;
       
-      // Use a vision model from Replicate (e.g., LLaVA or similar)
-      const output = await replicate.run(
-        "yorickvp/llava-13b:2facb4a710fb1bc6292e96081a4c6388a52e17e42bf7bc0e6e7d67f8ddc5706b",
-        {
-          input: {
-            image: dataUri,
-            prompt: prompt,
-          }
-        }
-      );
+      // Use a vision model from fal.ai (e.g., LLaVA or similar)
+      const output = await callFalAI("fal-ai/llava-13b", {
+        image_url: dataUri,
+        prompt: prompt,
+      });
       
-      // Parse Replicate output
-      const text = typeof output === 'string' ? output : JSON.stringify(output);
-      const out = extractJson<{ score: number; verified: boolean; notes: string; nameMatch?: boolean }>(text);
+      // Parse fal.ai output
+      const text = output.text || (typeof output === 'string' ? output : JSON.stringify(output));
+      console.log("[verification] fal.ai vision response:", text.substring(0, 200));
+      const out = extractJson<DocumentVerificationResult>(text);
       if (out) {
-        if (patientName && out.nameMatch === false && !out.notes.toLowerCase().includes("name")) {
-          out.notes = `${out.notes} (Patient name on document does NOT match request name "${patientName}")`;
-        }
-        return out;
+        const normalized = normalizeDocumentResult(out);
+        console.log("[verification] fal.ai vision success:", normalized);
+        return normalized;
+      } else {
+        console.warn("[verification] fal.ai vision could not parse JSON from response");
       }
     } catch (e) {
-      console.warn("[verification] Replicate vision failed:", (e as Error).message);
+      console.error("[verification] fal.ai vision failed:", (e as Error).message);
+      console.error("[verification] Full error:", JSON.stringify(e, null, 2));
     }
+  } else {
+    console.warn("[verification] fal.ai not configured for vision");
   }
 
   // If we reach here, both Gemini and Replicate vision either failed or are not configured.
@@ -152,8 +355,8 @@ Return ONLY JSON with this shape:
     score: 0,
     verified: false,
     notes:
-      "Automatic document verification could not run (AI vision not available or image unreadable). " +
-      "Please check the document manually: confirm patient name matches the request and that the slip is clear and from a real hospital.",
+      "Automatic document verification could not run. " +
+      "This request can continue to manual review. Please confirm the patient name, date, hospital details, and supporting registration information from the uploaded document.",
   };
 }
 

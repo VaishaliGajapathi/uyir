@@ -4,7 +4,7 @@ import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 import { transcribeAudio, parseRequestFromText, parseProfileFromText } from "../services/stt.js";
 import { analyzeMessage } from "../services/fraud.js";
 import { generateHealthTips } from "../services/verification.js";
-import { hasOpenAI, hasGemini, hasReplicate } from "../lib/ai.js";
+import { hasOpenAI, hasGemini, hasFal } from "../lib/ai.js";
 import { prisma } from "../db.js";
 
 export const aiRouter = Router();
@@ -12,7 +12,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 
 // Report which AI providers are configured (drives UI affordances).
 aiRouter.get("/status", (_req: Request, res: any) => {
-  res.json({ openai: hasOpenAI, gemini: hasGemini, replicate: hasReplicate });
+  res.json({ openai: hasOpenAI, gemini: hasGemini, fal: hasFal });
 });
 
 // Voice -> text (Whisper). Optionally parse into a request or profile.

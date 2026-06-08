@@ -8,47 +8,35 @@ declare global {
 
 interface MapViewProps {
   hospitalAddress?: string;
+  hospitalLat?: number;
+  hospitalLng?: number;
   donorLocation?: { lat: number; lng: number };
   onNavigate?: () => void;
   showNavigation?: boolean;
 }
 
-export function MapView({ hospitalAddress, donorLocation, onNavigate, showNavigation = true }: MapViewProps) {
+export function MapView({ hospitalAddress, hospitalLat, hospitalLng, donorLocation, onNavigate, showNavigation = true }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [directions, setDirections] = useState<any>(null);
 
   useEffect(() => {
     if (!window.google || !mapRef.current) return;
-    
+
+    // Use hospital coordinates if available, otherwise geocode address
+    const initialCenter = hospitalLat && hospitalLng 
+      ? { lat: hospitalLat, lng: hospitalLng }
+      : { lat: 11.1271, lng: 78.6569 }; // Tamil Nadu center fallback
+
     const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 11.1271, lng: 78.6569 }, // Tamil Nadu center
-      zoom: 7,
+      center: initialCenter,
+      zoom: hospitalLat && hospitalLng ? 14 : 7,
       styles: [
         { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
       ],
     });
 
     setMapLoaded(true);
-
-    // Add Tamil Nadu district markers
-    const districts = [
-      { name: "Chennai", lat: 13.0827, lng: 80.2707 },
-      { name: "Coimbatore", lat: 11.0168, lng: 76.9558 },
-      { name: "Madurai", lat: 9.9252, lng: 78.1198 },
-      { name: "Salem", lat: 11.6643, lng: 78.1460 },
-      { name: "Tiruppur", lat: 11.1085, lng: 77.3411 },
-      { name: "Erode", lat: 11.3410, lng: 77.7172 },
-      { name: "Trichy", lat: 10.7905, lng: 78.7047 },
-    ];
-
-    districts.forEach((district) => {
-      new window.google.maps.Marker({
-        position: { lat: district.lat, lng: district.lng },
-        map,
-        title: district.name,
-      });
-    });
 
     // If donor location is provided, show it
     if (donorLocation) {
@@ -67,8 +55,24 @@ export function MapView({ hospitalAddress, donorLocation, onNavigate, showNaviga
       });
     }
 
-    // Geocode hospital address and show marker
-    if (hospitalAddress) {
+    // Show hospital marker using coordinates if available, otherwise geocode
+    if (hospitalLat && hospitalLng) {
+      new window.google.maps.Marker({
+        position: { lat: hospitalLat, lng: hospitalLng },
+        map,
+        title: "Hospital",
+        icon: {
+          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 8,
+          fillColor: "#16a34a",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        },
+      });
+      map.setCenter({ lat: hospitalLat, lng: hospitalLng });
+      map.setZoom(14);
+    } else if (hospitalAddress) {
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: hospitalAddress }, (results: any, status: string) => {
         if (status === "OK" && results[0]) {
@@ -90,7 +94,7 @@ export function MapView({ hospitalAddress, donorLocation, onNavigate, showNaviga
         }
       });
     }
-  }, [hospitalAddress, donorLocation]);
+  }, [hospitalAddress, hospitalLat, hospitalLng, donorLocation]);
 
   function openNavigation() {
     if (!hospitalAddress) return;

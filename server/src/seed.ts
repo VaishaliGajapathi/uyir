@@ -56,7 +56,6 @@ async function main() {
           district,
           bloodGroup: group,
           isPlateletDonor: i % 3 === 0,
-          nightEmergency: i % 2 === 0,
           shareLocation: true,
           lat: c ? jitter(c.lat) : null,
           lng: c ? jitter(c.lng) : null,
@@ -77,6 +76,21 @@ async function main() {
   await prisma.user.create({
     data: { name: "NGO Verifier", mobile: "9000000002", role: "verifier", district: "Coimbatore", language: "en" },
   });
+
+  // Super admin (from environment variable or default)
+  const superAdminMobile = process.env.SUPER_ADMIN_MOBILE || "9000000000";
+  const bcrypt = (await import("bcryptjs")).default;
+  const superAdminPassword = await bcrypt.hash("admin123", 10);
+  await prisma.user.create({
+    data: {
+      name: "Super Admin",
+      mobile: superAdminMobile.replace(/\D/g, "").slice(-10),
+      role: "admin",
+      password: superAdminPassword,
+      verified: true,
+    },
+  });
+  console.log(`[seed] Super admin created with mobile: ${superAdminMobile}, password: admin123`);
 
   // A sample verified request to populate feeds
   const c = TN_DISTRICTS["Coimbatore"];

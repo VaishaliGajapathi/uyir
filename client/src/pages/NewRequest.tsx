@@ -13,7 +13,7 @@ const MIN_DOCUMENT_VERIFY_SCORE = 70;
 
 export function NewRequest() {
   const nav = useNavigate();
-  const { lang } = useApp();
+  const { lang, user } = useApp();
   const [phase, setPhase] = useState<Phase>("form");
   const [districts, setDistricts] = useState<string[]>([]);
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -24,20 +24,77 @@ export function NewRequest() {
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [form, setForm] = useState<any>({
-    patientFirstName: "", patientLastName: "", patientAge: null, patientGender: null, bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
-    hospitalName: "", district: "", contactPerson: "", contactNumber: "",
-    doctorReference: "", emergencyLevel: "orange", lat: null, lng: null,
+    patientFirstName: "", patientAge: null, patientGender: null, bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
+    hospitalName: "", district: "",
+    emergencyLevel: "orange", lat: null, lng: null,
     location: "", area: "", city: "", pincode: "",
   });
 
   useEffect(() => { api.districts().then(setDistricts).catch(() => {}); }, []);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
-  function applyVoice(_text: string, parsed: any) {
-    if (!parsed) return;
+  const missingRequiredFields = [
+    !form.patientFirstName ? (lang === "ta" ? "நோயாளியின் பெயர்" : "Patient name") : null,
+    !form.patientAge ? (lang === "ta" ? "நோயாளியின் வயது" : "Patient age") : null,
+    !form.patientGender ? (lang === "ta" ? "நோயாளியின் பாலினம்" : "Patient gender") : null,
+    !form.bloodGroup ? (lang === "ta" ? "இரத்த வகை" : "Blood group") : null,
+    !form.hospitalName ? (lang === "ta" ? "மருத்துவமனை" : "Hospital") : null,
+    !form.district ? (lang === "ta" ? "மாவட்டம்" : "District") : null,
+  ].filter(Boolean);
+
+  const documentAiUnavailable =
+    Number(docResult?.score || 0) === 0 &&
+    String(docResult?.notes || "").includes("Automatic document verification could not run");
+
+  function handleBack() {
+    if (phase === "documents") {
+      setPhase("form");
+      return;
+    }
+    if (phase === "verifying") {
+      setPhase("documents");
+      return;
+    }
+    if (phase === "result") {
+      setPhase("documents");
+      return;
+    }
+    nav(-1);
+  }
+
+  function applyVoice(text: string, parsed: any) {
+    console.log("Voice transcription received:", { text, parsed });
+
+    if (!parsed || Object.keys(parsed).length === 0) {
+      // Silently handle empty parsing — no toast during transcription
+      console.log("No parsed data from voice input");
+      return;
+    }
+
     const map: any = { ...parsed };
     if (map.unitsRequired) map.unitsRequired = Number(map.unitsRequired);
-    setForm((f: any) => ({ ...f, ...Object.fromEntries(Object.entries(map).filter(([, v]) => v != null)) }));
+
+    // Map parsed fields to form fields
+    const updates: any = {};
+    if (map.patientName) updates.patientFirstName = map.patientName;
+    if (map.patientAge) updates.patientAge = Number(map.patientAge);
+    if (map.bloodGroup) updates.bloodGroup = map.bloodGroup;
+    if (map.componentType) updates.componentType = map.componentType;
+    if (map.unitsRequired) updates.unitsRequired = map.unitsRequired;
+    if (map.hospitalName) updates.hospitalName = map.hospitalName;
+    if (map.district) updates.district = map.district;
+    if (map.emergencyLevel) updates.emergencyLevel = map.emergencyLevel;
+
+    // Apply updates silently
+    setForm((f: any) => ({ ...f, ...updates }));
+
+    // Simple toast after form records are populated — ask user to check details
+    const filledFields = Object.keys(updates).length;
+    if (filledFields > 0) {
+      alert(lang === "ta"
+        ? `${filledFields} புலங்கள் குரல் உள்ளீட்டிலிருந்து நிரப்பப்பட்டுள்ளன. தயவுசெய்து விவரங்களை சரிபார்க்கவும்.`
+        : `${filledFields} field(s) filled from voice input. Please check the details.`);
+    }
   }
 
   async function captureLocation() {
@@ -125,8 +182,14 @@ export function NewRequest() {
   async function createRequest() {
     setErr(""); setBusy(true);
     try {
-      const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
-      const payload = { ...form, patientName, unitsRequired: Number(form.unitsRequired) };
+      const patientName = form.patientFirstName.trim();
+      const payload = { 
+        ...form, 
+        patientName, 
+        unitsRequired: Number(form.unitsRequired),
+        contactNumber: user?.mobile || "",
+        contactPerson: user?.name || ""
+      };
       const r = await api.createRequest(payload);
       setRequestId(r.id);
       setPhase("documents");
@@ -184,7 +247,7 @@ export function NewRequest() {
 
   async function runVerify() {
     if (!requestId) return;
-    if (!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) {
+    if ((!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable) {
       setErr(lang === "ta"
         ? `ஆவணம் சரிபார்க்கப்படவில்லை. தெளிவான மருத்துவமனை ஆவணத்தை மீண்டும் பதிவேற்றவும் (${MIN_DOCUMENT_VERIFY_SCORE}% அல்லது அதற்கு மேல் தேவை).`
         : `Document verification has not passed yet. Please upload a clearer valid hospital document (${MIN_DOCUMENT_VERIFY_SCORE}% or above required).`);
@@ -214,16 +277,16 @@ export function NewRequest() {
 
   function shareToWhatsApp() {
     if (!requestId) return;
-    const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const patientName = form.patientFirstName.trim();
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${user?.mobile || ""}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
 
   function shareToFacebook() {
     if (!requestId) return;
-    const patientName = `${form.patientFirstName} ${form.patientLastName}`.trim();
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${form.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const patientName = form.patientFirstName.trim();
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${user?.mobile || ""}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
@@ -239,7 +302,7 @@ export function NewRequest() {
     <div className="min-h-screen bg-slate-50 px-4 py-4">
       <header className="flex items-center justify-between gap-3 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => nav(-1)}><ArrowLeft className="h-6 w-6 text-slate-700" /></button>
+          <button onClick={handleBack}><ArrowLeft className="h-6 w-6 text-slate-700" /></button>
           <h1 className="text-lg font-bold text-slate-800">{lang === "ta" ? "இரத்த கோரிக்கை" : "New Blood Request"}</h1>
         </div>
         <VoiceButton
@@ -247,7 +310,7 @@ export function NewRequest() {
           language={lang}
           onResult={applyVoice}
           hideLabel
-          className="h-10 w-10 rounded-full bg-uyir-600 text-white shadow-md hover:bg-uyir-700"
+          className="h-14 w-14 rounded-full bg-uyir-600 text-white shadow-lg hover:bg-uyir-700"
         />
       </header>
 
@@ -256,28 +319,27 @@ export function NewRequest() {
       {phase === "form" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Input label={lang === "ta" ? "நோயாளியின் முதல் பெயர் *" : "Patient first name *"} value={form.patientFirstName} onChange={(e) => set("patientFirstName", e.target.value)} />
-            <Input label={lang === "ta" ? "நோயாளியின் கடைசி பெயர் *" : "Patient last name *"} value={form.patientLastName} onChange={(e) => set("patientLastName", e.target.value)} />
+            <Input label={lang === "ta" ? "நோயாளியின் பெயர் *" : "Patient name *"} value={form.patientFirstName} onChange={(e) => set("patientFirstName", e.target.value)} />
+            <Input label={lang === "ta" ? "நோயாளியின் வயது *" : "Patient age *"} type="number" value={form.patientAge || ""} onChange={(e) => set("patientAge", Number(e.target.value))} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label={lang === "ta" ? "நோயாளியின் வயது *" : "Patient age *"} type="number" value={form.patientAge || ""} onChange={(e) => set("patientAge", Number(e.target.value))} />
             <Select label={lang === "ta" ? "நோயாளியின் பாலினம் *" : "Patient gender *"} value={form.patientGender || ""} onChange={(e) => set("patientGender", e.target.value)}>
               <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
               <option value="male">{lang === "ta" ? "ஆண்" : "Male"}</option>
               <option value="female">{lang === "ta" ? "பெண்" : "Female"}</option>
               <option value="other">{lang === "ta" ? "மற்றவை" : "Other"}</option>
             </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <Select label={lang === "ta" ? "இரத்த வகை *" : "Blood group *"} value={form.bloodGroup} onChange={(e) => set("bloodGroup", e.target.value)}>
               {BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}
             </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Select label={lang === "ta" ? "கூறு" : "Component"} value={form.componentType} onChange={(e) => set("componentType", e.target.value)}>
               {COMPONENT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </Select>
+            <Input label={lang === "ta" ? "தேவையான யூனிட்கள்" : "Units required"} type="number" min={1} value={form.unitsRequired} onChange={(e) => set("unitsRequired", e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label={lang === "ta" ? "தேவையான யூனிட்கள்" : "Units required"} type="number" min={1} value={form.unitsRequired} onChange={(e) => set("unitsRequired", e.target.value)} />
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">{lang === "ta" ? "அவசராதி நிலை" : "Emergency level"}</label>
               <div className="grid grid-cols-3 gap-2">
@@ -297,26 +359,6 @@ export function NewRequest() {
                 ))}
               </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
-              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-              {districts.map((d) => <option key={d}>{d}</option>)}
-            </Select>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "மருத்துவமனை *" : "Hospital *"}</label>
-              <HospitalAutocomplete
-                value={form.hospitalName}
-                onChange={(val) => set("hospitalName", val)}
-                district={form.district}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label={lang === "ta" ? "தொடர்பு நபர் *" : "Contact person *"} value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
-            <Input label={lang === "ta" ? "தொடர்பு எண் *" : "Contact number *"} inputMode="numeric" value={form.contactNumber} onChange={(e) => set("contactNumber", e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "இடம்" : "Location"}</label>
               <button
@@ -340,11 +382,21 @@ export function NewRequest() {
                 )}
               </button>
             </div>
-            <Input
-              label={lang === "ta" ? "பரிந்துரைக்கப்பட்ட மருத்துவர் பெயர்" : "Referred doctor name"}
-              value={form.doctorReference}
-              onChange={(e) => set("doctorReference", e.target.value)}
-            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
+              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
+              {districts.map((d) => <option key={d}>{d}</option>)}
+            </Select>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "மருத்துவமனை *" : "Hospital *"}</label>
+              <HospitalAutocomplete
+                value={form.hospitalName}
+                onChange={(val) => set("hospitalName", val)}
+                district={form.district}
+                userLocation={form.lat && form.lng ? { lat: form.lat, lng: form.lng } : null}
+              />
+            </div>
           </div>
           {form.lat && form.lng && (
             <>
@@ -369,18 +421,20 @@ export function NewRequest() {
             </>
           )}
           {err && <p className="text-sm text-uyir-600">{err}</p>}
+          {missingRequiredFields.length > 0 && (
+            <p className="text-sm text-amber-700">
+              {lang === "ta" ? "இன்னும் நிரப்ப வேண்டியது: " : "Still required: "}
+              {missingRequiredFields.join(", ")}
+            </p>
+          )}
           <Button className="w-full" size="lg" loading={busy}
             disabled={
               !form.patientFirstName || 
-              !form.patientLastName || 
               !form.patientAge || 
               !form.patientGender || 
               !form.bloodGroup || 
               !form.hospitalName || 
-              !form.district || 
-              !form.contactPerson || 
-              !form.contactNumber || 
-              form.contactNumber.length < 10
+              !form.district
             }
             onClick={() => {
               console.log("Form values:", form);
@@ -392,17 +446,26 @@ export function NewRequest() {
       {phase === "documents" && (
         <div className="space-y-3">
           <Card className="p-4">
-            <h3 className="font-bold text-slate-800">Upload hospital proof</h3>
-            <p className="mt-1 text-sm text-slate-500">A requirement slip or prescription. AI checks authenticity before alerts go out.</p>
+            <h3 className="font-bold text-slate-800">{lang === "ta" ? "மருத்துவமனை ஆவணம் பதிவேற்றவும்" : "Upload hospital proof"}</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {lang === "ta"
+                ? "நோயாளியின் சமீபத்திய admission slip, prescription, admission நேரத்தில் கட்டிய hospital bill/receipt அல்லது doctor referral letter ஐ பதிவேற்றவும்."
+                : "Upload the patient's recent admission slip, prescription, hospital bill/receipt paid during admission, or doctor referral letter. AI will check the patient name, date, hospital identity, and registration details."}
+            </p>
             <div className="mt-3 flex gap-3">
               <label className="flex-1 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500">
                 <Upload className="h-7 w-7" />
-                <span className="text-sm font-medium">{busy ? "Analysing…" : "Upload file"}</span>
+                <span className="text-sm font-medium">{busy ? "Analysing…" : (lang === "ta" ? "ஆவணத்தை பதிவேற்றவும்" : "Upload file")}</span>
+                <span className="px-4 text-center text-xs text-slate-400">
+                  {lang === "ta"
+                    ? "Admission slip / Prescription / Hospital receipt / Referral letter"
+                    : "Admission slip / Prescription / Hospital receipt / Referral letter"}
+                </span>
                 <input type="file" accept=".pdf,image/jpeg,image/jpg,image/png" className="hidden" onChange={uploadDoc} />
               </label>
               <button type="button" onClick={capturePhoto} disabled={busy} className="flex-1 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
                 <Camera className="h-7 w-7" />
-                <span className="text-sm font-medium">{busy ? "Capturing…" : "Take photo"}</span>
+                <span className="text-sm font-medium">{busy ? "Capturing…" : (lang === "ta" ? "புகைப்படம் எடுக்கவும்" : "Take photo")}</span>
               </button>
             </div>
             {docResult && (
@@ -411,11 +474,18 @@ export function NewRequest() {
                 <p className="mt-1 text-xs">{docResult.notes}</p>
               </div>
             )}
-            {(!docResult || !docResult.verified || Number(docResult.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && (
+            {(!docResult || ((!docResult.verified || Number(docResult.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable)) && (
               <p className="mt-3 text-xs text-amber-700">
                 {lang === "ta"
                   ? `அடுத்த படிக்கு செல்ல ஆவணம் AI மூலம் சரிபார்க்கப்பட்டு குறைந்தது ${MIN_DOCUMENT_VERIFY_SCORE}% மதிப்பெண் பெற வேண்டும்.`
                   : `To continue, the uploaded document must be AI-verified and score at least ${MIN_DOCUMENT_VERIFY_SCORE}%.`}
+              </p>
+            )}
+            {documentAiUnavailable && (
+              <p className="mt-3 text-xs text-amber-700">
+                {lang === "ta"
+                  ? "கீழே தொடரவும்; இந்த கோரிக்கை NGO / கைமுறை சரிபார்ப்புக்கு அனுப்பப்படும்."
+                  : "Continue below to send this request for NGO/manual review."}
               </p>
             )}
           </Card>
@@ -424,10 +494,10 @@ export function NewRequest() {
             className="w-full"
             size="lg"
             loading={busy}
-            disabled={!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE}
+            disabled={!docResult || ((!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable)}
             onClick={runVerify}
           >
-            <ShieldCheck className="h-4 w-4" /> Verify & Continue
+            <ShieldCheck className="h-4 w-4" /> {documentAiUnavailable ? (lang === "ta" ? "கைமுறை சரிபார்ப்புக்கு தொடரவும்" : "Continue to manual review") : (lang === "ta" ? "சரிபார்த்து தொடரவும்" : "Verify & Continue")}
           </Button>
         </div>
       )}

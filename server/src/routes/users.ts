@@ -17,6 +17,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   const allowed = [
     "name", "language", "district", "taluk", "bloodGroup", "gender",
     "isPlateletDonor", "nightEmergency", "shareLocation", "role",
+    "notificationsEnabled", "voiceEnabled", "locationEnabled", "pincode",
   ];
   const data: Record<string, any> = {};
   for (const k of allowed) if (k in req.body) data[k] = req.body[k];
@@ -30,15 +31,19 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 
 // Update live location (opt-in donors only).
 usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res: any) => {
-  const { lat, lng } = req.body;
+  const { lat, lng, district, taluk, pincode } = req.body;
   if (typeof lat !== "number" || typeof lng !== "number") {
     return res.status(400).json({ error: "lat/lng required" });
   }
+  const data: Record<string, any> = { lat, lng, shareLocation: true, locationEnabled: true };
+  if (typeof district === "string" && district.trim()) data.district = district.trim();
+  if (typeof taluk === "string" && taluk.trim()) data.taluk = taluk.trim();
+  if (typeof pincode === "string" && pincode.trim()) data.pincode = pincode.trim();
   const user = await prisma.user.update({
     where: { id: req.userId },
-    data: { lat, lng, shareLocation: true },
+    data,
   });
-  res.json({ ok: true, lat: user.lat, lng: user.lng });
+  res.json({ ok: true, lat: user.lat, lng: user.lng, district: user.district, taluk: user.taluk, pincode: user.pincode });
 });
 
 usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: any) => {

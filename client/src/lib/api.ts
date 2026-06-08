@@ -84,6 +84,17 @@ export interface BloodRequest {
   lat?: number; lng?: number; _count?: { responses: number };
   documents?: any[]; responses?: any[]; alerts?: any[];
   createdById?: string;
+  closedAt?: string;
+  createdBy?: {
+    id: string;
+    name: string;
+    mobile?: string;
+    district?: string;
+    taluk?: string;
+    pincode?: string;
+    lat?: number;
+    lng?: number;
+  };
 }
 
 export const api = {
@@ -92,10 +103,13 @@ export const api = {
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),
   login: (mobile: string, password: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile, password }) }),
   hospitalLogin: (data: { hospitalName: string; hospitalRegistrationId: string; mobile?: string }) => req<{ token: string; user: User }>("/auth/hospital/login", { method: "POST", body: JSON.stringify(data) }),
+  forgotPassword: (mobile: string) => req<{ ok: boolean; devOtp: string; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ mobile }) }),
+  resetPassword: (mobile: string, code: string, password: string) => req<{ ok: boolean; message: string }>("/auth/reset-password", { method: "POST", body: JSON.stringify({ mobile, code, password }) }),
   // users
   me: () => req<User>("/users/me"),
   updateMe: (data: Partial<User>) => req<User>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
-  setLocation: (lat: number, lng: number) => req("/users/me/location", { method: "POST", body: JSON.stringify({ lat, lng }) }),
+  setLocation: (lat: number, lng: number, extra: { district?: string; taluk?: string; pincode?: string } = {}) =>
+    req("/users/me/location", { method: "POST", body: JSON.stringify({ lat, lng, ...extra }) }),
   registerFcmToken: (token: string) => req("/users/me/fcm-token", { method: "POST", body: JSON.stringify({ token }) }),
   getDocuments: () => req<DonorDocument[]>("/users/me/documents"),
   uploadDonorDocument: (data: { documentType: "aadhar" | "driving_license" | "passport"; fileUrl: string; documentNumber?: string }) => req<DonorDocument>("/users/me/documents", { method: "POST", body: JSON.stringify(data) }),
@@ -146,7 +160,13 @@ export const api = {
   adminFraudReports: () => req<any[]>("/admin/fraud-reports"),
   adminHospitals: () => req<any[]>("/admin/hospitals"),
   adminVerifyRequest: (id: string, approved: boolean, notes: string) => req(`/admin/verify-request/${id}`, { method: "POST", body: JSON.stringify({ approved, notes }) }),
+  adminCloseRequest: (id: string) => req(`/admin/requests/${id}/close`, { method: "POST" }),
+  adminRejectRequest: (id: string, notes: string) => req(`/admin/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
+  adminGetAdmins: () => req<any[]>("/admin/admins"),
+  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
+  // hospital
+  hospitalRegister: (data: { hospitalName: string; hospitalRegistrationId: string; district: string; address?: string; phone?: string; contactPerson: string; contactMobile: string; password: string }) => req<{ token: string; user: User; hospital: any }>("/auth/hospital/register", { method: "POST", body: JSON.stringify(data) }),
   getHealthTips: () => req("/ai/health-tips", { method: "POST" }),
 };
 

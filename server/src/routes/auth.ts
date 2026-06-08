@@ -8,17 +8,9 @@ import bcrypt from "bcryptjs";
 export const authRouter = Router();
 
 async function sendSms(mobile: string, code: string, name?: string) {
-  // Try MSG91 first (cheaper for India)
-  if (process.env.MSG91_AUTH_KEY) {
-    const success = await sendMsg91OTP(mobile, code, name);
-    if (success) {
-      console.log(`[msg91] OTP sent to ${mobile}`);
-      return;
-    }
-  }
-
-  // Fallback to dev mode if MSG91 not configured
-  console.log(`[otp] ${mobile} -> ${code} (SMS not configured, using dev mode)`);
+  // Demo OTP mode: MSG91 is under verification, so we always log OTP locally.
+  // The frontend displays devOtp for users to enter manually.
+  console.log(`[otp] ${mobile} -> ${code} (Demo OTP mode - MSG91 under verification)`);
 }
 
 // Request OTP - only for new users (signup)
@@ -51,21 +43,9 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
     data: { mobile, code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
   });
 
-  try {
-    await sendSms(mobile, code, name);
-  } catch (e: any) {
-    console.log(`[otp] SMS failed, returning devOtp: ${code}`);
-    return res.json({ ok: true, devOtp: code, exists: false, user: null });
-  }
-
-  const allowDevOtpInProd = process.env.ALLOW_DEV_OTP_IN_PROD === "true";
-  const includeDevOtp = allowDevOtpInProd || process.env.NODE_ENV !== "production";
-
-  if (includeDevOtp) {
-    res.json({ ok: true, devOtp: code, exists: false, user: null });
-  } else {
-    res.json({ ok: true, exists: false, user: null });
-  }
+  // Always return devOtp for testing (SMS gateway not connected)
+  console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
+  res.json({ ok: true, devOtp: code, exists: false, user: null });
 });
 
 // Direct login for existing users with password
@@ -90,11 +70,69 @@ authRouter.post("/login", async (req: any, res: any) => {
 
   const passwordMatch = await bcrypt.compare(password, user.password);
   if (!passwordMatch) {
-    return res.status(401).json({ error: "Invalid password" });
+    return res.status(401).json({ error: "Invalid password. Use 'Forgot password' to reset." });
   }
 
   const token = signToken(user.id, user.role);
   res.json({ token, user });
+});
+
+// Forgot password - send OTP to reset password
+authRouter.post("/forgot-password", async (req: any, res: any) => {
+  const schema = z.object({
+    mobile: z.string().min(10).max(15),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
+  const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+
+  const user = await prisma.user.findUnique({ where: { mobile } });
+  if (!user) {
+    return res.status(404).json({ error: "User not found. Please sign up first." });
+  }
+
+  // Send OTP for password reset
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  await prisma.otpCode.create({
+    data: { mobile, code, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+  });
+
+  // Always return devOtp for testing (SMS gateway not connected)
+  console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
+  res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
+});
+
+// Reset password using OTP
+authRouter.post("/reset-password", async (req: any, res: any) => {
+  const schema = z.object({
+    mobile: z.string().min(10),
+    code: z.string().length(6),
+    password: z.string().min(4),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
+  const { code, password } = parse.data;
+  const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+
+  const otp = await prisma.otpCode.findFirst({
+    where: { mobile, code, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!otp) return res.status(400).json({ error: "Invalid or expired OTP" });
+
+  const user = await prisma.user.findUnique({ where: { mobile } });
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { mobile },
+    data: { password: hashedPassword },
+  });
+  await prisma.otpCode.deleteMany({ where: { mobile } });
+
+  res.json({ ok: true, message: "Password reset successfully" });
 });
 
 // Verify OTP -> create/login user, set password if provided, return JWT.
@@ -141,6 +179,86 @@ authRouter.post("/otp/verify", async (req: any, res: any) => {
 
   const token = signToken(user.id, user.role);
   res.json({ token, user });
+});
+
+// Hospital self-registration
+authRouter.post("/hospital/register", async (req: any, res: any) => {
+  const schema = z.object({
+    hospitalName: z.string().min(2),
+    hospitalRegistrationId: z.string().min(2),
+    district: z.string().min(2),
+    address: z.string().optional(),
+    phone: z.string().min(10).optional(),
+    contactPerson: z.string().min(2),
+    contactMobile: z.string().min(10),
+    password: z.string().min(4),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
+  const { hospitalName, hospitalRegistrationId, district, address, phone, contactPerson, contactMobile, password } = parse.data;
+
+  // Check if hospital already exists
+  const existingHospital = await prisma.hospital.findFirst({
+    where: {
+      OR: [
+        { name: { equals: hospitalName, mode: "insensitive" } },
+      ],
+    },
+  });
+
+  if (existingHospital) {
+    return res.status(400).json({ error: "Hospital with this name already exists" });
+  }
+
+  // Check if hospital approver already exists with this registration ID
+  const existingApprover = await prisma.user.findFirst({
+    where: {
+      hospitalRegistrationId,
+      role: "hospital_approver",
+    },
+  });
+
+  if (existingApprover) {
+    return res.status(400).json({ error: "Hospital approver with this registration ID already exists" });
+  }
+
+  // Get district coordinates
+  const { TN_DISTRICTS } = await import("../lib/districts.js");
+  const districtCoords = TN_DISTRICTS[district];
+
+  // Create hospital
+  const hospital = await prisma.hospital.create({
+    data: {
+      name: hospitalName,
+      district,
+      address,
+      phone,
+      lat: districtCoords?.lat,
+      lng: districtCoords?.lng,
+      verified: false, // Requires admin verification
+    },
+  });
+
+  // Create hospital approver user
+  const bcrypt = (await import("bcryptjs")).default;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      name: contactPerson,
+      mobile: contactMobile.replace(/\D/g, "").slice(-10),
+      role: "hospital_approver",
+      hospitalName,
+      hospitalRegistrationId,
+      hospitalId: hospital.id,
+      password: hashedPassword,
+      verified: true,
+    },
+    include: { hospital: true },
+  });
+
+  const token = signToken(user.id, user.role);
+  res.json({ token, user, hospital });
 });
 
 // Hospital approver login using hospital name and registration ID

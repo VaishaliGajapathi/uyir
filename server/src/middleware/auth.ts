@@ -44,6 +44,22 @@ export function requireAdminOrHospitalApprover(req: AuthedRequest, res: Response
   }
 }
 
+export function requireAdminOrVerifier(req: AuthedRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
+    if (decoded.role !== "admin" && decoded.role !== "verifier") {
+      return res.status(403).json({ error: "Forbidden: Admin or verifier required" });
+    }
+    req.userId = decoded.userId;
+    req.role = decoded.role;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
 export function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) {

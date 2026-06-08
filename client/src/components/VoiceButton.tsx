@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -16,8 +16,35 @@ export function VoiceButton({
   hideLabel?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "recording" | "processing">("idle");
+  const [recordingTime, setRecordingTime] = useState(0);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (state === "recording") {
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRecordingTime(0);
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [state]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   async function start() {
     const useNative = isNativeMobile();
@@ -79,13 +106,17 @@ export function VoiceButton({
       disabled={state === "processing"}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold transition",
-        state === "recording" ? "bg-uyir-600 text-white" : "bg-uyir-50 text-uyir-700 hover:bg-uyir-100",
+        state === "recording" ? "bg-red-500 text-white animate-pulse" : "bg-uyir-50 text-uyir-700 hover:bg-uyir-100",
         className
       )}
     >
       {state === "processing" ? <Loader2 className="h-5 w-5 animate-spin" /> : state === "recording" ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-      {!hideLabel && (label || (state === "recording" ? "Stop" : state === "processing" ? "Transcribing…" : "Speak"))}
-      {state === "recording" && <span className="ml-1 h-2 w-2 animate-pulse rounded-full bg-white" />}
+      {!hideLabel && (
+        <span>
+          {label || (state === "recording" ? `I'm listening... (${formatTime(recordingTime)})` : state === "processing" ? "Transcribing…" : "Tap to Speak")}
+        </span>
+      )}
+      {state === "recording" && <span className="ml-1 h-3 w-3 rounded-full bg-white animate-ping" />}
     </button>
   );
 }

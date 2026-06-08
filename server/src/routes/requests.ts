@@ -148,13 +148,26 @@ requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: 
     return res.status(400).json({ error: "Please upload a hospital document before verification." });
   }
 
-  if (!latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE) {
+  const documentAiUnavailable =
+    Number(latestDocument.aiScore || 0) === 0 &&
+    String(latestDocument.aiNotes || "").includes("Automatic document verification could not run");
+
+  if (!documentAiUnavailable && (!latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE)) {
     return res.status(400).json({
       error: `Document verification failed. Upload a clearer valid hospital document (minimum score ${MIN_DOCUMENT_VERIFY_SCORE}%). Latest result: ${latestDocument.aiScore}%${latestDocument.aiNotes ? ` - ${latestDocument.aiNotes}` : ""}`,
     });
   }
 
-  const result = await verifyRequest(request, request.documents.length > 0);
+  const baseResult = await verifyRequest(request, request.documents.length > 0);
+  const result = documentAiUnavailable
+    ? {
+        ...baseResult,
+        verified: false,
+        notes:
+          `${baseResult.notes} Automatic document AI verification is unavailable, so this request requires NGO/manual review before alerts are sent.`,
+        checks: { ...baseResult.checks, documentAutoVerificationUnavailable: true },
+      }
+    : baseResult;
   const status = result.verified ? "verified" : "pending_verification";
   const updated = await prisma.bloodRequest.update({
     where: { id: request.id },

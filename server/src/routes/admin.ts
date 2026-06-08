@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../db.js";
-import { requireAuth, requireAdminOrHospitalApprover } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrHospitalApprover, requireAdminOrVerifier } from "../middleware/auth.js";
+import { emitRequestUpdate } from "../services/alerts.js";
 
 export const adminRouter = Router();
 
@@ -8,7 +9,7 @@ export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
 // Get all donors with stats
-adminRouter.get("/donors", async (req: Request, res: any) => {
+adminRouter.get("/donors", requireAdminOrVerifier, async (req: Request, res: any) => {
   const donors = await prisma.user.findMany({
     where: { role: "donor" },
     orderBy: { createdAt: "desc" },
@@ -21,12 +22,40 @@ adminRouter.get("/donors", async (req: Request, res: any) => {
 });
 
 // Get all requests with details
-adminRouter.get("/requests", async (req: Request, res: any) => {
+adminRouter.get("/requests", requireAdminOrVerifier, async (req: Request, res: any) => {
   const requests = await prisma.bloodRequest.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       documents: true,
-      responses: { include: { donor: true } },
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          district: true,
+          taluk: true,
+          pincode: true,
+          lat: true,
+          lng: true,
+        },
+      },
+      responses: {
+        include: {
+          donor: {
+            select: {
+              id: true,
+              name: true,
+              mobile: true,
+              district: true,
+              taluk: true,
+              pincode: true,
+              lat: true,
+              lng: true,
+              bloodGroup: true,
+            },
+          },
+        },
+      },
       hospital: true,
     },
   });
@@ -34,17 +63,32 @@ adminRouter.get("/requests", async (req: Request, res: any) => {
 });
 
 // Get pending verification requests
-adminRouter.get("/pending-verification", async (req: Request, res: any) => {
+adminRouter.get("/pending-verification", requireAdminOrHospitalApprover, async (req: Request, res: any) => {
   const pending = await prisma.bloodRequest.findMany({
     where: { status: "pending_verification" },
     orderBy: { createdAt: "asc" },
-    include: { documents: true, hospital: true },
+    include: {
+      documents: true,
+      hospital: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          district: true,
+          taluk: true,
+          pincode: true,
+          lat: true,
+          lng: true,
+        },
+      },
+    },
   });
   res.json(pending);
 });
 
 // Get fraud reports
-adminRouter.get("/fraud-reports", async (req: Request, res: any) => {
+adminRouter.get("/fraud-reports", requireAdminOrVerifier, async (req: Request, res: any) => {
   const reports = await prisma.fraudReport.findMany({
     orderBy: { createdAt: "desc" },
     include: { againstUser: true },
@@ -53,7 +97,7 @@ adminRouter.get("/fraud-reports", async (req: Request, res: any) => {
 });
 
 // Get hospitals
-adminRouter.get("/hospitals", async (req: Request, res: any) => {
+adminRouter.get("/hospitals", requireAdminOrVerifier, async (req: Request, res: any) => {
   const hospitals = await prisma.hospital.findMany({
     orderBy: { name: "asc" },
   });
@@ -86,8 +130,34 @@ adminRouter.post("/verify-request/:id", requireAdminOrHospitalApprover, async (r
   res.json(request);
 });
 
+adminRouter.post("/requests/:id/close", requireAdminOrVerifier, async (req: Request, res: any) => {
+  const updated = await prisma.bloodRequest.update({
+    where: { id: req.params.id },
+    data: { status: "closed", closedAt: new Date() },
+  });
+  emitRequestUpdate(updated.id, { status: "closed" });
+  res.json(updated);
+});
+
+adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, async (req: Request, res: any) => {
+  const notes = String(req.body?.notes || "Rejected by admin");
+  const updated = await prisma.bloodRequest.update({
+    where: { id: req.params.id },
+    data: {
+      status: "rejected",
+      verificationNotes: notes,
+      verificationScore: 0,
+      verifiedAt: new Date(),
+      verifiedBy: (req as any).userId,
+      verifiedByType: "uyir_admin",
+    },
+  });
+  emitRequestUpdate(updated.id, { status: "rejected" });
+  res.json(updated);
+});
+
 // Ban user
-adminRouter.post("/ban-user/:id", async (req: Request, res: any) => {
+adminRouter.post("/ban-user/:id", requireAdminOrVerifier, async (req: Request, res: any) => {
   const { id } = req.params;
   const user = await prisma.user.update({
     where: { id },
@@ -97,7 +167,7 @@ adminRouter.post("/ban-user/:id", async (req: Request, res: any) => {
 });
 
 // Get dashboard stats
-adminRouter.get("/stats", async (req: Request, res: any) => {
+adminRouter.get("/stats", requireAdminOrVerifier, async (req: Request, res: any) => {
   const [totalDonors, totalRequests, pendingVerifications, activeRequests, fraudReports, livesSaved] = await Promise.all([
     prisma.user.count({ where: { role: "donor" } }),
     prisma.bloodRequest.count(),
@@ -107,4 +177,51 @@ adminRouter.get("/stats", async (req: Request, res: any) => {
     prisma.bloodRequest.count({ where: { status: "completed" } }),
   ]);
   res.json({ totalDonors, totalRequests, pendingVerifications, activeRequests, fraudReports, livesSaved });
+});
+
+// Get all admin users
+adminRouter.get("/admins", requireAdminOrVerifier, async (req: Request, res: any) => {
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ["admin", "verifier"] } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      mobile: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+  res.json(admins);
+});
+
+// Create new admin user (protected by admin role)
+adminRouter.post("/admins", requireAdminOrVerifier, async (req: Request, res: any) => {
+  const { name, mobile, role, password } = req.body;
+  if (!name || !mobile || !role) {
+    return res.status(400).json({ error: "Name, mobile, and role are required" });
+  }
+  if (!["admin", "verifier"].includes(role)) {
+    return res.status(400).json({ error: "Role must be admin or verifier" });
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { mobile: mobile.replace(/\D/g, "").slice(-10) } });
+  if (existingUser) {
+    return res.status(400).json({ error: "User with this mobile already exists" });
+  }
+
+  const bcrypt = (await import("bcryptjs")).default;
+  const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+
+  const admin = await prisma.user.create({
+    data: {
+      name,
+      mobile: mobile.replace(/\D/g, "").slice(-10),
+      role,
+      password: hashedPassword,
+      verified: true,
+    },
+  });
+
+  res.json(admin);
 });

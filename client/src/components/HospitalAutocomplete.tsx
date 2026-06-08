@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { MapPin, Building2, X } from "lucide-react";
-import { api } from "../lib/api";
 
 interface HospitalAutocompleteProps {
   value: string;
@@ -311,6 +310,38 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
   // the dropdown stays closed.
   const [enableSuggestions, setEnableSuggestions] = useState(false);
 
+  function normalizeText(text: string): string {
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function scoreHospital(hospital: string, query: string, selectedDistrict: string): number {
+    const normalizedHospital = normalizeText(hospital);
+    const normalizedQuery = normalizeText(query);
+    const normalizedDistrict = normalizeText(selectedDistrict);
+    const [hospitalNamePart, hospitalDistrictPart = ""] = hospital.split(",").map((part) => part.trim());
+    const normalizedHospitalName = normalizeText(hospitalNamePart);
+    const normalizedHospitalDistrict = normalizeText(hospitalDistrictPart);
+    const queryTokens = normalizedQuery.split(" ").filter(Boolean);
+
+    let score = 0;
+
+    if (normalizedDistrict && normalizedHospitalDistrict === normalizedDistrict) score += 120;
+    else if (normalizedDistrict && normalizedHospital.includes(normalizedDistrict)) score += 80;
+
+    if (!normalizedQuery) score += 20;
+    else {
+      if (normalizedHospitalName.startsWith(normalizedQuery)) score += 100;
+      if (normalizedHospital.startsWith(normalizedQuery)) score += 80;
+      if (normalizedHospitalName.includes(normalizedQuery)) score += 65;
+      if (normalizedHospital.includes(normalizedQuery)) score += 40;
+
+      const matchedTokens = queryTokens.filter((token) => normalizedHospitalName.includes(token));
+      score += matchedTokens.length * 18;
+    }
+
+    return score;
+  }
+
   // Calculate distance between two coordinates (Haversine formula)
   function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371; // Earth's radius in km
@@ -378,33 +409,20 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
       return;
     }
 
-    let filtered = TAMIL_NADU_HOSPITALS.filter(hospital => {
-      const hospitalLower = hospital.toLowerCase();
-      const valueLower = value.toLowerCase();
-      const districtLower = district.toLowerCase();
-      
-      // If district is selected, prioritize hospitals from that district
-      if (district && hospitalLower.includes(districtLower)) {
-        // Show all hospitals from the district that match the search term
-        return hospitalLower.includes(valueLower);
-      }
-      
-      // Otherwise, show hospitals that match the search term
-      return hospitalLower.includes(valueLower);
-    });
-
-    // If district is selected, also add hospitals from that district even if they don't match the search term
-    if (district && filtered.length < 8) {
-      const districtHospitals = TAMIL_NADU_HOSPITALS.filter(hospital =>
-        hospital.toLowerCase().includes(district.toLowerCase()) &&
-        !filtered.includes(hospital)
-      );
-      filtered = [...filtered, ...districtHospitals];
-    }
+    const normalizedQuery = normalizeText(value);
+    let filtered = TAMIL_NADU_HOSPITALS
+      .map((hospital) => ({ hospital, score: scoreHospital(hospital, value, district) }))
+      .filter(({ hospital, score }) => {
+        if (score <= 0) return false;
+        if (!normalizedQuery) return true;
+        const hospitalText = normalizeText(hospital);
+        return normalizedQuery.split(" ").every((token) => !token || hospitalText.includes(token));
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(({ hospital }) => hospital);
 
     // If user location is available, sort by distance
-    if (userLocation) {
-      const districtCoords = getDistrictCoordinates(district);
+    if (userLocation && district) {
       const referenceLat = userLocation.lat;
       const referenceLng = userLocation.lng;
 
@@ -448,6 +466,12 @@ export function HospitalAutocomplete({ value, onChange, district, userLocation }
           onChange={(e) => {
             setEnableSuggestions(true);
             onChange(e.target.value);
+          }}
+          onFocus={() => {
+            if (value.length > 0) {
+              setEnableSuggestions(true);
+              setShowSuggestions(true);
+            }
           }}
           placeholder="Hospital name"
           className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-10 text-sm placeholder:text-slate-400 focus:border-uyir-500 focus:outline-none focus:ring-2 focus:ring-uyir-500/20"

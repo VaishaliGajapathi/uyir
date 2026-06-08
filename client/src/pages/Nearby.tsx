@@ -1,57 +1,70 @@
 import { useEffect, useState } from "react";
-import { Radar, MapPin, Clock, Check, X, Navigation, Droplet } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Radar, MapPin, Clock, Check, X, Navigation, Droplet, Award } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Button, Card, Spinner } from "../components/ui";
+import { Button, Card, Spinner, Sheet, Badge } from "../components/ui";
 import { emergencyMeta } from "../lib/utils";
+import { DonationCertificate } from "../components/DonationCertificate";
+
+function getMissingDonorFields(user: any, lang: "ta" | "en") {
+  const fields: string[] = [];
+  if (!user?.name || user.name.trim() === "" || user.name === "UYIR User") {
+    fields.push(lang === "ta" ? "பெயர்" : "Name");
+  }
+  if (!user?.bloodGroup) {
+    fields.push(lang === "ta" ? "இரத்த வகை" : "Blood Group");
+  }
+  if (!user?.district) {
+    fields.push(lang === "ta" ? "மாவட்டம்" : "District");
+  }
+  if (!user?.locationEnabled || user?.lat == null || user?.lng == null) {
+    fields.push(lang === "ta" ? "GPS இடம்" : "GPS Location");
+  }
+  return fields;
+}
 
 export function Nearby() {
   const { user, refreshUser } = useApp();
+  const nav = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const [certificateData, setCertificateData] = useState<any>(null);
 
   async function load() {
     setLoading(true);
     try {
-      const [requests, alerts] = await Promise.all([
-        api.listRequests(),
-        api.myAlerts(),
-      ]);
+      const alerts = await api.myAlerts();
+      const normalized = alerts.map((a: any) => ({
+        id: a.id,
+        request: a.request,
+        status: a.status,
+        matchScore: a.matchScore ?? null,
+        distanceKm: a.distanceKm ?? null,
+        etaMinutes: a.etaMinutes ?? null,
+        responseId: a.id,
+      }));
 
-      const alertByRequestId = new Map(alerts.map((a: any) => [a.requestId || a.request?.id, a]));
-
-      const merged = requests.map((request: any) => {
-        const existingAlert = alertByRequestId.get(request.id);
-        return {
-          id: existingAlert?.id || request.id,
-          request,
-          status: existingAlert?.status || "available",
-          matchScore: existingAlert?.matchScore ?? null,
-          distanceKm: existingAlert?.distanceKm ?? null,
-          etaMinutes: existingAlert?.etaMinutes ?? null,
-          responseId: existingAlert?.id ?? null,
-        };
-      });
-
-      const completedAlerts = alerts
-        .filter((a: any) => a.status === "completed" && !merged.some((m: any) => m.responseId === a.id))
-        .map((a: any) => ({
-          id: a.id,
-          request: a.request,
-          status: a.status,
-          matchScore: a.matchScore ?? null,
-          distanceKm: a.distanceKm ?? null,
-          etaMinutes: a.etaMinutes ?? null,
-          responseId: a.id,
-        }));
-
-      setItems([...merged, ...completedAlerts]);
+      setItems(normalized);
     } finally {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const missing = getMissingDonorFields(user, user?.language === "en" ? "en" : "ta");
+    if (missing.length > 0) {
+      alert(
+        user?.language === "en"
+          ? `Please complete these donor details first: ${missing.join(", ")}`
+          : `முதலில் இந்த தானதாரர் விவரங்களை நிரப்பவும்: ${missing.join(", ")}`
+      );
+      nav("/profile?completeDonor=1", { replace: true });
+      return;
+    }
+    load();
+  }, [user?.id, user?.name, user?.bloodGroup, user?.district]);
 
   async function enableLocation() {
     if (!navigator.geolocation) return alert("Geolocation unavailable");
@@ -64,6 +77,18 @@ export function Nearby() {
   async function act(id: string, fn: () => Promise<any>) {
     setBusy(id);
     try { await fn(); await load(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  function showCertificate(item: any) {
+    setCertificateData({
+      donorName: user?.name || "Donor",
+      bloodGroup: user?.bloodGroup || "Unknown",
+      donationDate: item.completedAt || new Date().toISOString(),
+      hospitalName: item.request.hospitalName,
+      district: item.request.district,
+      certificateId: `UYIR-${item.id.slice(-8)}`,
+    });
+    setCertificateOpen(true);
   }
 
   const active = items.filter((a) => !["declined", "completed"].includes(a.status));
@@ -105,13 +130,13 @@ export function Nearby() {
               <Card key={a.id} className={`overflow-hidden ring-2 ${em.ring} ring-opacity-40`}>
                 <div className={`flex items-center justify-between px-4 py-1.5 text-xs font-bold ${em.color}`}>
                   <span>URGENT · {em.label}</span>
-                  <span className="font-semibold">{a.matchScore != null ? `match ${a.matchScore}` : "nearby"}</span>
+                  <span className="font-semibold">{a.distanceKm != null ? `${a.distanceKm} km` : a.matchScore != null ? `match ${a.matchScore}` : "live alert"}</span>
                 </div>
                 <div className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-uyir-50 text-xl font-extrabold text-uyir-700">{r.bloodGroup}</div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-800">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ")}</p>
+                      <p className="font-bold text-slate-800">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ").replace("whole blood", "blood")}</p>
                       <p className="flex items-center gap-1 truncate text-sm text-slate-500"><MapPin className="h-3.5 w-3.5" /> {r.hospitalName}, {r.district}</p>
                       <div className="mt-0.5 flex gap-3 text-[11px] text-slate-400">
                         {a.distanceKm != null && <span>{a.distanceKm} km away</span>}
@@ -120,12 +145,6 @@ export function Nearby() {
                     </div>
                   </div>
 
-                  {a.status === "available" && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptRequestAsDonor(r.id))}><Check className="h-4 w-4" /> I can donate</Button>
-                      <Button variant="outline" loading={busy === a.id} onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${r.hospitalName}, ${r.district}`)}`, "_blank")}><Navigation className="h-4 w-4" /> Navigate</Button>
-                    </div>
-                  )}
                   {a.status === "alerted" && a.responseId && (
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptResponse(a.responseId))}><Check className="h-4 w-4" /> Accept</Button>
@@ -151,8 +170,43 @@ export function Nearby() {
       )}
 
       {done.length > 0 && (
-        <p className="mt-5 text-center text-sm text-emerald-600">{done.length} donation(s) completed. Thank you for saving lives. 🩸</p>
+        <div className="mt-5 space-y-3">
+          <p className="text-center text-sm text-emerald-600">{done.length} donation(s) completed. Thank you for saving lives. 🩸</p>
+          <div className="space-y-2">
+            {done.map((d) => (
+              <Card key={d.id} className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{d.request.patientName} · {d.request.bloodGroup}</p>
+                    <p className="text-xs text-slate-400">{d.request.hospitalName} · {new Date(d.completedAt).toLocaleDateString()}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => showCertificate(d)}>
+                    <Award className="h-4 w-4" /> Certificate
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
+
+      <Sheet open={certificateOpen} onClose={() => setCertificateOpen(false)}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">Your Donation Certificate</h3>
+          <button onClick={() => setCertificateOpen(false)}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        {certificateData && (
+          <DonationCertificate
+            donorName={certificateData.donorName}
+            bloodGroup={certificateData.bloodGroup}
+            donationDate={certificateData.donationDate}
+            hospitalName={certificateData.hospitalName}
+            district={certificateData.district}
+            certificateId={certificateData.certificateId}
+            onClose={() => setCertificateOpen(false)}
+          />
+        )}
+      </Sheet>
     </div>
   );
 }

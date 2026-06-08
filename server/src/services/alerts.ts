@@ -45,6 +45,7 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
       id: true,
       bloodGroup: true,
       district: true,
+      taluk: true,
       lat: true,
       lng: true,
       lastDonationDate: true,
@@ -59,6 +60,7 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
     id: d.id,
     bloodGroup: d.bloodGroup,
     district: d.district,
+    taluk: d.taluk,
     lat: d.lat,
     lng: d.lng,
     lastDonationDate: d.lastDonationDate,
@@ -71,13 +73,14 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
     bloodGroup: req.bloodGroup,
     componentType: req.componentType,
     district: req.district,
+    taluk: req.taluk,
     lat: req.lat,
     lng: req.lng,
   });
 
   // For tight radius tiers, filter by actual distance.
   if (radiusKm < 9999) {
-    ranked = ranked.filter((r) => r.distanceKm == null || r.distanceKm <= radiusKm + 1);
+    ranked = ranked.filter((r) => r.distanceKm != null && r.distanceKm <= radiusKm + 1);
   }
 
   // Skip donors already alerted for this request.

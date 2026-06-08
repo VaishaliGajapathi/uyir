@@ -1,181 +1,79 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, ShieldCheck, MapPin, Calendar, Droplet } from "lucide-react";
+import { Phone, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Button, Input } from "../components/ui";
+import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
-import { tr, t } from "../lib/constants";
 
-const BLOOD_GROUPS = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'];
+function dashboardPathForRole(role?: string) {
+  if (role === "hospital_approver") return "/hospital-dashboard";
+  if (role === "admin" || role === "verifier") return "/admin";
+  return "/home";
+}
 
 export function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
-  const [step, setStep] = useState<"mobile" | "otp" | "password" | "location" | "details">("mobile");
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [view, setView] = useState<"login" | "signup" | "otp" | "forgot" | "reset">("login");
   const [mobile, setMobile] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState("donor");
-  const [devOtp, setDevOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [showLegalInfo, setShowLegalInfo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [userExists, setUserExists] = useState(false);
-  const [hasPassword, setHasPassword] = useState(false);
-  const [existingUser, setExistingUser] = useState<any>(null);
-  
-  // New noble cause fields
-  const [dob, setDob] = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [pincode, setPincode] = useState("");
-  const [district, setDistrict] = useState("");
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-
-  async function requestPermissions() {
-    try {
-      // Request notification permission
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-
-      // Request location permission
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          () => console.log('Location permission granted'),
-          (err) => console.log('Location permission denied:', err),
-          { timeout: 10000 }
-        );
-      }
-
-      // Request microphone permission (for voice input)
-      if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach(track => track.stop());
-        } catch (err) {
-          console.log('Microphone permission denied:', err);
-        }
-      }
-    } catch (err) {
-      console.log('Permission request error:', err);
-    }
-  }
-
-  async function sendOtp() {
-    setErr(""); setLoading(true);
-    try {
-      const r = await api.requestOtp(mobile, name);
-      setDevOtp(r.devOtp || "");
-      setCode(r.devOtp || "");
-      setUserExists(r.exists || false);
-      setHasPassword(r.hasPassword || false);
-      setExistingUser(r.user || null);
-      
-      if (r.exists && r.hasPassword) {
-        setStep("password");
-      } else if (r.exists && !r.hasPassword) {
-        setStep("otp");
-      } else {
-        setStep("otp");
-      }
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
-  }
-
-  async function getLocation() {
-    setErr(""); setLoading(true);
-    try {
-      if (!('geolocation' in navigator)) {
-        throw new Error("Location not supported on this device");
-      }
-      
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setLat(latitude);
-          setLng(longitude);
-          
-          // Reverse geocode to get pincode and district
-          try {
-            const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-            const data = await res.json();
-            setPincode(data.postcode || "");
-            setDistrict(data.locality || data.city || data.principalSubdivision || "");
-          } catch (e) {
-            console.log("Reverse geocode failed, using location only");
-          }
-          
-          setLoading(false);
-          setStep("details");
-        },
-        (err) => {
-          setErr("Location permission required for emergency matching. Please enable location access.");
-          setLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    } catch (e: any) {
-      setErr(e.message);
-      setLoading(false);
-    }
-  }
+  const [devOtp, setDevOtp] = useState("");
 
   async function handleLogin() {
     setErr(""); setLoading(true);
     try {
       const r = await api.login(mobile, password);
       login(r.token, r.user);
-      await requestPermissions();
+      nav(dashboardPathForRole(r.user.role));
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function verify() {
+  async function handleSignup() {
     setErr(""); setLoading(true);
     try {
-      const r = await api.verifyOtp({ mobile, code, name: userExists ? existingUser?.name : name, role: userExists ? existingUser?.role : role, language: lang, password: userExists ? undefined : password });
+      const r = await api.requestOtp(mobile, name);
+      setDevOtp(r.devOtp || "");
+      setCode(r.devOtp || "");
+      setView("otp");
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+  }
+
+  async function verifyOtp() {
+    setErr(""); setLoading(true);
+    try {
+      const r = await api.verifyOtp({ mobile, code, name, role: "donor", language: lang, password });
       login(r.token, r.user);
-      await requestPermissions();
-      
-      // For new users, proceed to location step
-      if (!userExists) {
-        setStep("location");
-      }
+      nav(dashboardPathForRole(r.user.role));
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function completeSignup() {
+  async function handleForgotPassword() {
     setErr(""); setLoading(true);
     try {
-      // Age validation: 18-65
-      if (!dob) {
-        throw new Error(lang === "ta" ? "பிறந்த தேதி தேவை" : "Date of birth required");
-      }
-      
-      const age = new Date().getFullYear() - new Date(dob).getFullYear();
-      if (age < 18 || age > 65) {
-        throw new Error(lang === "ta" ? "இரத்த தானம்: 18-65 வயது மட்டுமே" : "Blood donation: 18-65 years only");
-      }
-      
-      if (!bloodGroup) {
-        throw new Error(lang === "ta" ? "இரத்த வகை தேவை" : "Blood group required");
-      }
-      
-      // Update profile with noble cause fields
-      await api.updateMe({
-        dob: new Date(dob).toISOString(),
-        bloodGroup,
-        district,
-        pincode,
-        lat,
-        lng,
-      });
-      
-      setLoading(false);
-      nav("/home");
-    } catch (e: any) { setErr(e.message); setLoading(false); }
+      const r = await api.forgotPassword(mobile);
+      setDevOtp(r.devOtp || "");
+      setCode(r.devOtp || "");
+      setView("reset");
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+  }
+
+  async function handleResetPassword() {
+    setErr(""); setLoading(true);
+    try {
+      const r = await api.resetPassword(mobile, code, password);
+      setView("login");
+      setPassword("");
+      setCode("");
+      setDevOtp("");
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
   return (
@@ -183,10 +81,11 @@ export function Onboarding() {
       <div className="w-full max-w-sm">
         <div className="rounded-2xl bg-white px-5 py-6 text-slate-800 shadow-xl ring-1 ring-slate-200">
           <div className="mb-4 text-center">
-            <img src="/uyir-logo.png" alt="UYIR" className="mx-auto h-36 w-auto object-contain" />
+            <img src="/uyir-logo.png" alt="UYIR" className="mx-auto h-24 w-auto object-contain" />
           </div>
 
-          <div className="mb-3 flex gap-2">
+          {/* Language Toggle */}
+          <div className="mb-4 flex gap-2">
             {(["ta", "en"] as Lang[]).map((l) => (
               <button key={l} onClick={() => setLang(l)}
                 className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${lang === l ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}>
@@ -195,211 +94,459 @@ export function Onboarding() {
             ))}
           </div>
 
-          <div className="mb-3 flex gap-2">
-            <button
-              onClick={() => { setMode("login"); setStep("mobile"); setErr(""); }}
-              className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${mode === "login" ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}
-            >
-              {lang === "ta" ? "உள்நுழை" : "Login"}
-            </button>
-            <button
-              onClick={() => { setMode("signup"); setStep("mobile"); setErr(""); }}
-              className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${mode === "signup" ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}
-            >
-              {lang === "ta" ? "புதிய பதிவு" : "Sign up"}
-            </button>
-          </div>
-
-          {step === "mobile" ? (
-            mode === "login" ? (
-              <div className="space-y-2">
-                <Input
-                  label={String(tr("mobileNumber", lang))}
-                  inputMode="numeric"
-                  placeholder="10-digit mobile"
-                  value={mobile}
-                  onChange={(e) => setMobile(String(e.target.value))}
-                  maxLength={10}
-                />
-                <Button
-                  className="w-full"
-                  size="md"
-                  loading={loading}
-                  disabled={mobile.length < 10}
-                  onClick={sendOtp}
-                >
-                  <Phone className="h-3 w-3" /> {lang === "ta" ? "தொடரவும்" : "Continue"}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Input label={String(tr("mobileNumber", lang))} inputMode="numeric" placeholder="10-digit mobile" value={mobile}
-                  onChange={(e) => setMobile(String(e.target.value))} maxLength={10} />
-                <>
-                  <Input label={String(tr("yourName", lang))} placeholder="Name" value={name} onChange={(e) => setName(String(e.target.value))} />
-                  <div>
-                    <span className="mb-1 block text-xs font-medium text-slate-600">{tr("iWantTo", lang)}</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[{ v: "donor", t: tr("donateBlood", lang) }, { v: "requester", t: tr("requestBlood", lang) }].map((o) => (
-                        <button key={o.v} onClick={() => setRole(o.v)}
-                          className={`rounded-lg border py-2 text-xs font-semibold ${role === o.v ? "border-uyir-500 bg-uyir-50 text-uyir-700" : "border-slate-200 text-slate-500"}`}>
-                          {o.t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
-                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
-                    <div className="text-[10px] text-slate-600">
-                      <p className="font-semibold text-slate-700">{tr("consentTitle", lang)}</p>
-                      <p className="mt-0.5 leading-tight">{t.consentText[lang]}</p>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); window.open('/terms', '_blank'); }}
-                        className="mt-0.5 text-uyir-600 underline"
-                      >
-                        {lang === "ta" ? "முழு விதிமுறைகளைப் படிக்க" : "Read full terms"}
-                      </button>
-                    </div>
-                  </label>
-                </>
-                <Button
-                  className="w-full"
-                  size="md"
-                  loading={loading}
-                  disabled={mobile.length < 10 || !name || !consent}
-                  onClick={sendOtp}
-                >
-                  <Phone className="h-3 w-3" /> {tr("sendOtp", lang)}
-                </Button>
-              </div>
-            )
-          ) : step === "location" ? (
-            <div className="space-y-4 text-center">
-              <div className="text-6xl mb-4">📍</div>
-              <h2 className="text-xl font-bold">{lang === "ta" ? "உங்கள் இடம்" : "Your Location"}</h2>
-              <p className="text-sm text-slate-600">
-                {lang === "ta" ? "2am அவசரத்தில் அருகில் உள்ள மருத்துவமனைக்கு மட்டும் அழைப்போம்" : "We'll only alert you for nearby hospitals during 2am emergencies"}
-              </p>
-              <Button
-                className="w-full"
-                size="md"
-                loading={loading}
-                onClick={getLocation}
-              >
-                <MapPin className="h-4 w-4" /> {lang === "ta" ? "இடத்தை பகிரவும்" : "Share Location"}
-              </Button>
-              <p className="text-xs text-slate-400">
-                {lang === "ta" ? "நாங்கள் உங்கள் இடத்தை கண்காணிக்க மாட்டோம். அவசர பொருத்தத்திற்கு மட்டும்." : "We don't track your location. Only for emergency matching."}
-              </p>
-            </div>
-          ) : step === "details" ? (
+          {/* Login View */}
+          {view === "login" && (
             <div className="space-y-4">
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "உள்நுழை" : "Sign In"}</h2>
+              
+              {/* Phone Number with India Code */}
               <div>
                 <label className="block mb-1 text-xs font-medium text-slate-600">
-                  {lang === "ta" ? "பிறந்த தேதி" : "Date of Birth"}
+                  {lang === "ta" ? "மொபைல் எண்" : "Phone Number"}
                 </label>
-                <input
-                  type="date"
-                  className="w-full p-3 border-2 border-slate-200 rounded-lg text-sm"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  max="2008-12-31"
-                  min="1960-01-01"
-                />
-                <p className="text-xs text-slate-400 mt-1">{lang === "ta" ? "18-65 வயது மட்டுமே இரத்த தானம் செய்யலாம்" : "18-65 years only for blood donation"}</p>
-              </div>
-
-              <div>
-                <label className="block mb-2 text-xs font-medium text-slate-600">
-                  {lang === "ta" ? "இரத்த வகை" : "Blood Group"}
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {BLOOD_GROUPS.map(bg => (
-                    <button
-                      key={bg}
-                      onClick={() => setBloodGroup(bg)}
-                      className={`p-3 rounded-lg border-2 font-bold text-sm ${
-                        bloodGroup === bg 
-                          ? 'bg-uyir-600 text-white border-uyir-600' 
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {bg}
-                    </button>
-                  ))}
+                <div className="flex">
+                  <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
+                    <span className="text-lg">🇮🇳</span>
+                    <span className="text-sm font-semibold text-slate-600">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="98765 43210"
+                    value={mobile}
+                    onChange={(e) => setMobile(String(e.target.value))}
+                    maxLength={10}
+                    className="flex-1 rounded-r-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
+                  />
                 </div>
               </div>
 
-              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                <p className="text-xs text-emerald-800">
-                  <b>{lang === "ta" ? "உங்கள் இடம்:" : "Your Location:"}</b> {district} - {pincode}<br/>
-                  <b>{lang === "ta" ? "குறிப்பு:" : "Note:"}</b> {lang === "ta" ? "எடை, Hb, உடல்நிலை மருத்துவமனையில் இலவசமாக சரிபார்க்கப்படும்" : "Weight, Hb, health checked free at hospital"}
-                </p>
+              {/* Password with Eye Toggle */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "கடவுச்சொல்" : "Password"}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder={lang === "ta" ? "உங்கள் கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}
+                    value={password}
+                    onChange={(e) => setPassword(String(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
+              {/* Forgot Password */}
+              <div className="text-right">
+                <button onClick={() => { setView("forgot"); setErr(""); }} className="text-xs text-uyir-600 hover:underline">
+                  {lang === "ta" ? "கடவுச்சொல் மறந்துவிட்டீர்களா?" : "Forgot password?"}
+                </button>
+              </div>
+
+              {/* Sign In Button */}
               <Button
                 className="w-full"
                 size="md"
                 loading={loading}
-                disabled={!dob || !bloodGroup}
-                onClick={completeSignup}
-              >
-                <Droplet className="h-4 w-4" /> {lang === "ta" ? "உயிர் காப்பாளர் ஆகுங்கள்" : "Become a Lifesaver"}
-              </Button>
-            </div>
-          ) : step === "password" ? (
-            <div className="space-y-2">
-              <p className="text-center text-sm text-slate-600">{lang === "ta" ? "உங்கள் கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}</p>
-              <Input
-                label={lang === "ta" ? "கடவுச்சொல்" : "Password"}
-                type="password"
-                placeholder="••••"
-                value={password}
-                onChange={(e) => setPassword(String(e.target.value))}
-              />
-              <Button
-                className="w-full"
-                size="md"
-                loading={loading}
-                disabled={password.length < 4}
+                disabled={mobile.length < 10 || password.length < 4}
                 onClick={handleLogin}
               >
-                <ShieldCheck className="h-3 w-3" /> {lang === "ta" ? "உள்நுழை" : "Login"}
+                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "உள்நுழை" : "Sign In"}
               </Button>
-              <button className="w-full text-xs text-slate-400" onClick={() => { setStep("mobile"); setPassword(""); }}>{tr("changeNumber", lang)}</button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {userExists && existingUser && (
-                <div className="rounded-lg bg-emerald-50 p-3 text-center">
-                  <p className="text-sm font-semibold text-emerald-700">Welcome back, {existingUser.name}!</p>
-                  <p className="text-xs text-emerald-600">{existingUser.role === "donor" ? "Donor" : "Requester"}</p>
-                </div>
-              )}
-              <Input label={String(tr("enterOtp", lang))} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(String(e.target.value))} />
-              {!userExists && (
-                <Input
-                  label={lang === "ta" ? "கடவுச்சொல்லை அமைக்கவும் (முதல் முறை)" : "Set a password (first time)"}
-                  type="password"
-                  placeholder="••••"
-                  value={password}
-                  onChange={(e) => setPassword(String(e.target.value))}
-                />
-              )}
-              {devOtp && <p className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-700">Demo OTP: <b>{devOtp}</b> (SMS gateway not wired for MVP)</p>}
-              <Button className="w-full" size="md" loading={loading} disabled={code.length < 6 || (!userExists && password.length < 4)} onClick={verify}>
-                <ShieldCheck className="h-3 w-3" /> {userExists ? "Login" : tr("verifyContinue", lang)}
-              </Button>
-              <button className="w-full text-xs text-slate-400" onClick={() => { setStep("mobile"); setUserExists(false); setExistingUser(null); setPassword(""); }}>{tr("changeNumber", lang)}</button>
+
+              {/* Don't have account */}
+              <div className="text-center text-sm">
+                <span className="text-slate-500">{lang === "ta" ? "கணக்கு இல்லையா?" : "Don't have an account?"} </span>
+                <button onClick={() => { setView("signup"); setErr(""); }} className="font-semibold text-uyir-600 hover:underline">
+                  {lang === "ta" ? "பதிவு செய்யவும்" : "Sign up"}
+                </button>
+              </div>
+
+              {err && <p className="text-center text-xs text-red-500">{err}</p>}
             </div>
           )}
-          {err && <p className="mt-2 text-center text-xs text-uyir-600">{err}</p>}
+
+          {/* Signup View */}
+          {view === "signup" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "புதிய பதிவு" : "Sign Up"}</h2>
+              
+              {/* Name */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "பெயர்" : "Name"}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang === "ta" ? "உங்கள் பெயர்" : "Your name"}
+                  value={name}
+                  onChange={(e) => setName(String(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
+                />
+              </div>
+
+              {/* Phone Number with India Code */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "மொபைல் எண்" : "Phone Number"}
+                </label>
+                <div className="flex">
+                  <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
+                    <span className="text-lg">🇮🇳</span>
+                    <span className="text-sm font-semibold text-slate-600">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="98765 43210"
+                    value={mobile}
+                    onChange={(e) => setMobile(String(e.target.value))}
+                    maxLength={10}
+                    className="flex-1 rounded-r-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
+                  />
+                </div>
+              </div>
+
+              {/* Password with Eye Toggle */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "கடவுச்சொல்" : "Password"}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder={lang === "ta" ? "கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}
+                    value={password}
+                    onChange={(e) => setPassword(String(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Ethical Consent Checkbox */}
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="consent"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-uyir-600 focus:ring-uyir-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="consent" className="text-xs text-slate-600">
+                    {lang === "ta" 
+                      ? "நான் இந்த இரத்த தானத்தை இலவசமாக கொடுக்கிறேன், பணத்திற்காக இல்லை. இது ஒரு நல்ல நோக்கத்திற்காக மட்டுமே." 
+                      : "I pledge to donate blood voluntarily without any monetary compensation. This is for a noble cause to save lives."}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowLegalInfo(true)}
+                    className="ml-1 text-xs font-semibold text-uyir-600 hover:underline"
+                  >
+                    {lang === "ta" ? "மேலும் படிக்க" : "Read more"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Get OTP Button */}
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={mobile.length < 10 || !name || !password || !consent}
+                onClick={handleSignup}
+              >
+                <Phone className="h-4 w-4" /> {lang === "ta" ? "OTP பெறு" : "Get OTP"}
+              </Button>
+
+              {/* Already have account */}
+              <div className="text-center text-sm">
+                <span className="text-slate-500">{lang === "ta" ? "ஏற்கனவே கணக்கு உள்ளதா?" : "Already have an account?"} </span>
+                <button onClick={() => { setView("login"); setErr(""); }} className="font-semibold text-uyir-600 hover:underline">
+                  {lang === "ta" ? "உள்நுழை" : "Sign in"}
+                </button>
+              </div>
+
+              {err && <p className="text-center text-xs text-red-500">{err}</p>}
+            </div>
+          )}
+
+          {/* OTP View */}
+          {view === "otp" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "OTP உள்ளிடவும்" : "Enter OTP"}</h2>
+              <p className="text-center text-sm text-slate-500">
+                {lang === "ta" ? "உங்கள் மொபைலுக்கு அனுப்பப்பட்ட 6-இலக்க OTP" : "Enter the 6-digit OTP sent to your mobile"}
+              </p>
+              
+              {devOtp && (
+                <div className="rounded-md bg-amber-50 px-3 py-2 text-center">
+                  <p className="text-xs text-amber-700">
+                    {lang === "ta" ? "டெமோ OTP:" : "Demo OTP:"} <b className="text-lg">{devOtp}</b>
+                  </p>
+                  <p className="text-[10px] text-amber-600">
+                    {lang === "ta" ? "(SMS கேட்வே இணைக்கப்படவில்லை)" : "(SMS gateway not connected)"}
+                  </p>
+                </div>
+              )}
+              
+              <input
+                type="number"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(String(e.target.value))}
+                maxLength={6}
+                className="w-full rounded-lg border border-slate-300 p-3 text-center text-lg tracking-widest outline-none focus:border-uyir-500"
+              />
+
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={code.length !== 6}
+                onClick={verifyOtp}
+              >
+                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "சரிபார்க்கவும்" : "Verify"}
+              </Button>
+
+              <button onClick={() => { setView("signup"); setErr(""); }} className="w-full text-xs text-slate-400">
+                {lang === "ta" ? "மாற்றவும்" : "Change"}
+              </button>
+
+              {err && <p className="text-center text-xs text-red-500">{err}</p>}
+            </div>
+          )}
+
+          {/* Forgot Password View */}
+          {view === "forgot" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "கடவுச்சொல் மறந்துவிட்டீர்களா?" : "Forgot Password?"}</h2>
+              <p className="text-center text-sm text-slate-500">
+                {lang === "ta" ? "உங்கள் மொபைல் எண்ணை உள்ளிடவும், OTP அனுப்புவோம்" : "Enter your mobile number to receive OTP"}
+              </p>
+              
+              {/* Phone Number with India Code */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "மொபைல் எண்" : "Phone Number"}
+                </label>
+                <div className="flex">
+                  <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
+                    <span className="text-lg">🇮🇳</span>
+                    <span className="text-sm font-semibold text-slate-600">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="98765 43210"
+                    value={mobile}
+                    onChange={(e) => setMobile(String(e.target.value))}
+                    maxLength={10}
+                    className="flex-1 rounded-r-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
+                  />
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={mobile.length < 10}
+                onClick={handleForgotPassword}
+              >
+                <Phone className="h-4 w-4" /> {lang === "ta" ? "OTP பெறு" : "Get OTP"}
+              </Button>
+
+              <button onClick={() => { setView("login"); setErr(""); }} className="w-full text-xs text-slate-400">
+                {lang === "ta" ? "திரும்பு" : "Back to Login"}
+              </button>
+
+              {err && <p className="text-center text-xs text-red-500">{err}</p>}
+            </div>
+          )}
+
+          {/* Reset Password View */}
+          {view === "reset" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "புதிய கடவுச்சொல்" : "Set New Password"}</h2>
+              <p className="text-center text-sm text-slate-500">
+                {lang === "ta" ? "OTP மற்றும் புதிய கடவுச்சொல்லை உள்ளிடவும்" : "Enter OTP and your new password"}
+              </p>
+              
+              {devOtp && (
+                <div className="rounded-md bg-amber-50 px-3 py-2 text-center">
+                  <p className="text-xs text-amber-700">
+                    {lang === "ta" ? "டெமோ OTP:" : "Demo OTP:"} <b className="text-lg">{devOtp}</b>
+                  </p>
+                </div>
+              )}
+              
+              <input
+                type="number"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(String(e.target.value))}
+                maxLength={6}
+                className="w-full rounded-lg border border-slate-300 p-3 text-center text-lg tracking-widest outline-none focus:border-uyir-500"
+              />
+
+              {/* Password with Eye Toggle */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "புதிய கடவுச்சொல்" : "New Password"}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder={lang === "ta" ? "புதிய கடவுச்சொல்லை உள்ளிடவும்" : "Enter new password"}
+                    value={password}
+                    onChange={(e) => setPassword(String(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={code.length !== 6 || password.length < 4}
+                onClick={handleResetPassword}
+              >
+                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "கடவுச்சொல் மாற்று" : "Reset Password"}
+              </Button>
+
+              <button onClick={() => { setView("login"); setErr(""); }} className="w-full text-xs text-slate-400">
+                {lang === "ta" ? "திரும்பு" : "Back to Login"}
+              </button>
+
+              {err && <p className="text-center text-xs text-red-500">{err}</p>}
+            </div>
+          )}
         </div>
-        <p className="mt-5 text-center text-[10px] text-slate-400">
-          Blood donation is voluntary & unpaid. Requesting payment results in a permanent ban.
-        </p>
       </div>
+
+      {/* Legal Information Modal */}
+      {showLegalInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="mb-4 text-lg font-bold text-slate-800">
+                {lang === "ta" ? "இரத்த விற்பனை - சட்ட எச்சரிக்கை" : "Blood Selling - Legal Warning"}
+              </h3>
+              <button
+                onClick={() => setShowLegalInfo(false)}
+                className="mb-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3 text-sm text-slate-600">
+              <p className="font-semibold text-red-600">
+                {lang === "ta" ? "⚠️ முக்கிய சட்ட எச்சரிக்கை" : "⚠️ Important Legal Warning"}
+              </p>
+              
+              <p>
+                {lang === "ta" 
+                  ? "இந்தியாவில், இரத்தத்தை பணத்திற்காக விற்பனை செய்வது குற்றம் மற்றும் தண்டனைக்குரிய செயல். இது பல்வேறு சட்டங்களின் கீழ் குற்றமாகக் கருதப்படுகிறது:"
+                  : "In India, selling blood for money is a criminal offense punishable by law. This is considered a crime under various laws:"}
+              </p>
+
+              <ul className="ml-4 list-disc space-y-2">
+                <li>
+                  <strong>{lang === "ta" ? "இந்திய தண்டனைச் சட்டம் (IPC) - பிரிவு 420:" : "Indian Penal Code (IPC) - Section 420:"}</strong>
+                  {lang === "ta" ? " மோசடி மற்றும் நம்பிக்கையை துரோகமாக பயன்படுத்துதல் - 7 ஆண்டுகள் வரை சிறைத்தண்டனை" : " Cheating and dishonestly inducing delivery of property - Up to 7 years imprisonment"}
+                </li>
+                <li>
+                  <strong>{lang === "ta" ? "இந்திய தண்டனைச் சட்டம் (IPC) - பிரிவு 406:" : "Indian Penal Code (IPC) - Section 406:"}</strong>
+                  {lang === "ta" ? " நம்பிக்கையை மீறுதல் - 3 ஆண்டுகள் வரை சிறைத்தண்டனை" : " Criminal breach of trust - Up to 3 years imprisonment"}
+                </li>
+                <li>
+                  <strong>{lang === "ta" ? "மருத்துவ சட்டங்கள்:" : "Medical Laws:"}</strong>
+                  {lang === "ta" ? " மருத்துவ சட்டங்களை மீறுதல் - கடுமையான தண்டனை மற்றும் உரிமம் ரத்து" : " Violation of medical laws - Severe penalties and license cancellation"}
+                </li>
+                <li>
+                  <strong>{lang === "ta" ? "மனித உறுப்பு சட்டம் (THOA):" : "Human Organ Act (THOA):"}</strong>
+                  {lang === "ta" ? " மனித உறுப்புகளை வணிக நோக்கத்திற்காக பயன்படுத்துதல் - 10 ஆண்டுகள் வரை சிறைத்தண்டனை மற்றும் ரூ.1 லட்சம் வரை அபராதம்" : " Commercial use of human organs - Up to 10 years imprisonment and fine up to ₹1 lakh"}
+                </li>
+              </ul>
+
+              <p className="font-semibold text-red-600">
+                {lang === "ta" ? "தண்டனைகள்:" : "Penalties:"}
+              </p>
+              <ul className="ml-4 list-disc space-y-1">
+                <li>{lang === "ta" ? "சிறைத்தண்டனை (3 முதல் 10 ஆண்டுகள்)" : "Imprisonment (3 to 10 years)"}</li>
+                <li>{lang === "ta" ? "கடுமையான நிதி அபராதம்" : "Heavy monetary fines"}</li>
+                <li>{lang === "ta" ? "மருத்துவ உரிமம் ரத்து" : "Medical license cancellation"}</li>
+                <li>{lang === "ta" ? "குற்றவியல் பதிவு" : "Criminal record"}</li>
+              </ul>
+
+              <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-800">
+                {lang === "ta" 
+                  ? "UYIR தளம் இரத்த தானத்தை ஊக்குவிக்கிறது, வணிக நோக்கத்திற்காக அல்ல. எந்தவொரு பணப் பரிவர்த்தனையும் கண்டறியப்பட்டால், அது உடனடியாக காவல்துறையிடம் புகாரளிக்கப்படும்."
+                  : "UYIR platform promotes voluntary blood donation, not commercial blood selling. Any monetary transaction detected will be immediately reported to police authorities."}
+              </p>
+
+              <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-800">
+                <p className="font-semibold mb-2">
+                  {lang === "ta" ? "🔵 UYIR தளத்தின் பங்கு:" : "🔵 UYIR Platform Role:"}
+                </p>
+                <p className="mb-2">
+                  {lang === "ta" 
+                    ? "UYIR இரத்த தானம் தேவைப்படுபவர்களையும் தானம் கொடுப்பவர்களையும் இணைக்கும் ஒரு தளம் மட்டுமே. UYIR எந்தவொரு பரிவர்த்தனையிலும் நேரடியாக ஈடுபடுவதில்லை."
+                    : "UYIR is only a platform to connect blood donors and requestors. UYIR does not directly participate in any transactions."}
+                </p>
+                <p className="font-semibold mb-1">
+                  {lang === "ta" ? "பொறுப்பு மறுப்பு:" : "Disclaimer:"}
+                </p>
+                <p className="mb-2">
+                  {lang === "ta" 
+                    ? "UYIR தளம் தானம் தேவைப்படுபவர்களுக்கும் தானம் கொடுப்பவர்களுக்கும் இடையே நடக்கும் எந்தவொரு செயல்பாட்டிற்கும் பொறுப்பேற்காது. ஏதேனும் மோசடி அல்லது சந்தேகத்திற்கிடமான செயல்பாடுகளைக் கண்டறிந்தால், உடனடியாக ஆதரவு குழுவைத் தொடர்பு கொள்ளவும்."
+                    : "UYIR platform is not responsible for any activities between donors and requestors. If you detect any fraudulent or suspicious activities, please contact the support team immediately."}
+                </p>
+                <p className="font-semibold">
+                  {lang === "ta" ? "ஆதரவு தொடர்பு:" : "Support Contact:"}
+                </p>
+                <p>
+                  {lang === "ta" ? "மோசடி செயல்களைப் புகாரளிக்க: support@uyir.org" : "Report fraudulent activities: support@uyir.org"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowLegalInfo(false)}
+              className="mt-4 w-full rounded-lg bg-uyir-600 py-2 text-sm font-semibold text-white hover:bg-uyir-700"
+            >
+              {lang === "ta" ? "புரிந்தது" : "I Understand"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

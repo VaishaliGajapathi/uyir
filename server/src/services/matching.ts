@@ -16,6 +16,7 @@ export interface DonorCandidate {
   id: string;
   bloodGroup: string | null;
   district: string | null;
+  taluk: string | null;
   lat: number | null;
   lng: number | null;
   lastDonationDate: Date | null;
@@ -38,10 +39,10 @@ function daysSince(d: Date | null): number {
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 }
 
-// Implements the UYIR ranking formula.
+// Implements the UYIR ranking formula with hierarchical location priority (taluk → city → district).
 export function scoreDonor(
   donor: DonorCandidate,
-  req: { bloodGroup: string; componentType: string; district: string; lat?: number | null; lng?: number | null }
+  req: { bloodGroup: string; componentType: string; district: string; taluk?: string | null; lat?: number | null; lng?: number | null }
 ): ScoredDonor {
   const reasons: string[] = [];
   let score = 0;
@@ -67,12 +68,20 @@ export function scoreDonor(
   } else if (donor.district && TN_DISTRICTS[donor.district] && reqLat != null) {
     distanceKm = haversineKm(TN_DISTRICTS[donor.district].lat, TN_DISTRICTS[donor.district].lng, reqLat, reqLng);
   }
+
+  // Hierarchical location priority: taluk/area first (+40), then district
+  if (req.taluk && donor.taluk && req.taluk.trim().toLowerCase() === donor.taluk.trim().toLowerCase()) {
+    score += 40;
+    reasons.push("Same taluk/area +40");
+  } else if (donor.district === req.district) {
+    score += 15;
+    reasons.push("Same district +15");
+  }
+
   if (distanceKm != null) {
     if (distanceKm < 5) { score += 30; reasons.push("Within 5km +30"); }
     else if (distanceKm < 15) { score += 20; reasons.push("Within 15km +20"); }
     else if (distanceKm < 40) { score += 10; reasons.push("Within 40km +10"); }
-  } else if (donor.district === req.district) {
-    score += 15; reasons.push("Same district +15");
   }
 
   // Eligibility: last donation > 90 days (+20).
@@ -103,7 +112,7 @@ export function scoreDonor(
 
 export function rankDonors(
   donors: DonorCandidate[],
-  req: { bloodGroup: string; componentType: string; district: string; lat?: number | null; lng?: number | null }
+  req: { bloodGroup: string; componentType: string; district: string; taluk?: string | null; lat?: number | null; lng?: number | null }
 ): ScoredDonor[] {
   return donors
     .map((d) => scoreDonor(d, req))

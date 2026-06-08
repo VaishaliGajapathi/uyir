@@ -1,20 +1,52 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle, Navigation, MapPin, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Button, Card, Input, Badge } from "../components/ui";
+import { Button, Card, Input, Badge, Sheet } from "../components/ui";
 import { BLOOD_GROUPS, t } from "../lib/constants";
+import { DonationCertificate } from "../components/DonationCertificate";
+
+const DISTRICTS = ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruppur", "Erode", "Trichy", "Namakkal", "Dindigul", "Tirunelveli", "Vellore", "Thanjavur", "Kancheepuram", "Krishnagiri", "Theni", "Virudhunagar", "Nilgiris"];
+
+function getMissingDonorFields(user: any, form: any, lang: "ta" | "en") {
+  const fields: string[] = [];
+  const name = String(form?.name ?? user?.name ?? "").trim();
+  const bloodGroup = form?.bloodGroup ?? user?.bloodGroup;
+  const district = form?.district ?? user?.district;
+  const hasLocationCoords = (form?.lat ?? user?.lat) != null && (form?.lng ?? user?.lng) != null;
+  const hasLocationPermission = Boolean(form?.locationEnabled ?? user?.locationEnabled);
+
+  if (!name || name === "UYIR User") {
+    fields.push(lang === "ta" ? "பெயர்" : "Name");
+  }
+  if (!bloodGroup) {
+    fields.push(lang === "ta" ? "இரத்த வகை" : "Blood Group");
+  }
+  if (!district) {
+    fields.push(lang === "ta" ? "மாவட்டம்" : "District");
+  }
+  if (!hasLocationPermission || !hasLocationCoords) {
+    fields.push(lang === "ta" ? "GPS இடம்" : "GPS Location");
+  }
+
+  return fields;
+}
 
 export function Profile() {
   const { user, logout, lang, setLang, refreshUser } = useApp();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<any>({ ...user });
   const [showNotificationWarning, setShowNotificationWarning] = useState(false);
   const [pendingNotificationToggle, setPendingNotificationToggle] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const isDonorSetup = searchParams.get("completeDonor") === "1";
+  const missingDonorFields = getMissingDonorFields(user, form, lang);
 
   // Detect changes in form
   const checkChanges = () => {
@@ -37,6 +69,14 @@ export function Profile() {
   };
 
   async function save() {
+    if (missingDonorFields.length > 0) {
+      alert(
+        lang === "ta"
+          ? `இந்த விவரங்கள் அவசியம்: ${missingDonorFields.join(", ")}`
+          : `These details are required: ${missingDonorFields.join(", ")}`
+      );
+      return;
+    }
     if (!confirmed) {
       alert(lang === "ta" 
         ? "தயவுசெய்து உங்கள் வயது 18-65, எடை 45kg மேல் என்பதை உறுதிப்படுத்தவும்."
@@ -49,7 +89,82 @@ export function Profile() {
       await refreshUser();
       setHasChanges(false);
       alert(lang === "ta" ? "சுயவிவரம் புதுப்பிக்கப்பட்டது!" : "Profile updated successfully!");
+      if (isDonorSetup) {
+        nav("/nearby");
+      }
     } catch (e: any) { alert(e.message); } finally { setBusy(false); }
+  }
+
+  async function captureDonorLocation() {
+    if (!("geolocation" in navigator)) {
+      alert(lang === "ta" ? "உங்கள் உலாவி இடம் கண்டறியலை ஆதரிக்கவில்லை" : "Geolocation is not supported by your browser");
+      return;
+    }
+
+    setCapturingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        });
+      });
+
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      let district = "";
+      let taluk = "";
+      let pincode = "";
+
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+        const data = await response.json();
+        const addr = data?.address || {};
+        const rawDistrict = addr.county || addr.state_district || addr.city_district || addr.city || addr.town || "";
+        const rawText = [rawDistrict, data?.display_name, addr.state, addr.county, addr.city, addr.town].filter(Boolean).join(" ");
+        const matchedDistrict = DISTRICTS.find((item) => rawText.toLowerCase().includes(item.toLowerCase()));
+        district = matchedDistrict || "";
+        taluk = addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || "";
+        pincode = addr.postcode || "";
+      } catch {
+        district = form.district || user?.district || "";
+      }
+
+      await api.setLocation(lat, lng, {
+        district: district || undefined,
+        taluk: taluk || undefined,
+        pincode: pincode || undefined,
+      });
+      await refreshUser();
+      setForm((prev: any) => ({
+        ...prev,
+        lat,
+        lng,
+        shareLocation: true,
+        locationEnabled: true,
+        district: district || prev.district || user?.district || "",
+        taluk: taluk || prev.taluk || user?.taluk || "",
+        pincode: pincode || prev.pincode || user?.pincode || "",
+      }));
+      setHasChanges(true);
+      alert(
+        lang === "ta"
+          ? district
+            ? `இருப்பிடம் பதிவு செய்யப்பட்டது. மாவட்டம்: ${district}`
+            : "இருப்பிடம் பதிவு செய்யப்பட்டது."
+          : district
+            ? `Location captured. District: ${district}`
+            : "Location captured successfully."
+      );
+    } catch (e: any) {
+      const message = e?.code === 1
+        ? (lang === "ta" ? "இடம் அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் GPS அனுமதியை இயக்கவும்." : "Location permission denied. Please enable GPS permission in browser settings.")
+        : e?.message || (lang === "ta" ? "இருப்பிடத்தைப் பெற முடியவில்லை" : "Failed to capture location");
+      alert(message);
+    } finally {
+      setCapturingLocation(false);
+    }
   }
 
   function handleNotificationToggle(field: string, currentValue: boolean) {
@@ -111,7 +226,41 @@ export function Profile() {
             </div>
           </div>
         </div>
+        {user?.role === "donor" && (
+          <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setCertificateOpen(true)}>
+            <Award className="h-4 w-4" /> {lang === "ta" ? "தானதானம் சான்றிதழ் பார்க்க" : "View Donation Certificate"}
+          </Button>
+        )}
       </Card>
+
+      {isDonorSetup && (
+        <Card className="mb-3 border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-bold text-amber-900">
+            {lang === "ta" ? "ரத்ததான அறிவிப்புகளுக்கு முன் இந்த விவரங்களை நிரப்பவும்" : "Complete these details before receiving donor alerts"}
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            {missingDonorFields.length > 0
+              ? (lang === "ta"
+                  ? `பூர்த்தி செய்ய வேண்டியது: ${missingDonorFields.join(", ")}`
+                  : `Still required: ${missingDonorFields.join(", ")}`)
+              : (lang === "ta"
+                  ? "விவரங்கள் நிரம்பியுள்ளன. கீழே உறுதிப்படுத்தி சேமிக்கவும்."
+                  : "Required details are filled. Confirm below and save.")}
+          </p>
+          <Button className="mt-3 w-full" variant="outline" loading={capturingLocation} onClick={captureDonorLocation}>
+            <Navigation className="h-4 w-4" /> {lang === "ta" ? "தற்போதைய GPS இருப்பிடத்தைப் பதிவு செய்" : "Capture current GPS location"}
+          </Button>
+          <p className="mt-2 text-[11px] text-amber-900">
+            {form.lat != null && form.lng != null
+              ? (lang === "ta"
+                  ? `GPS பதிவு செய்யப்பட்டது${form.district ? ` · ${form.district}` : ""}`
+                  : `GPS captured${form.district ? ` · ${form.district}` : ""}`)
+              : (lang === "ta"
+                  ? "ரியல்-டைம் ரத்ததான அறிவிப்புகளுக்கு GPS அவசியம்."
+                  : "GPS is mandatory for real-time donor alerts.")}
+          </p>
+        </Card>
+      )}
 
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-medium text-slate-600">{lang === "ta" ? "மொழி" : "Language"}</span>
@@ -173,11 +322,27 @@ export function Profile() {
             onChange={(e) => handleFormChange("district", e.target.value)}
           >
             <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-            {["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruppur", "Erode", "Trichy", "Namakkal", "Dindigul", "Tirunelveli", "Vellore", "Thanjavur", "Kancheepuram", "Krishnagiri", "Theni", "Virudhunagar", "Nilgiris"].map((d) => (
+            {DISTRICTS.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
           <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>
+        </div>
+
+        <div>
+          <label className="mb-0.5 block text-sm font-medium text-slate-500">
+            {lang === "ta" ? "GPS / தற்போதைய இருப்பிடம் *" : "GPS / Current Location *"}
+          </label>
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {form.lat != null && form.lng != null ? (
+              <div className="space-y-1">
+                <p className="flex items-center gap-1"><MapPin className="h-4 w-4 text-uyir-600" /> {lang === "ta" ? "இருப்பிடம் பதிவு செய்யப்பட்டது" : "Location captured"}</p>
+                <p className="text-xs text-slate-500">{form.district || user?.district || "—"}{form.taluk ? ` · ${form.taluk}` : ""}{form.pincode ? ` · ${form.pincode}` : ""}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-rose-600">{lang === "ta" ? "GPS பதிவு செய்யப்படவில்லை. மேலே உள்ள பொத்தானை அழுத்தவும்." : "GPS location not captured yet. Use the button above."}</p>
+            )}
+          </div>
         </div>
 
         <div>
@@ -207,7 +372,7 @@ export function Profile() {
           </div>
         </label>
 
-        {hasChanges && (
+        {(hasChanges || isDonorSetup) && (
           <Button className="w-full py-0.5 text-[9px]" loading={busy} onClick={save}>
             {lang === "ta" ? "சேமி" : "Save"}
           </Button>
@@ -331,6 +496,22 @@ export function Profile() {
       <Button variant="outline" className="w-full" onClick={handleLogout}>
         <LogOut className="h-4 w-4" /> {t.signOut[lang]}
       </Button>
+
+      <Sheet open={certificateOpen} onClose={() => setCertificateOpen(false)}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">{lang === "ta" ? "தானதானம் சான்றிதழ்" : "Donation Certificate"}</h3>
+          <button onClick={() => setCertificateOpen(false)}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        <DonationCertificate
+          donorName={user?.name || "Donor"}
+          bloodGroup={user?.bloodGroup || "Unknown"}
+          donationDate={new Date().toISOString()}
+          hospitalName={lang === "ta" ? "UYIR இரத்த வங்கி" : "UYIR Blood Bank"}
+          district={user?.district || "Tamil Nadu"}
+          certificateId={`UYIR-DEMO-${user?.id?.slice(-6) || "TEST"}`}
+          onClose={() => setCertificateOpen(false)}
+        />
+      </Sheet>
     </div>
   );
 }

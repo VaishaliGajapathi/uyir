@@ -83,7 +83,7 @@ export function BottomNav() {
       {/* Desktop sidebar */}
       <div className="hidden md:flex flex-col h-full">
         <div className="flex flex-col items-center py-4 gap-1 border-b border-slate-100">
-          <img src="/uyir-logo.png" alt="UYIR" className="h-14 w-auto object-contain" />
+          <img src="/uyir-logo.png" alt="Life Saver" className="h-14 w-auto object-contain" />
         </div>
         <div className="flex flex-1 flex-col items-center py-4 gap-1">
           {mainItems.map((it) => (

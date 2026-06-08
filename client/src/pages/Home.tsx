@@ -7,6 +7,23 @@ import { Card } from "../components/ui";
 import { emergencyMeta, timeAgo } from "../lib/utils";
 import { t } from "../lib/constants";
 
+function getMissingDonorFields(user: any, lang: "ta" | "en") {
+  const fields: string[] = [];
+  if (!user?.name || user.name.trim() === "" || user.name === "UYIR User") {
+    fields.push(lang === "ta" ? "பெயர்" : "Name");
+  }
+  if (!user?.bloodGroup) {
+    fields.push(lang === "ta" ? "இரத்த வகை" : "Blood Group");
+  }
+  if (!user?.district) {
+    fields.push(lang === "ta" ? "மாவட்டம்" : "District");
+  }
+  if (!user?.locationEnabled || user?.lat == null || user?.lng == null) {
+    fields.push(lang === "ta" ? "GPS இடம்" : "GPS Location");
+  }
+  return fields;
+}
+
 export function Home() {
   const { user, lang } = useApp();
   const nav = useNavigate();
@@ -30,6 +47,20 @@ export function Home() {
     }
   }
 
+  function openDonateBlood() {
+    const missing = getMissingDonorFields(user, lang);
+    if (missing.length > 0) {
+      alert(
+        lang === "ta"
+          ? `ரத்ததான அறிவிப்புகளை பெற முன் இந்த விவரங்களை நிரப்பவும்: ${missing.join(", ")}`
+          : `Please complete these details before entering donor alerts: ${missing.join(", ")}`
+      );
+      nav("/profile?completeDonor=1");
+      return;
+    }
+    nav("/nearby");
+  }
+
   return (
     <div className="space-y-5 px-4 py-4">
       <Card className="bg-gradient-to-r from-uyir-100 to-emerald-50 p-4">
@@ -47,11 +78,11 @@ export function Home() {
         </div>
       </Card>
       <header className="flex items-center justify-between pt-4">
-        <div>
-          <h1 className={`text-2xl font-extrabold text-uyir-700 ${lang === "ta" ? "ta" : ""}`}>
-            {lang === "ta" ? "உயிர்" : "UYIR"}
-          </h1>
-          <p className="text-xs text-slate-500">{lang === "ta" ? "வணக்கம்" : "Hi"}, {user?.name?.split(" ")[0]}</p>
+        <div className="flex items-center gap-3">
+          <img src="/uyir-logo.png" alt="Life Saver" className="h-10 w-auto object-contain" />
+          <div>
+            <p className="text-xs text-slate-500">{lang === "ta" ? "வணக்கம்" : "Hi"}, {user?.name?.split(" ")[0]}</p>
+          </div>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-uyir-50 text-lg font-bold text-uyir-700">
           {user?.bloodGroup || "?"}
@@ -83,7 +114,7 @@ export function Home() {
           <span className="text-lg font-bold leading-tight">{lang === "ta" ? "இரத்தம் தேவை" : "Need Blood"}</span>
           <span className="text-xs text-white/80">{lang === "ta" ? "சரிபார்க்கப்பட்ட கோரிக்கை உருவாக்கு" : "Create verified request"}</span>
         </button>
-        <button onClick={() => nav("/nearby")}
+        <button onClick={openDonateBlood}
           className="flex flex-col items-start gap-2 rounded-2xl bg-uyir-600 p-4 text-left text-white shadow-lg shadow-uyir-600/30 active:scale-[0.98] transition">
           <HeartHandshake className="h-7 w-7" />
           <span className="text-lg font-bold leading-tight">{lang === "ta" ? "இரத்தம் தானம்" : "Donate Blood"}</span>
