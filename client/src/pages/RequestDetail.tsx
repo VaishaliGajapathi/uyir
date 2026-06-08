@@ -152,14 +152,16 @@ export function RequestDetail() {
 
   function shareToWhatsApp() {
     if (!r) return;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const signupLink = window.location.origin;
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
 
   function shareToInstagram() {
     if (!r) return;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const signupLink = window.location.origin;
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
     // Instagram doesn't have direct URL sharing, so we copy to clipboard and open Instagram
     navigator.clipboard.writeText(message);
     window.open("https://www.instagram.com/", "_blank");
@@ -167,7 +169,8 @@ export function RequestDetail() {
 
   function shareToFacebook() {
     if (!r) return;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
+    const signupLink = window.location.origin;
+    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
@@ -246,8 +249,19 @@ export function RequestDetail() {
               className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600 text-white hover:bg-slate-700"
               onClick={() => {
                 const shareLink = `${window.location.origin}/request/${r.id}`;
-                navigator.clipboard.writeText(shareLink);
-                alert("Link copied! Share this link with donors to help them navigate to the app and login.");
+                const signupLink = window.location.origin;
+                const message = `🩸 UYIR Blood Request - Verified Emergency
+
+Patient: ${r.patientName}
+Blood Group: ${r.bloodGroup}
+Hospital: ${r.hospitalName}, ${r.district}
+Contact: ${r.contactNumber}
+
+📱 Download UYIR App: ${signupLink}
+
+Request link: ${shareLink}`;
+                navigator.clipboard.writeText(message);
+                alert("Message copied! Share with donors to help them navigate to the app and login.");
               }}
             >
               <Share2 className="h-6 w-6" />
