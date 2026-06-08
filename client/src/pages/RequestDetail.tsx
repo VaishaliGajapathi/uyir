@@ -153,7 +153,15 @@ export function RequestDetail() {
   function shareToWhatsApp() {
     if (!r) return;
     const signupLink = window.location.origin;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
+    const timestamp = new Date().toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
@@ -161,7 +169,15 @@ export function RequestDetail() {
   function shareToInstagram() {
     if (!r) return;
     const signupLink = window.location.origin;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
+    const timestamp = new Date().toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     // Instagram doesn't have direct URL sharing, so we copy to clipboard and open Instagram
     navigator.clipboard.writeText(message);
     window.open("https://www.instagram.com/", "_blank");
@@ -170,7 +186,15 @@ export function RequestDetail() {
   function shareToFacebook() {
     if (!r) return;
     const signupLink = window.location.origin;
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n📱 Download UYIR App: ${signupLink}\n\n#UYIR #TamilNadu #BloodDonation`;
+    const timestamp = new Date().toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
     const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
@@ -248,15 +272,24 @@ export function RequestDetail() {
             <button
               className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600 text-white hover:bg-slate-700"
               onClick={() => {
-                const shareLink = `${window.location.origin}/request/${r.id}`;
+                const shareLink = `${window.location.origin}/request/${r.id}?action=accept`;
                 const signupLink = window.location.origin;
-                const message = `🩸 UYIR Blood Request - Verified Emergency
+                const timestamp = new Date().toLocaleString('en-IN', { 
+                  timeZone: 'Asia/Kolkata',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                const message = `🚨 UYIR Verified Emergency — ${timestamp} IST
 
 Patient: ${r.patientName}
 Blood Group: ${r.bloodGroup}
 Hospital: ${r.hospitalName}, ${r.district}
 Contact: ${r.contactNumber}
 
+✅ Verified by UYIR AI + Hospital
 📱 Download UYIR App: ${signupLink}
 
 Request link: ${shareLink}`;

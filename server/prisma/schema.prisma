@@ -25,12 +25,14 @@ model User {
   dob                DateTime?
   lastDonationDate   DateTime?
   isPlateletDonor    Boolean  @default(false)
-  nightEmergency     Boolean  @default(false)
+  isAvailable        Boolean  @default(true)  // Auto-calculated based on 90-day gap
   shareLocation      Boolean  @default(false)
   lat                Float?
   lng                Float?
+  pincode            String?  // Auto-filled from geolocation
   reputationScore    Int      @default(0)
   donationCount      Int      @default(0)
+  livesSavedCount    Int      @default(0)  // Track impact
   verified           Boolean  @default(false)
   banned             Boolean  @default(false)
   fcmToken           String?
@@ -40,15 +42,6 @@ model User {
   notificationsEnabled Boolean  @default(true)
   voiceEnabled         Boolean  @default(true)
   locationEnabled      Boolean  @default(true)
-
-  // Health fields for donors
-  hemoglobinLevel    Float?
-  drinkingHabits     String?  // never | occasional | regular
-  smokingHabits      String?  // never | occasional | regular
-  sleepHours         Int?
-  healthTips         String?
-  weight             Float?   // in kg
-  height             Float?   // in cm
 
   // Hospital approver fields
   hospitalName       String?
@@ -64,7 +57,6 @@ model User {
   hospital           Hospital?       @relation(fields: [hospitalId], references: [id])
   ratingsGiven       DonationRating[] @relation("GivenRatings")
   ratingsReceived    DonationRating[] @relation("ReceivedRatings")
-  healthReminders    HealthReminder[]
 }
 
 model Hospital {
@@ -235,19 +227,3 @@ model DonationRating {
   requester User         @relation("GivenRatings", fields: [requesterId], references: [id])
 }
 
-model HealthReminder {
-  id                String   @id @default(cuid())
-  donorId           String
-  donationDate      DateTime
-  hoursAfterDonation Int
-  message           String
-  fluidType         String
-  foodRecommendation String
-  sleepRecommendation String
-  scheduledAt       DateTime
-  sent              Boolean  @default(false)
-  sentAt            DateTime?
-  createdAt         DateTime @default(now())
-
-  donor User @relation(fields: [donorId], references: [id])
-}

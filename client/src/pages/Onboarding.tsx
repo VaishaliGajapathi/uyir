@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, ShieldCheck } from "lucide-react";
+import { Phone, ShieldCheck, MapPin, Calendar, Droplet } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Input } from "../components/ui";
 import type { Lang } from "../lib/constants";
 import { tr, t } from "../lib/constants";
 
+const BLOOD_GROUPS = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'];
+
 export function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
-  const [step, setStep] = useState<"mobile" | "otp" | "password">("mobile");
+  const [step, setStep] = useState<"mobile" | "otp" | "password" | "location" | "details">("mobile");
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [mobile, setMobile] = useState("");
   const [code, setCode] = useState("");
@@ -24,6 +26,14 @@ export function Onboarding() {
   const [userExists, setUserExists] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [existingUser, setExistingUser] = useState<any>(null);
+  
+  // New noble cause fields
+  const [dob, setDob] = useState("");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [district, setDistrict] = useState("");
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
   async function requestPermissions() {
     try {
@@ -75,6 +85,44 @@ export function Onboarding() {
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
+  async function getLocation() {
+    setErr(""); setLoading(true);
+    try {
+      if (!('geolocation' in navigator)) {
+        throw new Error("Location not supported on this device");
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setLat(latitude);
+          setLng(longitude);
+          
+          // Reverse geocode to get pincode and district
+          try {
+            const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+            const data = await res.json();
+            setPincode(data.postcode || "");
+            setDistrict(data.locality || data.city || data.principalSubdivision || "");
+          } catch (e) {
+            console.log("Reverse geocode failed, using location only");
+          }
+          
+          setLoading(false);
+          setStep("details");
+        },
+        (err) => {
+          setErr("Location permission required for emergency matching. Please enable location access.");
+          setLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    } catch (e: any) {
+      setErr(e.message);
+      setLoading(false);
+    }
+  }
+
   async function handleLogin() {
     setErr(""); setLoading(true);
     try {
@@ -90,7 +138,44 @@ export function Onboarding() {
       const r = await api.verifyOtp({ mobile, code, name: userExists ? existingUser?.name : name, role: userExists ? existingUser?.role : role, language: lang, password: userExists ? undefined : password });
       login(r.token, r.user);
       await requestPermissions();
+      
+      // For new users, proceed to location step
+      if (!userExists) {
+        setStep("location");
+      }
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+  }
+
+  async function completeSignup() {
+    setErr(""); setLoading(true);
+    try {
+      // Age validation: 18-65
+      if (!dob) {
+        throw new Error(lang === "ta" ? "பிறந்த தேதி தேவை" : "Date of birth required");
+      }
+      
+      const age = new Date().getFullYear() - new Date(dob).getFullYear();
+      if (age < 18 || age > 65) {
+        throw new Error(lang === "ta" ? "இரத்த தானம்: 18-65 வயது மட்டுமே" : "Blood donation: 18-65 years only");
+      }
+      
+      if (!bloodGroup) {
+        throw new Error(lang === "ta" ? "இரத்த வகை தேவை" : "Blood group required");
+      }
+      
+      // Update profile with noble cause fields
+      await api.updateMe({
+        dob: new Date(dob).toISOString(),
+        bloodGroup,
+        district,
+        pincode,
+        lat,
+        lng,
+      });
+      
+      setLoading(false);
+      nav("/home");
+    } catch (e: any) { setErr(e.message); setLoading(false); }
   }
 
   return (
@@ -189,6 +274,80 @@ export function Onboarding() {
                 </Button>
               </div>
             )
+          ) : step === "location" ? (
+            <div className="space-y-4 text-center">
+              <div className="text-6xl mb-4">📍</div>
+              <h2 className="text-xl font-bold">{lang === "ta" ? "உங்கள் இடம்" : "Your Location"}</h2>
+              <p className="text-sm text-slate-600">
+                {lang === "ta" ? "2am அவசரத்தில் அருகில் உள்ள மருத்துவமனைக்கு மட்டும் அழைப்போம்" : "We'll only alert you for nearby hospitals during 2am emergencies"}
+              </p>
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                onClick={getLocation}
+              >
+                <MapPin className="h-4 w-4" /> {lang === "ta" ? "இடத்தை பகிரவும்" : "Share Location"}
+              </Button>
+              <p className="text-xs text-slate-400">
+                {lang === "ta" ? "நாங்கள் உங்கள் இடத்தை கண்காணிக்க மாட்டோம். அவசர பொருத்தத்திற்கு மட்டும்." : "We don't track your location. Only for emergency matching."}
+              </p>
+            </div>
+          ) : step === "details" ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "பிறந்த தேதி" : "Date of Birth"}
+                </label>
+                <input
+                  type="date"
+                  className="w-full p-3 border-2 border-slate-200 rounded-lg text-sm"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  max="2008-12-31"
+                  min="1960-01-01"
+                />
+                <p className="text-xs text-slate-400 mt-1">{lang === "ta" ? "18-65 வயது மட்டுமே இரத்த தானம் செய்யலாம்" : "18-65 years only for blood donation"}</p>
+              </div>
+
+              <div>
+                <label className="block mb-2 text-xs font-medium text-slate-600">
+                  {lang === "ta" ? "இரத்த வகை" : "Blood Group"}
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {BLOOD_GROUPS.map(bg => (
+                    <button
+                      key={bg}
+                      onClick={() => setBloodGroup(bg)}
+                      className={`p-3 rounded-lg border-2 font-bold text-sm ${
+                        bloodGroup === bg 
+                          ? 'bg-uyir-600 text-white border-uyir-600' 
+                          : 'bg-white text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {bg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                <p className="text-xs text-emerald-800">
+                  <b>{lang === "ta" ? "உங்கள் இடம்:" : "Your Location:"}</b> {district} - {pincode}<br/>
+                  <b>{lang === "ta" ? "குறிப்பு:" : "Note:"}</b> {lang === "ta" ? "எடை, Hb, உடல்நிலை மருத்துவமனையில் இலவசமாக சரிபார்க்கப்படும்" : "Weight, Hb, health checked free at hospital"}
+                </p>
+              </div>
+
+              <Button
+                className="w-full"
+                size="md"
+                loading={loading}
+                disabled={!dob || !bloodGroup}
+                onClick={completeSignup}
+              >
+                <Droplet className="h-4 w-4" /> {lang === "ta" ? "உயிர் காப்பாளர் ஆகுங்கள்" : "Become a Lifesaver"}
+              </Button>
+            </div>
           ) : step === "password" ? (
             <div className="space-y-2">
               <p className="text-center text-sm text-slate-600">{lang === "ta" ? "உங்கள் கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}</p>

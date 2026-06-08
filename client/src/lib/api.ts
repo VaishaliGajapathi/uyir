@@ -37,11 +37,13 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 export interface User {
   id: string; name: string; mobile: string; role: string; language: string;
   district?: string; taluk?: string; bloodGroup?: string; gender?: string; age?: number;
-  isPlateletDonor: boolean; nightEmergency: boolean; shareLocation: boolean;
+  dob?: string; // Date of birth
+  isPlateletDonor: boolean; isAvailable: boolean; shareLocation: boolean;
   lastDonationDate?: string; reputationScore: number; donationCount: number;
+  livesSavedCount?: number; // Track impact
   verified: boolean; badges?: { badgeName: string; awardedDate: string }[];
-  hemoglobinLevel?: number; drinkingHabits?: string; smokingHabits?: string; sleepHours?: number; healthTips?: string;
-  weight?: number; height?: number;
+  pincode?: string; // Auto-filled from geolocation
+  lat?: number; lng?: number;
   notificationsEnabled?: boolean; voiceEnabled?: boolean; locationEnabled?: boolean;
   documents?: DonorDocument[];
   hospitalName?: string;
