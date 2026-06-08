@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "npm install --include=dev && prisma generate && tsc -p tsconfig.json",
+    "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "db:migrate": "prisma migrate deploy",
     "db:setup": "prisma generate && prisma migrate dev --name init && tsx src/seed.ts",
     "db:seed": "tsx src/seed.ts",
     "postinstall": "prisma generate"

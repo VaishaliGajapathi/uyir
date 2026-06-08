@@ -57,6 +57,7 @@ model User {
   hospital           Hospital?       @relation(fields: [hospitalId], references: [id])
   ratingsGiven       DonationRating[] @relation("GivenRatings")
   ratingsReceived    DonationRating[] @relation("ReceivedRatings")
+  healthReminders    HealthReminder[]
 }
 
 model Hospital {
@@ -227,3 +228,19 @@ model DonationRating {
   requester User         @relation("GivenRatings", fields: [requesterId], references: [id])
 }
 
+model HealthReminder {
+  id                   String   @id @default(cuid())
+  donorId              String
+  donationDate         DateTime
+  hoursAfterDonation   Int
+  message              String
+  fluidType            String
+  foodRecommendation   String
+  sleepRecommendation  String
+  scheduledAt          DateTime
+  sent                 Boolean  @default(false)
+  sentAt               DateTime?
+  createdAt            DateTime @default(now())
+
+  donor User @relation(fields: [donorId], references: [id])
+}
