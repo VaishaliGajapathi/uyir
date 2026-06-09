@@ -18,13 +18,16 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    throw new Error("API returned HTML instead of JSON. Backend may be unreachable.");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     let message: string;
     if (typeof err.error === "string") {
       message = err.error;
     } else if (err.error) {
-      // Backend sometimes sends structured validation errors (e.g. zod flatten result)
       message = JSON.stringify(err.error);
     } else {
       message = `Request failed (${res.status})`;

@@ -3,6 +3,15 @@
   command = "npm run build"
   publish = "client/dist"
 
+# Proxy API requests to Render backend.
+# IMPORTANT: Replace with your actual Render service URL.
+[[redirects]]
+  from = "/api/*"
+  to = "https://uyir-server.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA catch-all
 [[redirects]]
   from = "/*"
   to = "/index.html"
