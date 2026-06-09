@@ -133,44 +133,21 @@ authRouter.post("/hospital/register", async (req: any, res: any) => {
   if (existingApprover) return res.status(400).json({ error: "Hospital approver with this registration ID already exists" });
 
   const { TN_DISTRICTS } = await import("../lib/districts.js");
-  const districtCoords = (TN_DISTRICTS as any)[district];
+  const districtData = TN_DISTRICTS.find((d: any) => d.name === district);
+  const lat = districtData?.lat ?? 11.0;
+  const lng = districtData?.lng ?? 78.0;
 
   const hospital = await queryOne<any>(
     'INSERT INTO "Hospital" ("id","name","district","address","phone","lat","lng","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,false,NOW()) RETURNING *',
-    [hospitalName, district, address || null, phone || null, districtCoords?.lat || null, districtCoords?.lng || null]
+    [hospitalName, district, address || null, phone || null, lat, lng]
   );
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","role","hospitalName","hospitalRegistrationId","hospitalId","password","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,NOW()) RETURNING *',
-    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), "hospital_approver", hospitalName, hospitalRegistrationId, hospital!.id, hashedPassword]
+    'INSERT INTO "User" ("id","name","mobile","password","role","district","hospitalName","hospitalRegistrationId","hospitalId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
+    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), hashedPassword, "hospital_approver", district, hospitalName, hospitalRegistrationId, hospital.id]
   );
 
-  const token = signToken(user!.id, user!.role);
-  res.json({ token, user: { ...user, hospital }, hospital });
-});
-
-authRouter.post("/hospital/login", async (req: any, res: any) => {
-  const schema = z.object({ hospitalName: z.string().min(2), hospitalRegistrationId: z.string().min(2), mobile: z.string().min(10).optional() });
-  const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
-  const { hospitalName, hospitalRegistrationId, mobile } = parse.data;
-
-  const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE LOWER("name") = LOWER($1) LIMIT 1', [hospitalName]);
-  if (!hospital) return res.status(404).json({ error: "Hospital not found. Please contact UYIR admin to register your hospital." });
-
-  let user = await queryOne<any>('SELECT * FROM "User" WHERE "hospitalRegistrationId" = $1 AND "role" = $2 LIMIT 1', [hospitalRegistrationId, "hospital_approver"]);
-
-  if (!user) {
-    user = await queryOne<any>(
-      'INSERT INTO "User" ("id","name","mobile","role","hospitalName","hospitalRegistrationId","hospitalId","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,true,NOW()) RETURNING *',
-      [`${hospitalName} Approver`, mobile || "0000000000", "hospital_approver", hospitalName, hospitalRegistrationId, hospital.id]
-    );
-  } else if (user.hospitalId !== hospital.id) {
-    await exec('UPDATE "User" SET "hospitalId" = $1 WHERE "id" = $2', [hospital.id, user.id]);
-    user = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [user.id]);
-  }
-
-  const token = signToken(user!.id, user!.role);
-  res.json({ token, user: { ...user, hospital } });
+  const token = signToken(user.id, user.role);
+  res.json({ token, user });
 });
