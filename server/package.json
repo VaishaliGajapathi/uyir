@@ -5,23 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
-    "start": "prisma db push --accept-data-loss && node dist/index.js",
-    "db:migrate": "prisma migrate deploy",
-    "db:setup": "prisma generate && prisma migrate dev --name init && tsx src/seed.ts",
-    "db:seed": "tsx src/seed.ts",
-    "postinstall": "prisma generate"
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
     "@google/generative-ai": "^0.21.0",
-    "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.20.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -30,10 +26,10 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.77.0",
-    "prisma": "^5.22.0",
+    "pg": "^8.21.0",
     "replicate": "^1.0.1",
-    "twilio": "^5.3.5",
     "tsx": "^4.19.2",
+    "twilio": "^5.3.5",
     "typescript": "^5.7.2",
     "zod": "^3.24.1"
   }
