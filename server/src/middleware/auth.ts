@@ -7,6 +7,7 @@ export interface AuthedRequest extends Request {
   userId?: string;
   role?: string;
   params: any;
+  query: any;
   body: any;
   headers: any;
 }
