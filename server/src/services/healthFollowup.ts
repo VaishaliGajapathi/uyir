@@ -18,10 +18,6 @@ export async function generateHealthReminders(donorId: string, donationDate: Dat
       age: true,
       gender: true,
       bloodGroup: true,
-      hemoglobinLevel: true,
-      drinkingHabits: true,
-      smokingHabits: true,
-      sleepHours: true,
       language: true,
     },
   });
@@ -36,10 +32,6 @@ Donor Profile:
 - Age: ${donor.age || "Not specified"}
 - Gender: ${donor.gender || "Not specified"}
 - Blood Group: ${donor.bloodGroup || "Not specified"}
-- Hemoglobin Level: ${donor.hemoglobinLevel || "Not specified"}
-- Drinking Habits: ${donor.drinkingHabits || "Not specified"}
-- Smoking Habits: ${donor.smokingHabits || "Not specified"}
-- Sleep Hours: ${donor.sleepHours || "Not specified"}
 
 Generate 5 health reminders at different time intervals after donation (immediate, 6 hours, 12 hours, 24 hours, 48 hours, 72 hours).
 For each reminder, provide:
