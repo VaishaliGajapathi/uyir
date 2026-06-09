@@ -21,7 +21,7 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
   }
 
   const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 5 * 60 * 1000)]);
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
   console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, exists: false, user: null });
 });
@@ -54,13 +54,13 @@ authRouter.post("/forgot-password", async (req: any, res: any) => {
   if (!user) return res.status(404).json({ error: "User not found. Please sign up first." });
 
   const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 5 * 60 * 1000)]);
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
   console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
 });
 
 authRouter.post("/reset-password", async (req: any, res: any) => {
-  const schema = z.object({ mobile: z.string().min(10), code: z.string().length(6), password: z.string().min(4) });
+  const schema = z.object({ mobile: z.string().min(10), code: z.coerce.string().length(6), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
   const { code, password } = parse.data;
@@ -80,17 +80,23 @@ authRouter.post("/reset-password", async (req: any, res: any) => {
 
 authRouter.post("/otp/verify", async (req: any, res: any) => {
   const schema = z.object({
-    mobile: z.string().min(10), code: z.string().length(6),
+    mobile: z.string().min(10), code: z.coerce.string().length(6),
     name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
   });
   const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
+  if (!parse.success) {
+    console.log("[otp/verify] validation failed:", parse.error.flatten());
+    return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  }
   const { code, name, role, language, password } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
 
   const otp = await queryOne<any>('SELECT * FROM "OtpCode" WHERE "mobile" = $1 AND "code" = $2 AND "expiresAt" > NOW() ORDER BY "createdAt" DESC LIMIT 1', [mobile, code]);
-  if (!otp) return res.status(400).json({ error: "Invalid or expired OTP" });
+  if (!otp) {
+    console.log(`[otp/verify] OTP not found for ${mobile}, code=${code}`);
+    return res.status(400).json({ error: "Invalid or expired OTP" });
+  }
 
   let user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
