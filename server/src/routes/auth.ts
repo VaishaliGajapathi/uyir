@@ -20,7 +20,7 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
     return res.json({ ok: true, exists: true, hasPassword: false, user: existingUser, message: "User exists, set password" });
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = "123456";
   await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 5 * 60 * 1000)]);
   console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, exists: false, user: null });
@@ -53,7 +53,7 @@ authRouter.post("/forgot-password", async (req: any, res: any) => {
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (!user) return res.status(404).json({ error: "User not found. Please sign up first." });
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = "123456";
   await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 5 * 60 * 1000)]);
   console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
