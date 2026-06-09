@@ -1,3 +1,19 @@
+-- Drop existing tables in reverse dependency order (safe to rerun)
+DROP TABLE IF EXISTS "HealthReminder" CASCADE;
+DROP TABLE IF EXISTS "DonationRating" CASCADE;
+DROP TABLE IF EXISTS "DonorDocument" CASCADE;
+DROP INDEX IF EXISTS "DonorResponse_requestId_donorId_key";
+DROP TABLE IF EXISTS "OtpCode" CASCADE;
+DROP TABLE IF EXISTS "AlertLog" CASCADE;
+DROP TABLE IF EXISTS "FraudReport" CASCADE;
+DROP TABLE IF EXISTS "DonorBadge" CASCADE;
+DROP TABLE IF EXISTS "DonorResponse" CASCADE;
+DROP TABLE IF EXISTS "RequestDocument" CASCADE;
+DROP TABLE IF EXISTS "BloodRequest" CASCADE;
+DROP INDEX IF EXISTS "User_mobile_key";
+DROP TABLE IF EXISTS "Hospital" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
