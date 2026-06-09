@@ -12,7 +12,17 @@ import { adminRouter } from "./routes/admin.js";
 import { TN_DISTRICT_NAMES } from "./lib/districts.js";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://uyirorg.netlify.app",
+    "https://uyirblooddonation.netlify.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json({ limit: "30mb" }));
 
 app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server. Frontend is hosted on Netlify." }));

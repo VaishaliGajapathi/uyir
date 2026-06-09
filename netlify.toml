@@ -7,7 +7,7 @@
 # IMPORTANT: Replace with your actual Render service URL.
 [[redirects]]
   from = "/api/*"
-  to = "https://uyir-server.onrender.com/api/:splat"
+  to = "https://uyirproduction.onrender.com/api/:splat"
   status = 200
   force = true
 

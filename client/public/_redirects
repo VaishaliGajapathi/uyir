@@ -1,6 +1,5 @@
 # Proxy API requests to Render backend
-# IMPORTANT: Replace with your actual Render service URL
-/api/*  https://uyir-server.onrender.com/api/:splat  200
+/api/*  https://uyirproduction.onrender.com/api/:splat  200
 
 # SPA catch-all
 /*  /index.html  200
