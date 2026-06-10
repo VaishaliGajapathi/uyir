@@ -26,6 +26,8 @@ export function Admin() {
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
   const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
+  const [donorPage, setDonorPage] = useState(1);
+  const DONORS_PER_PAGE = 20;
   const statusCounts = useMemo(() => requests.reduce((acc: Record<string, number>, request: any) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
     return acc;
@@ -47,6 +49,16 @@ export function Admin() {
       return matchSearch && matchBlood && matchDistrict;
     });
   }, [donors, donorSearch, donorBloodFilter, donorDistrictFilter]);
+
+  const totalDonorPages = Math.ceil(filteredDonors.length / DONORS_PER_PAGE) || 1;
+  const paginatedDonors = useMemo(() => {
+    const start = (donorPage - 1) * DONORS_PER_PAGE;
+    return filteredDonors.slice(start, start + DONORS_PER_PAGE);
+  }, [filteredDonors, donorPage]);
+
+  useEffect(() => {
+    setDonorPage(1);
+  }, [donorSearch, donorBloodFilter, donorDistrictFilter]);
 
   function formatAddress(person?: any) {
     return [person?.taluk, person?.district, person?.pincode].filter(Boolean).join(", ") || "Not available";
@@ -201,35 +213,59 @@ export function Admin() {
   if (loading) return <Spinner />;
 
   return (
-    <div className="px-4 py-4 h-screen overflow-y-auto">
-      <header className="mb-4 flex items-center justify-between py-4">
-        <div className="flex items-center gap-3">
-          <img src="/uyir-logo.png" alt="Life Saver" className="h-14 w-auto object-contain" />
-          <h1 className="text-xl font-extrabold text-slate-800">Admin Dashboard</h1>
+    <div className="flex h-screen bg-slate-50">
+      {/* Left Sidebar */}
+      <aside className="w-56 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
+        <div className="p-4 border-b border-slate-100">
+          <img src="/uyir-logo.png" alt="UYIR" className="h-10 w-auto object-contain mb-2" />
+          <h2 className="text-lg font-bold text-slate-800">Hi, {user?.name?.split(" ")[0] || "Admin"}</h2>
+          <p className="text-xs text-slate-500">Admin Dashboard</p>
         </div>
-        <Button size="sm" onClick={loadAll}>Refresh</Button>
-      </header>
+        <nav className="p-2 space-y-1">
+          {([
+            { id: "overview", label: "Overview", icon: Users },
+            { id: "donors", label: "Donors", icon: Droplet },
+            { id: "requests", label: "Requests", icon: ShieldCheck },
+            { id: "verification", label: "Verification", icon: CheckCircle2 },
+            { id: "fraud", label: "Fraud Reports", icon: AlertTriangle },
+            { id: "hospitals", label: "Hospitals", icon: Building2 },
+            { id: "admins", label: "Admin Users", icon: ShieldCheck },
+          ] as const).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id as Tab)}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                  tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="p-4 border-t border-slate-100 mt-auto">
+          <Button size="sm" variant="outline" className="w-full" onClick={loadAll}>Refresh</Button>
+        </div>
+      </aside>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        <StatCard icon={Users} label="Total Donors" value={stats?.totalDonors} color="bg-blue-50 text-blue-600" />
-        <StatCard icon={Droplet} label="Total Requests" value={stats?.totalRequests} color="bg-red-50 text-red-600" />
-        <StatCard icon={ShieldCheck} label="Pending Verification" value={stats?.pendingVerifications} color="bg-amber-50 text-amber-600" />
-        <StatCard icon={Droplet} label="Active Requests" value={stats?.activeRequests} color="bg-emerald-50 text-emerald-600" />
-        <StatCard icon={AlertTriangle} label="Fraud Reports" value={stats?.fraudReports} color="bg-rose-50 text-rose-600" />
-        <StatCard icon={CheckCircle2} label="Lives Saved" value={stats?.livesSaved} color="bg-violet-50 text-violet-600" />
-      </div>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-6">
 
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        {(["overview", "donors", "requests", "verification", "fraud", "hospitals", "admins"] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${tab === t ? "bg-uyir-600 text-white" : "bg-white text-slate-500 border border-slate-200"}`}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
+
 
       {tab === "overview" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard icon={Users} label="Total Donors" value={stats?.totalDonors} color="bg-blue-50 text-blue-600" />
+            <StatCard icon={Droplet} label="Total Requests" value={stats?.totalRequests} color="bg-red-50 text-red-600" />
+            <StatCard icon={ShieldCheck} label="Pending Verification" value={stats?.pendingVerifications} color="bg-amber-50 text-amber-600" />
+            <StatCard icon={Droplet} label="Active Requests" value={stats?.activeRequests} color="bg-emerald-50 text-emerald-600" />
+            <StatCard icon={AlertTriangle} label="Fraud Reports" value={stats?.fraudReports} color="bg-rose-50 text-rose-600" />
+            <StatCard icon={CheckCircle2} label="Lives Saved" value={stats?.livesSaved} color="bg-violet-50 text-violet-600" />
+          </div>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Request Status Summary</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -336,7 +372,7 @@ export function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {filteredDonors.map((d) => (
+                {paginatedDonors.map((d) => (
                   <>
                   <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedDonorId(expandedDonorId === d.id ? null : d.id)}>
                     <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 font-medium text-slate-800">
@@ -411,12 +447,23 @@ export function Admin() {
                   )}
                   </>
                 ))}
-                {filteredDonors.length === 0 && (
-                  <tr><td colSpan={15} className="px-3 py-8 text-center text-slate-400">No donors match your filters.</td></tr>
+                {paginatedDonors.length === 0 && (
+                  <tr><td colSpan={15} className="px-3 py-8 text-center text-slate-400">No donors on this page.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalDonorPages > 1 && (
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-slate-500">Page {donorPage} of {totalDonorPages} ({filteredDonors.length} total)</span>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" disabled={donorPage === 1} onClick={() => setDonorPage(donorPage - 1)}>Previous</Button>
+                <Button size="sm" variant="outline" disabled={donorPage === totalDonorPages} onClick={() => setDonorPage(donorPage + 1)}>Next</Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -636,6 +683,7 @@ export function Admin() {
           </div>
         </Card>
       )}
+      </main>
     </div>
   );
 }
