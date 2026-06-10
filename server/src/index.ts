@@ -23,6 +23,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+app.options("*", cors());
 app.use(express.json({ limit: "30mb" }));
 
 app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server. Frontend is hosted on Netlify." }));
@@ -50,8 +51,10 @@ app.use("/impact", impactRouter);
 app.use("/stream", streamRouter);
 app.use("/admin", adminRouter);
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   console.error("[error]", err);
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.status(500).json({ error: err?.message || "Internal error" });
 });
 
