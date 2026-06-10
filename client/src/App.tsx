@@ -36,9 +36,9 @@ function AppShell({ children }: { children: ReactNode }) {
   const { user } = useApp();
   const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier";
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {showEndUserShell && <BottomNav />}
-      <div className={`flex-1 ${showEndUserShell ? "ml-20 md:ml-20 pb-16 md:pb-0" : ""}`}>
+      <div className={`flex-1 w-full min-w-0 ${showEndUserShell ? "md:ml-20 pb-16 md:pb-0" : ""}`}>
         {showEndUserShell && <LiveAlertBanner />}
         {children}
       </div>
