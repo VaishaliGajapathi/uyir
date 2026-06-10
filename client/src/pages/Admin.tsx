@@ -126,7 +126,7 @@ export function Admin() {
   if (loading) return <Spinner />;
 
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4 h-screen overflow-y-auto">
       <header className="mb-4 flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
           <img src="/uyir-logo.png" alt="Life Saver" className="h-14 w-auto object-contain" />
@@ -230,7 +230,7 @@ export function Admin() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-lg bg-white p-3 text-xs">
-                    <p className="font-bold text-slate-700">Requester</p>
+                    <p className="font-bold text-slate-700">Requestor</p>
                     <p className="mt-1 text-slate-700">Name: {r.createdBy?.name || r.contactPerson}</p>
                     <p className="text-slate-500">Phone: {r.createdBy?.mobile || r.contactNumber}</p>
                     <p className="text-slate-500">Address: {formatAddress(r.createdBy)}</p>
