@@ -259,36 +259,46 @@ Return ONLY JSON with this exact shape:
  "gstNumberFound":true/false}`;
 
   // Try fal.ai OpenRouter first (supports Gemini, GPT-4o, Claude, etc via one key)
+  const FAL_VISION_MODELS = [
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o",
+    "anthropic/claude-3.5-sonnet",
+    "xai/grok-2-vision",
+    "meta-llama/llama-3.2-90b-vision-instruct",
+    "google/gemini-2.0-flash",
+  ];
+
   if (falOpenRouter && hasFalOpenRouter) {
-    try {
-      const falModel = process.env.FAL_VISION_MODEL || "google/gemini-2.5-flash";
-      console.log("[verification] Attempting fal.ai OpenRouter vision with model:", falModel);
-      const res = await falOpenRouter.chat.completions.create({
-        model: falModel,
-        messages: [
-          { role: "system", content: "Only return valid JSON. Do not wrap in markdown." },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-      });
-      const text = res.choices[0]?.message?.content || "";
-      console.log("[verification] fal.ai OpenRouter response:", text.substring(0, 200));
-      const out = extractJson<DocumentVerificationResult>(text);
-      if (out) {
-        const normalized = normalizeDocumentResult(out);
-        console.log("[verification] fal.ai OpenRouter success:", normalized);
-        return normalized;
+    for (const modelName of FAL_VISION_MODELS) {
+      try {
+        console.log("[verification] Attempting fal.ai OpenRouter vision with model:", modelName);
+        const res = await falOpenRouter.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: "system", content: "Only return valid JSON. Do not wrap in markdown." },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.1,
+        });
+        const text = res.choices[0]?.message?.content || "";
+        console.log("[verification] fal.ai OpenRouter response:", text.substring(0, 200));
+        const out = extractJson<DocumentVerificationResult>(text);
+        if (out) {
+          const normalized = normalizeDocumentResult(out);
+          console.log("[verification] fal.ai OpenRouter success:", normalized);
+          return normalized;
+        }
+        console.warn(`[verification] fal.ai OpenRouter model ${modelName} could not parse JSON from response`);
+      } catch (e) {
+        console.error(`[verification] fal.ai OpenRouter model ${modelName} failed:`, (e as Error).message);
       }
-      console.warn("[verification] fal.ai OpenRouter could not parse JSON from response");
-    } catch (e) {
-      console.error("[verification] fal.ai OpenRouter failed:", (e as Error).message);
     }
   } else {
     console.warn("[verification] fal.ai OpenRouter not configured for vision");
