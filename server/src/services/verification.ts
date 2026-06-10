@@ -228,31 +228,41 @@ export async function verifyDocument(
   }
 
   const nameCheck = patientName
-    ? `Check carefully if the PATIENT NAME in the document matches "${patientName}" and set nameMatch accordingly.`
-    : "";
+    ? `CRITICAL: Patient name must be "${patientName}". Read the document carefully and set nameMatch to true ONLY if you can clearly see this exact name (or a very close spelling variant) printed on the document. Do NOT guess.`
+    : "CRITICAL: Read and report the patient name found in the document. Set nameMatch to true if any patient name is clearly visible.";
 
-  const prompt = `You are verifying a hospital ${documentType.replace("_", " ")} for a blood/platelet requirement in Tamil Nadu.
-Inspect the uploaded image carefully and extract whether it looks like a real medical document.
+  const prompt = `You are a strict medical document verifier for a blood donation platform in Tamil Nadu, India.
+Your job is to verify if this uploaded document is a GENUINE, VALID hospital document for an active blood/platelet request.
 
-Check these signals:
-- patient name match with the request
-- whether a hospital/clinic name is visible
-- whether the document date is visible and recent enough for an active admission/request
-- whether the document is clear, readable, and not badly cropped
-- if it is a prescription, referral, or doctor note: check for doctor name and registration / medical council number
-- if it is a bill, receipt, or invoice: check for GST number and/or hospital registration/license number
-- if it is an admission slip/discharge summary: check hospital identity and recent admission date
+Document type being uploaded: ${documentType.replace("_", " ")}
 
-${nameCheck}
+STRICT VERIFICATION CRITERIA (all must pass for high score):
+1. PATIENT NAME: ${nameCheck}
+2. HOSPITAL/CLINIC NAME: Must find a clearly printed hospital or clinic name. Set hospitalNameFound=true ONLY if readable.
+3. DOCUMENT DATE: Must find a date on the document. The date should be within the last 7 days for an active request. Set dateRecent=true if within 7 days.
+4. DOCUMENT AUTHENTICITY: Check for:
+   - Hospital letterhead/logo
+   - Doctor signature or stamp
+   - Registration numbers (hospital reg, doctor reg, GST)
+   - Official formatting (not handwritten on plain paper)
+   - Whether the image looks like a real photo of a physical document (not a screenshot or digital fake)
+5. DOCUMENT CLARITY: The image must be clear enough to read text. Blurry/cropped documents fail.
 
-Return ONLY JSON with this exact shape:
+SCORING RULES (be strict):
+- Score 90-100: All checks passed - patient name matches, hospital name clear, date recent (within 7 days), document looks authentic
+- Score 70-89: Minor issues - name matches but date older than 7 days, or hospital name slightly unclear but readable
+- Score 50-69: Moderate issues - blurry but readable, missing registration number, date unclear
+- Score 0-49: Major issues - name mismatch, no hospital name, completely blurry, looks fake/screenshot, no date visible
+- verified=true ONLY if score >= 70 AND nameMatch=true AND hospitalNameFound=true AND dateRecent=true
+
+Return ONLY valid JSON with this exact shape:
 {"score":0-100,
  "verified":true/false,
- "notes":"short reason mentioning the strongest positive/negative checks",
+ "notes":"Detailed reason: which checks passed/failed and why. Mention patient name found, hospital name found, date found, and authenticity assessment.",
  "documentKind":"prescription|referral_letter|bill|receipt|admission_slip|discharge_summary|unknown",
  "nameMatch":true/false,
  "hospitalNameFound":true/false,
- "documentDate":"string or empty",
+ "documentDate":"exact date string found on document or empty",
  "dateRecent":true/false,
  "doctorRegistrationFound":true/false,
  "hospitalRegistrationFound":true/false,
