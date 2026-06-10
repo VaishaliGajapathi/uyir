@@ -1,4 +1,4 @@
-import { gemini, openai, MODELS, completeJSON, extractJson, hasGemini, hasFal, hasOpenAI, callFalAI, GEMINI_VISION_MODELS } from "../lib/ai.js";
+import { gemini, openai, falOpenRouter, MODELS, completeJSON, extractJson, hasGemini, hasFalOpenRouter, hasOpenAI, GEMINI_VISION_MODELS } from "../lib/ai.js";
 
 export interface VerificationResult {
   score: number; // 0-100
@@ -258,7 +258,43 @@ Return ONLY JSON with this exact shape:
  "hospitalRegistrationFound":true/false,
  "gstNumberFound":true/false}`;
 
-  // Try Gemini first
+  // Try fal.ai OpenRouter first (supports Gemini, GPT-4o, Claude, etc via one key)
+  if (falOpenRouter && hasFalOpenRouter) {
+    try {
+      const falModel = process.env.FAL_VISION_MODEL || "google/gemini-2.5-flash";
+      console.log("[verification] Attempting fal.ai OpenRouter vision with model:", falModel);
+      const res = await falOpenRouter.chat.completions.create({
+        model: falModel,
+        messages: [
+          { role: "system", content: "Only return valid JSON. Do not wrap in markdown." },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+            ],
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      });
+      const text = res.choices[0]?.message?.content || "";
+      console.log("[verification] fal.ai OpenRouter response:", text.substring(0, 200));
+      const out = extractJson<DocumentVerificationResult>(text);
+      if (out) {
+        const normalized = normalizeDocumentResult(out);
+        console.log("[verification] fal.ai OpenRouter success:", normalized);
+        return normalized;
+      }
+      console.warn("[verification] fal.ai OpenRouter could not parse JSON from response");
+    } catch (e) {
+      console.error("[verification] fal.ai OpenRouter failed:", (e as Error).message);
+    }
+  } else {
+    console.warn("[verification] fal.ai OpenRouter not configured for vision");
+  }
+
+  // Fallback to Gemini directly
   if (gemini && hasGemini) {
     for (const modelName of GEMINI_VISION_MODELS) {
       try {
@@ -281,8 +317,6 @@ Return ONLY JSON with this exact shape:
         console.error(`[verification] Gemini vision model ${modelName} failed:`, (e as Error).message);
       }
     }
-  } else {
-    console.warn("[verification] Gemini not configured for vision");
   }
 
   if (openai && hasOpenAI) {
@@ -317,39 +351,7 @@ Return ONLY JSON with this exact shape:
     }
   }
 
-  // Fallback to fal.ai
-  if (hasFal) {
-    try {
-      console.log("[verification] Attempting fal.ai vision fallback");
-      // Convert base64 to data URI for fal.ai
-      const dataUri = `data:${mimeType};base64,${base64}`;
-      
-      // Use a vision model from fal.ai (e.g., LLaVA or similar)
-      const output = await callFalAI("fal-ai/llava-13b", {
-        image_url: dataUri,
-        prompt: prompt,
-      });
-      
-      // Parse fal.ai output
-      const text = output.text || (typeof output === 'string' ? output : JSON.stringify(output));
-      console.log("[verification] fal.ai vision response:", text.substring(0, 200));
-      const out = extractJson<DocumentVerificationResult>(text);
-      if (out) {
-        const normalized = normalizeDocumentResult(out);
-        console.log("[verification] fal.ai vision success:", normalized);
-        return normalized;
-      } else {
-        console.warn("[verification] fal.ai vision could not parse JSON from response");
-      }
-    } catch (e) {
-      console.error("[verification] fal.ai vision failed:", (e as Error).message);
-      console.error("[verification] Full error:", JSON.stringify(e, null, 2));
-    }
-  } else {
-    console.warn("[verification] fal.ai not configured for vision");
-  }
-
-  // If we reach here, both Gemini and Replicate vision either failed or are not configured.
+  // If we reach here, all vision providers either failed or are not configured.
   // This does NOT mean the document is fake – only that automatic AI checking could not run.
   return {
     score: 0,

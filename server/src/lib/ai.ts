@@ -21,6 +21,16 @@ export const hasFal = !!FAL_KEY;
 export const openai = OPENAI_KEY ? new OpenAI({ apiKey: OPENAI_KEY }) : null;
 export const gemini = GEMINI_KEY ? new GoogleGenerativeAI(GEMINI_KEY) : null;
 
+// fal.ai OpenRouter vision client (OpenAI-compatible)
+export const falOpenRouter = FAL_KEY
+  ? new OpenAI({
+      baseURL: "https://fal.run/openrouter/router/openai/v1",
+      apiKey: "not-needed",
+      defaultHeaders: { Authorization: `Key ${FAL_KEY}` },
+    })
+  : null;
+export const hasFalOpenRouter = !!FAL_KEY;
+
 // Configure fal.ai client
 if (FAL_KEY) {
   console.log("[ai] Configuring fal.ai client with key length:", FAL_KEY.length);
