@@ -81,8 +81,8 @@ export function Impact() {
       <div className="mb-6 grid grid-cols-2 gap-3">
         <StatCard icon={Activity} label={lang === "ta" ? "இன்று" : "Today"} value={stats?.requestsToday} />
         <StatCard icon={TrendingUp} label={lang === "ta" ? "செயலில்" : "Active"} value={stats?.activeRequests} />
-        <StatCard icon={Users} label={lang === "ta" ? "உயிர்கள்" : "Lives"} value={stats?.livesSaved} />
         <StatCard icon={Award} label={lang === "ta" ? "தானம்" : "Donors"} value={stats?.donors} />
+        <StatCard icon={Trophy} label={lang === "ta" ? "மொத்தம்" : "Total"} value={stats?.totalRequests} />
       </div>
 
       <section className="mb-6">
