@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner } from "../components/ui";
 import { timeAgo } from "../lib/utils";
+import { BLOOD_GROUPS } from "../lib/constants";
 
 type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "admins";
 
@@ -21,11 +22,30 @@ export function Admin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [adminForm, setAdminForm] = useState({ name: "", mobile: "", role: "admin", password: "" });
+  const [donorBloodFilter, setDonorBloodFilter] = useState("");
+  const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
+  const [donorSearch, setDonorSearch] = useState("");
   const statusCounts = useMemo(() => requests.reduce((acc: Record<string, number>, request: any) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
     return acc;
   }, {}), [requests]);
   const requestStatusEntries = useMemo(() => Object.entries(statusCounts) as Array<[string, number]>, [statusCounts]);
+
+  const uniqueDistricts = useMemo(() => {
+    const set = new Set<string>();
+    donors.forEach((d) => { if (d.district) set.add(d.district); });
+    return Array.from(set).sort();
+  }, [donors]);
+
+  const filteredDonors = useMemo(() => {
+    const search = donorSearch.trim().toLowerCase();
+    return donors.filter((d) => {
+      const matchSearch = !search || d.name?.toLowerCase().includes(search) || d.mobile?.includes(search);
+      const matchBlood = !donorBloodFilter || d.bloodGroup === donorBloodFilter;
+      const matchDistrict = !donorDistrictFilter || d.district === donorDistrictFilter;
+      return matchSearch && matchBlood && matchDistrict;
+    });
+  }, [donors, donorSearch, donorBloodFilter, donorDistrictFilter]);
 
   function formatAddress(person?: any) {
     return [person?.taluk, person?.district, person?.pincode].filter(Boolean).join(", ") || "Not available";
@@ -190,20 +210,115 @@ export function Admin() {
 
       {tab === "donors" && (
         <Card className="p-4">
-          <h3 className="mb-2 font-bold text-slate-800">All Donors ({donors.length})</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {donors.map((d) => (
-              <div key={d.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">{d.name} · {d.bloodGroup || "?"}</p>
-                  <p className="text-xs text-slate-400">{d.mobile} · {d.district} · {d._count.responses} donations</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={d.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{d.verified ? "Verified" : "Unverified"}</Badge>
-                  <Badge className="bg-amber-50 text-amber-700">Rep: {d.reputationScore}</Badge>
-                </div>
-              </div>
-            ))}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <h3 className="font-bold text-slate-800">Donor Database</h3>
+            <span className="text-xs text-slate-400">({filteredDonors.length} of {donors.length})</span>
+          </div>
+
+          {/* Filters */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search name or mobile..."
+                value={donorSearch}
+                onChange={(e) => setDonorSearch(e.target.value)}
+                className="w-full rounded-md border border-slate-200 py-1.5 pl-7 pr-2 text-sm outline-none focus:border-uyir-400"
+              />
+            </div>
+            <select
+              value={donorBloodFilter}
+              onChange={(e) => setDonorBloodFilter(e.target.value)}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-uyir-400"
+            >
+              <option value="">All Blood Groups</option>
+              {BLOOD_GROUPS.map((bg) => (
+                <option key={bg} value={bg}>{bg}</option>
+              ))}
+            </select>
+            <select
+              value={donorDistrictFilter}
+              onChange={(e) => setDonorDistrictFilter(e.target.value)}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-uyir-400"
+            >
+              <option value="">All Districts</option>
+              {uniqueDistricts.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <Button size="sm" variant="outline" onClick={() => { setDonorSearch(""); setDonorBloodFilter(""); setDonorDistrictFilter(""); }}>
+              Reset
+            </Button>
+          </div>
+
+          {/* Excel-like Table */}
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-600 sticky top-0">
+                <tr>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Name</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Mobile</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Blood</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">District</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Taluk</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Pincode</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Gender</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Age</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Verified</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Available</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Platelet</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Donations</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Rep</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Last Donation</th>
+                  <th className="whitespace-nowrap border-b border-slate-200 px-3 py-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDonors.map((d) => (
+                  <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 font-medium text-slate-800">{d.name}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.mobile}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2">
+                      <Badge className="bg-rose-50 text-rose-700">{d.bloodGroup || "?"}</Badge>
+                    </td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.district || "—"}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.taluk || "—"}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.pincode || "—"}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.gender || "—"}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.age ?? "—"}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2">
+                      <Badge className={d.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>
+                        {d.verified ? "Yes" : "No"}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2">
+                      <Badge className={d.isAvailable ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>
+                        {d.isAvailable ? "Yes" : "No"}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2">
+                      <Badge className={d.isPlateletDonor ? "bg-violet-100 text-violet-700" : "bg-slate-200 text-slate-500"}>
+                        {d.isPlateletDonor ? "Yes" : "No"}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.donationCount ?? 0}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.reputationScore ?? 0}</td>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">
+                      {d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={() => banUser(d.id)}>
+                        <Ban className="h-3 w-3" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredDonors.length === 0 && (
+                  <tr><td colSpan={15} className="px-3 py-8 text-center text-slate-400">No donors match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}
