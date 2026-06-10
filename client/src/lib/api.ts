@@ -174,6 +174,8 @@ export const api = {
   // hospital
   hospitalRegister: (data: { hospitalName: string; hospitalRegistrationId: string; district: string; address?: string; phone?: string; contactPerson: string; contactMobile: string; password: string }) => req<{ token: string; user: User; hospital: any }>("/auth/hospital/register", { method: "POST", body: JSON.stringify(data) }),
   getHealthTips: () => req("/ai/health-tips", { method: "POST" }),
+  // push notifications
+  savePushSubscription: (subscription: PushSubscription) => req("/users/me/push-subscription", { method: "POST", body: JSON.stringify({ subscription }) }),
 };
 
 export function streamUrl(path: string) {

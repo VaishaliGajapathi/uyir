@@ -47,6 +47,13 @@ usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: a
   res.json({ ok: true });
 });
 
+usersRouter.post("/me/push-subscription", requireAuth, async (req: AuthedRequest, res: any) => {
+  const { subscription } = req.body;
+  if (!subscription) return res.status(400).json({ error: "subscription object required" });
+  await exec('UPDATE "User" SET "pushSubscription" = $1 WHERE "id" = $2', [JSON.stringify(subscription), req.userId]);
+  res.json({ ok: true });
+});
+
 usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res: any) => {
   const documents = await query<any>('SELECT * FROM "DonorDocument" WHERE "donorId" = $1 ORDER BY "uploadedAt" DESC', [req.userId]);
   res.json(documents);

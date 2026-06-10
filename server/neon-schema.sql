@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "verified" BOOLEAN NOT NULL DEFAULT false,
     "banned" BOOLEAN NOT NULL DEFAULT false,
     "fcmToken" TEXT,
+    "pushSubscription" TEXT,
     "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true,
     "voiceEnabled" BOOLEAN NOT NULL DEFAULT true,

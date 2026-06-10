@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, Droplet, MapPin, Award, User, Shield, Star } from "lucide-react";
+import { Home, Droplet, MapPin, Award, User, Shield, Star, Bell } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 import { tr } from "../lib/constants";
 import { cn } from "../lib/utils";
+import { usePushNotifications } from "../lib/push";
 
 const mainItems = [
   { to: "/", key: "home", icon: Home, end: true },
@@ -18,6 +20,18 @@ const adminItem = { to: "/admin", key: "admin", icon: Shield } as const;
 export function BottomNav() {
   const { lang, user } = useApp();
   const isAdmin = user?.role === "admin" || user?.role === "verifier";
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { permission, subscribed, enableNotifications } = usePushNotifications();
+
+  async function handleBellClick() {
+    if (permission === "default") {
+      await enableNotifications();
+    } else if (permission === "granted" && !subscribed) {
+      await enableNotifications();
+    }
+    // TODO: Show notification history panel
+  }
+
   return (
     <nav className="fixed left-0 top-0 bottom-0 z-40 w-0 md:w-20 md:border-r border-slate-200 md:bg-white/95 md:backdrop-blur flex flex-col pt-safe">
       {/* Mobile bottom nav */}
@@ -61,6 +75,15 @@ export function BottomNav() {
               )}
             </NavLink>
           )}
+          <button onClick={handleBellClick} className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md transition text-slate-400 hover:bg-slate-50 relative">
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+            <span className="text-[8px] font-medium">Alerts</span>
+          </button>
           <NavLink
             to={profileItem.to}
             className={({ isActive }) =>
@@ -118,6 +141,15 @@ export function BottomNav() {
               )}
             </NavLink>
           )}
+          <button onClick={handleBellClick} className="flex flex-col items-center gap-1 p-2 rounded-xl transition text-slate-400 hover:bg-slate-50 relative">
+            <Bell className="h-6 w-6" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+            <span className="text-[10px] font-medium">Alerts</span>
+          </button>
         </div>
         <div className="border-t border-slate-200 p-2">
           <NavLink

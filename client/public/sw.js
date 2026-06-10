@@ -38,3 +38,44 @@ self.addEventListener('activate', (event) => {
     })
   );
 });
+
+// Push notification handler
+self.addEventListener('push', (event) => {
+  const options = {
+    body: event.data ? event.data.text() : 'New notification from UYIR',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [200, 100, 200],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    },
+    actions: [
+      {
+        action: 'explore',
+        title: 'View',
+        icon: '/icon-192.png'
+      },
+      {
+        action: 'close',
+        title: 'Close',
+        icon: '/icon-192.png'
+      }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification('UYIR Blood Donation', options)
+  );
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'explore') {
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
+});
