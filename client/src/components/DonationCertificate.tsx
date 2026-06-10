@@ -11,6 +11,7 @@ interface DonationCertificateProps {
   hospitalName: string;
   district: string;
   certificateId: string;
+  hasDonated?: boolean;
   onClose?: () => void;
 }
 
@@ -21,6 +22,7 @@ export function DonationCertificate({
   hospitalName,
   district,
   certificateId,
+  hasDonated = false,
   onClose,
 }: DonationCertificateProps) {
   const { lang } = useApp();
@@ -126,10 +128,12 @@ Join UYIR and save lives! 🙏
 
             {/* Donation Date */}
             <div className="flex items-center gap-2">
-              <Calendar className="h-3 w-3 text-blue-600" />
+              <Calendar className={`h-3 w-3 ${hasDonated ? "text-blue-600" : "text-slate-400"}`} />
               <div>
                 <p className="text-[9px] text-slate-500">Donation Date</p>
-                <p className="text-sm font-bold text-slate-800 italic" style={{ fontFamily: "cursive, serif" }}>{new Date(donationDate).toLocaleDateString()}</p>
+                <p className={`text-sm font-bold italic ${hasDonated ? "text-slate-800" : "text-slate-400"}`} style={{ fontFamily: "cursive, serif" }}>
+                  {hasDonated ? new Date(donationDate).toLocaleDateString() : (lang === "ta" ? "இன்னும் தானம் செய்யவில்லை" : "Not donated yet")}
+                </p>
               </div>
             </div>
           </div>
@@ -144,7 +148,9 @@ Join UYIR and save lives! 🙏
           <div className="mb-3 flex items-end justify-between gap-4">
             <div className="flex-1 text-center">
               <p className="mb-1 text-[9px] text-slate-500">Date</p>
-              <p className="text-sm font-bold text-slate-800 italic" style={{ fontFamily: "cursive, serif" }}>{new Date(donationDate).toLocaleDateString()}</p>
+              <p className={`text-sm font-bold italic ${hasDonated ? "text-slate-800" : "text-slate-400"}`} style={{ fontFamily: "cursive, serif" }}>
+                {hasDonated ? new Date(donationDate).toLocaleDateString() : (lang === "ta" ? "—" : "—")}
+              </p>
             </div>
             <div className="flex-1 text-center">
               <p className="mb-1 text-[9px] text-slate-500">Founder</p>
@@ -169,16 +175,23 @@ Join UYIR and save lives! 🙏
       {/* Action Buttons */}
       <div className="space-y-3">
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={downloadCertificate}>
-            <Download className="h-4 w-4" /> Download
-          </Button>
+          {hasDonated ? (
+            <Button className="flex-1" onClick={downloadCertificate}>
+              <Download className="h-4 w-4" /> {lang === "ta" ? "பதிவிறக்கம்" : "Download"}
+            </Button>
+          ) : (
+            <Button className="flex-1" disabled variant="outline">
+              <Download className="h-4 w-4" /> {lang === "ta" ? "தானம் செய்த பின் பதிவிறக்கம்" : "Download after donation"}
+            </Button>
+          )}
           {onClose && (
             <Button variant="outline" className="flex-1" onClick={onClose}>
-              Close
+              {lang === "ta" ? "மூடு" : "Close"}
             </Button>
           )}
         </div>
 
+        {hasDonated && (
         <div>
           <p className="mb-2 text-center text-sm font-semibold text-slate-700">Share your achievement</p>
           <div className="flex justify-center gap-3">
@@ -218,6 +231,7 @@ Join UYIR and save lives! 🙏
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

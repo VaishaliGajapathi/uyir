@@ -236,11 +236,9 @@ export function Profile() {
             </div>
           </div>
         </div>
-        {user?.role === "donor" && (
-          <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setCertificateOpen(true)}>
-            <Award className="h-4 w-4" /> {lang === "ta" ? "தானதானம் சான்றிதழ் பார்க்க" : "View Donation Certificate"}
-          </Button>
-        )}
+        <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setCertificateOpen(true)}>
+          <Award className="h-4 w-4" /> {lang === "ta" ? "தானதானம் சான்றிதழ் பார்க்க" : "View Donation Certificate"}
+        </Button>
       </Card>
 
       {isDonorSetup && (
@@ -515,10 +513,11 @@ export function Profile() {
         <DonationCertificate
           donorName={user?.name || "Donor"}
           bloodGroup={user?.bloodGroup || "Unknown"}
-          donationDate={new Date().toISOString()}
+          donationDate={user?.lastDonationDate || new Date().toISOString()}
           hospitalName={lang === "ta" ? "UYIR இரத்த வங்கி" : "UYIR Blood Bank"}
           district={user?.district || "Tamil Nadu"}
-          certificateId={`UYIR-DEMO-${user?.id?.slice(-6) || "TEST"}`}
+          certificateId={`UYIR-${user?.id?.slice(-6) || "TEST"}`}
+          hasDonated={!!user?.donationCount && user.donationCount > 0}
           onClose={() => setCertificateOpen(false)}
         />
       </Sheet>
