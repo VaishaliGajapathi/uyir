@@ -1,6 +1,9 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+
+process.on("uncaughtException", (err) => console.error("[FATAL] uncaughtException:", err));
+process.on("unhandledRejection", (reason) => console.error("[FATAL] unhandledRejection:", reason));
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
 import { requestsRouter } from "./routes/requests.js";

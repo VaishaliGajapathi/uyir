@@ -6,7 +6,13 @@ import bcrypt from "bcryptjs";
 
 export const authRouter = Router();
 
-authRouter.post("/otp/request", async (req: any, res: any) => {
+function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
+  return (req: any, res: any, next: any) => {
+    Promise.resolve(fn(req, res)).catch(next);
+  };
+}
+
+authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15), name: z.string().optional() });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
@@ -24,9 +30,9 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
   await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
   console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, exists: false, user: null });
-});
+}));
 
-authRouter.post("/login", async (req: any, res: any) => {
+authRouter.post("/login", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
@@ -42,9 +48,9 @@ authRouter.post("/login", async (req: any, res: any) => {
 
   const token = signToken(user.id, user.role);
   res.json({ token, user });
-});
+}));
 
-authRouter.post("/forgot-password", async (req: any, res: any) => {
+authRouter.post("/forgot-password", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
@@ -57,9 +63,9 @@ authRouter.post("/forgot-password", async (req: any, res: any) => {
   await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
   console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
   res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
-});
+}));
 
-authRouter.post("/reset-password", async (req: any, res: any) => {
+authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10), code: z.coerce.string().length(6), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
@@ -79,9 +85,9 @@ authRouter.post("/reset-password", async (req: any, res: any) => {
   await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
   await exec('DELETE FROM "OtpCode" WHERE "mobile" = $1', [mobile]);
   res.json({ ok: true, message: "Password reset successfully" });
-});
+}));
 
-authRouter.post("/otp/verify", async (req: any, res: any) => {
+authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), code: z.coerce.string().length(6),
     name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin"]).optional(),
@@ -123,9 +129,9 @@ authRouter.post("/otp/verify", async (req: any, res: any) => {
 
   const token = signToken(user!.id, user!.role);
   res.json({ token, user });
-});
+}));
 
-authRouter.post("/hospital/register", async (req: any, res: any) => {
+authRouter.post("/hospital/register", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     hospitalName: z.string().min(2), hospitalRegistrationId: z.string().min(2), district: z.string().min(2),
     address: z.string().optional(), phone: z.string().min(10).optional(),
@@ -159,4 +165,4 @@ authRouter.post("/hospital/register", async (req: any, res: any) => {
 
   const token = signToken(user.id, user.role);
   res.json({ token, user });
-});
+}));
