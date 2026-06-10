@@ -6,12 +6,16 @@ const pool = new Pool({
 });
 
 export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> {
-  const client = await pool.connect();
+  let client: PoolClient | undefined;
   try {
+    client = await pool.connect();
     const result = await client.query(sql, params);
     return result.rows as T[];
+  } catch (e: any) {
+    console.error("[db] query error:", e.message, "SQL:", sql.slice(0, 200));
+    throw e;
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 
@@ -21,12 +25,16 @@ export async function queryOne<T = any>(sql: string, params?: any[]): Promise<T 
 }
 
 export async function exec(sql: string, params?: any[]): Promise<{ rowCount: number }> {
-  const client = await pool.connect();
+  let client: PoolClient | undefined;
   try {
+    client = await pool.connect();
     const result = await client.query(sql, params);
     return { rowCount: result.rowCount || 0 };
+  } catch (e: any) {
+    console.error("[db] exec error:", e.message, "SQL:", sql.slice(0, 200));
+    throw e;
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

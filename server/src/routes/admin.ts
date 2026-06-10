@@ -1,12 +1,21 @@
-import { Router, Request } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { query, queryOne, exec } from "../db.js";
 import { requireAuth, requireAdminOrHospitalApprover, requireAdminOrVerifier } from "../middleware/auth.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
+function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch((err) => {
+      console.error("[admin] route error:", err.message || err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    });
+  };
+}
+
 // Stats for dashboard overview
-adminRouter.get("/stats", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/stats", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const totalDonors = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["donor"]);
   const totalRequests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
   const pendingVerifications = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" = $1', ["pending_verification"]);
@@ -21,67 +30,69 @@ adminRouter.get("/stats", requireAdminOrVerifier, async (req: Request, res: any)
     fraudReports: fraudReports?.cnt || 0,
     livesSaved: livesSaved?.cnt || 0,
   });
-});
+}));
 
 // Donors list
-adminRouter.get("/donors", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/donors", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
+  console.log("[admin] fetching donors...");
   const donors = await query<any>('SELECT * FROM "User" WHERE "role" = $1 ORDER BY "createdAt" DESC', ["donor"]);
+  console.log(`[admin] donors fetched: ${donors.length} records`);
   res.json(donors);
-});
+}));
 
 // All requests
-adminRouter.get("/requests", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/requests", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const requests = await query<any>('SELECT * FROM "BloodRequest" ORDER BY "createdAt" DESC', []);
   res.json(requests);
-});
+}));
 
 // Pending verification requests
-adminRouter.get("/pending-verification", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/pending-verification", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const requests = await query<any>('SELECT * FROM "BloodRequest" WHERE "status" = $1 ORDER BY "createdAt" DESC', ["pending_verification"]);
   res.json(requests);
-});
+}));
 
 // Hospitals list
-adminRouter.get("/hospitals", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/hospitals", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const hospitals = await query<any>('SELECT * FROM "Hospital" ORDER BY "createdAt" DESC', []);
   res.json(hospitals);
-});
+}));
 
 // Verify a hospital
-adminRouter.post("/hospitals/:id/verify", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/hospitals/:id/verify", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "Hospital" SET "verified" = true WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true });
-});
+}));
 
 // Fraud reports
-adminRouter.get("/fraud-reports", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/fraud-reports", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const reports = await query<any>('SELECT * FROM "FraudReport" ORDER BY "createdAt" DESC', []);
   res.json(reports);
-});
+}));
 
 // Action a fraud report
-adminRouter.post("/reports/:id/action", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/reports/:id/action", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["actioned", req.params.id]);
   res.json({ ok: true });
-});
+}));
 
 // Verify (approve/reject) a blood request
-adminRouter.post("/verify-request/:id", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/verify-request/:id", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   const { approved, notes } = req.body;
   const status = approved ? "verified" : "rejected";
   await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW() WHERE "id" = $3', [status, notes || "", req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
-});
+}));
 
 // Admin users list
-adminRouter.get("/admins", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2) ORDER BY "createdAt" DESC', ["admin", "verifier"]);
   res.json(admins);
-});
+}));
 
 // Create admin user
-adminRouter.post("/admins", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   const { name, mobile, role, password } = req.body;
   const bcrypt = await import("bcryptjs");
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -90,46 +101,46 @@ adminRouter.post("/admins", requireAdminOrVerifier, async (req: Request, res: an
     [name, mobile.replace(/\D/g, "").slice(-10), hashedPassword, role || "admin", "ta"]
   );
   res.status(201).json(user);
-});
+}));
 
 // Close a request
-adminRouter.post("/requests/:id/close", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/requests/:id/close", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "BloodRequest" SET "status" = $1, "closedAt" = NOW() WHERE "id" = $2', ["closed", req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
-});
+}));
 
 // Reject a request
-adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   const { notes } = req.body;
   await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW() WHERE "id" = $3', ["rejected", notes || "", req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
-});
+}));
 
 // Ban a user
-adminRouter.post("/ban-user/:id", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/ban-user/:id", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "User" SET "reputationScore" = -1000, "isAvailable" = false WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
-});
+}));
 
 // Reject a hospital
-adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true });
-});
+}));
 
 // Dismiss a fraud report
-adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, async (req: Request, res: any) => {
+adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["dismissed", req.params.id]);
   res.json({ ok: true });
-});
+}));
 
 // Legacy dashboard endpoint (kept for compatibility)
-adminRouter.get("/dashboard", requireAdminOrHospitalApprover, async (req: Request, res: any) => {
+adminRouter.get("/dashboard", requireAdminOrHospitalApprover, asyncHandler(async (_req: Request, res: Response) => {
   const users = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User"');
   const requests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
   const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
   res.json({ totalUsers: users?.cnt || 0, totalRequests: requests?.cnt || 0, completedDonations: completed?.cnt || 0 });
-});
+}));
