@@ -133,7 +133,7 @@ authRouter.post("/hospital/register", async (req: any, res: any) => {
   if (existingApprover) return res.status(400).json({ error: "Hospital approver with this registration ID already exists" });
 
   const { TN_DISTRICTS } = await import("../lib/districts.js");
-  const districtData = TN_DISTRICTS.find((d: any) => d.name === district);
+  const districtData = Object.values(TN_DISTRICTS).find((d) => d.name === district);
   const lat = districtData?.lat ?? 11.0;
   const lng = districtData?.lng ?? 78.0;
 
