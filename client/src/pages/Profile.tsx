@@ -64,8 +64,18 @@ export function Profile() {
   };
 
   const handleFormChange = (key: string, value: any) => {
-    setForm({ ...form, [key]: value });
-    checkChanges();
+    const newForm = { ...form, [key]: value };
+    setForm(newForm);
+    if (!user) return;
+    const changed =
+      newForm.name !== user.name ||
+      newForm.bloodGroup !== user.bloodGroup ||
+      newForm.district !== user.district ||
+      newForm.lastDonationDate !== user.lastDonationDate ||
+      newForm.notificationsEnabled !== user.notificationsEnabled ||
+      newForm.voiceEnabled !== user.voiceEnabled ||
+      newForm.locationEnabled !== user.locationEnabled;
+    setHasChanges(changed);
   };
 
   async function save() {
