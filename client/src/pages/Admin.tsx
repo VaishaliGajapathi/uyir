@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner } from "../components/ui";
@@ -25,6 +25,7 @@ export function Admin() {
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
+  const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
   const statusCounts = useMemo(() => requests.reduce((acc: Record<string, number>, request: any) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
     return acc;
@@ -125,6 +126,60 @@ export function Admin() {
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
+  async function verifyHospital(id: string) {
+    if (!confirm("Verify this hospital?")) return;
+    setBusy(`hosp:${id}`);
+    try {
+      await api.adminVerifyHospital(id);
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function rejectHospital(id: string) {
+    if (!confirm("Reject this hospital?")) return;
+    setBusy(`hosp-reject:${id}`);
+    try {
+      await api.adminRejectHospital(id);
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function actionFraud(id: string) {
+    if (!confirm("Mark this fraud report as actioned?")) return;
+    setBusy(`fraud:${id}`);
+    try {
+      await api.adminVerifyRequest(id, true, "Fraud report actioned");
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function dismissFraud(id: string) {
+    if (!confirm("Dismiss this fraud report?")) return;
+    setBusy(`fraud-dismiss:${id}`);
+    try {
+      await api.adminDismissFraud(id);
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  function exportDonorsToCSV() {
+    const headers = ["Name", "Mobile", "Blood Group", "District", "Taluk", "Pincode", "Gender", "Age", "Verified", "Available", "Platelet", "Donations", "Reputation", "Last Donation"];
+    const rows = filteredDonors.map((d) => [
+      d.name, d.mobile, d.bloodGroup || "", d.district || "", d.taluk || "", d.pincode || "",
+      d.gender || "", d.age ?? "", d.verified ? "Yes" : "No", d.isAvailable ? "Yes" : "No",
+      d.isPlateletDonor ? "Yes" : "No", d.donationCount ?? 0, d.reputationScore ?? 0,
+      d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "",
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `uyir-donors-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function createAdmin() {
     if (!adminForm.name || !adminForm.mobile || !adminForm.role) {
       alert("Please fill all required fields");
@@ -215,6 +270,12 @@ export function Admin() {
             <span className="text-xs text-slate-400">({filteredDonors.length} of {donors.length})</span>
           </div>
 
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={exportDonorsToCSV}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+          </div>
+
           {/* Filters */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[160px]">
@@ -276,8 +337,14 @@ export function Admin() {
               </thead>
               <tbody>
                 {filteredDonors.map((d) => (
-                  <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 font-medium text-slate-800">{d.name}</td>
+                  <>
+                  <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedDonorId(expandedDonorId === d.id ? null : d.id)}>
+                    <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 font-medium text-slate-800">
+                      <div className="flex items-center gap-1">
+                        {expandedDonorId === d.id ? <ChevronUp className="h-3 w-3 text-slate-400" /> : <ChevronDown className="h-3 w-3 text-slate-400" />}
+                        {d.name}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 text-slate-600">{d.mobile}</td>
                     <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2">
                       <Badge className="bg-rose-50 text-rose-700">{d.bloodGroup || "?"}</Badge>
@@ -308,11 +375,41 @@ export function Admin() {
                       {d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2">
-                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={() => banUser(d.id)}>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={(e) => { e.stopPropagation(); banUser(d.id); }}>
                         <Ban className="h-3 w-3" />
                       </Button>
                     </td>
                   </tr>
+                  {expandedDonorId === d.id && (
+                    <tr className="bg-slate-50">
+                      <td colSpan={15} className="px-4 py-3">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div><span className="text-slate-500">Full Name:</span> <span className="font-medium">{d.name}</span></div>
+                          <div><span className="text-slate-500">Mobile:</span> <span className="font-medium">{d.mobile}</span></div>
+                          <div><span className="text-slate-500">Blood Group:</span> <span className="font-medium">{d.bloodGroup || "—"}</span></div>
+                          <div><span className="text-slate-500">Gender:</span> <span className="font-medium">{d.gender || "—"}</span></div>
+                          <div><span className="text-slate-500">Age:</span> <span className="font-medium">{d.age ?? "—"}</span></div>
+                          <div><span className="text-slate-500">DOB:</span> <span className="font-medium">{d.dob ? new Date(d.dob).toLocaleDateString() : "—"}</span></div>
+                          <div><span className="text-slate-500">District:</span> <span className="font-medium">{d.district || "—"}</span></div>
+                          <div><span className="text-slate-500">Taluk:</span> <span className="font-medium">{d.taluk || "—"}</span></div>
+                          <div><span className="text-slate-500">Pincode:</span> <span className="font-medium">{d.pincode || "—"}</span></div>
+                          <div><span className="text-slate-500">Lat/Lng:</span> <span className="font-medium">{d.lat ?? "—"}, {d.lng ?? "—"}</span></div>
+                          <div><span className="text-slate-500">Verified:</span> <span className="font-medium">{d.verified ? "Yes" : "No"}</span></div>
+                          <div><span className="text-slate-500">Available:</span> <span className="font-medium">{d.isAvailable ? "Yes" : "No"}</span></div>
+                          <div><span className="text-slate-500">Platelet Donor:</span> <span className="font-medium">{d.isPlateletDonor ? "Yes" : "No"}</span></div>
+                          <div><span className="text-slate-500">Notifications:</span> <span className="font-medium">{d.notificationsEnabled ? "On" : "Off"}</span></div>
+                          <div><span className="text-slate-500">Voice:</span> <span className="font-medium">{d.voiceEnabled ? "On" : "Off"}</span></div>
+                          <div><span className="text-slate-500">Location:</span> <span className="font-medium">{d.shareLocation ? "On" : "Off"}</span></div>
+                          <div><span className="text-slate-500">Donation Count:</span> <span className="font-medium">{d.donationCount ?? 0}</span></div>
+                          <div><span className="text-slate-500">Reputation:</span> <span className="font-medium">{d.reputationScore ?? 0}</span></div>
+                          <div><span className="text-slate-500">Last Donation:</span> <span className="font-medium">{d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "—"}</span></div>
+                          <div><span className="text-slate-500">Joined:</span> <span className="font-medium">{d.createdAt ? timeAgo(d.createdAt) : "—"}</span></div>
+                          <div className="col-span-2"><span className="text-slate-500">User ID:</span> <span className="font-mono text-[10px]">{d.id}</span></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 ))}
                 {filteredDonors.length === 0 && (
                   <tr><td colSpan={15} className="px-3 py-8 text-center text-slate-400">No donors match your filters.</td></tr>
@@ -393,7 +490,11 @@ export function Admin() {
               <div key={r.id} className="rounded-lg bg-slate-50 p-3">
                 <div className="mb-2">
                   <p className="text-sm font-semibold text-slate-700">{r.patientName} · {r.bloodGroup}</p>
-                  <p className="text-xs text-slate-400">{r.hospitalName} · {r.unitsRequired} units · {r.verificationScore}% AI score</p>
+                  <p className="text-xs text-slate-400">{r.hospitalName} · {r.district} · {r.unitsRequired} units</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    AI Score: <Badge className={r.verificationScore >= 70 ? "bg-emerald-100 text-emerald-700" : r.verificationScore >= 50 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}>{r.verificationScore ?? 0}%</Badge>
+                    {r.verificationNotes && <span className="ml-2">{r.verificationNotes.slice(0, 80)}...</span>}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" className="flex-1 bg-emerald-600" loading={busy === r.id} onClick={() => verifyRequest(r.id, true)}>
@@ -415,16 +516,29 @@ export function Admin() {
           {fraudReports.length === 0 && <p className="text-sm text-slate-400">No fraud reports.</p>}
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {fraudReports.map((f) => (
-              <div key={f.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">{f.reportedUser?.name} · {f.reason}</p>
-                  <p className="text-xs text-slate-400">{timeAgo(f.createdAt)} · {f.status}</p>
+              <div key={f.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{f.reportedUser?.name || f.reporter?.name || "Unknown"} · {f.reason}</p>
+                    <p className="text-xs text-slate-400">{timeAgo(f.createdAt)} · Status: {f.status}</p>
+                    {f.notes && <p className="text-xs text-slate-500 mt-1">Note: {f.notes}</p>}
+                  </div>
                 </div>
-                {f.status === "open" && (
-                  <Button size="sm" variant="danger" loading={busy === f.reportedUserId} onClick={() => banUser(f.reportedUserId)}>
-                    <Ban className="h-4 w-4" /> Ban
-                  </Button>
-                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {f.status === "open" && (
+                    <>
+                      <Button size="sm" className="bg-emerald-600" loading={busy === `fraud:${f.id}`} onClick={() => actionFraud(f.id)}>
+                        <CheckCircle2 className="h-3 w-3" /> Actioned
+                      </Button>
+                      <Button size="sm" variant="outline" loading={busy === `fraud-dismiss:${f.id}`} onClick={() => dismissFraud(f.id)}>
+                        <XCircle className="h-3 w-3" /> Dismiss
+                      </Button>
+                      <Button size="sm" variant="danger" loading={busy === f.reportedUserId} onClick={() => banUser(f.reportedUserId)}>
+                        <Ban className="h-3 w-3" /> Ban User
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -436,12 +550,28 @@ export function Admin() {
           <h3 className="mb-2 font-bold text-slate-800">Hospitals ({hospitals.length})</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {hospitals.map((h) => (
-              <div key={h.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">{h.name}</p>
-                  <p className="text-xs text-slate-400">{h.district} · {h.address}</p>
+              <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{h.hospitalName || h.name}</p>
+                    <p className="text-xs text-slate-400">{h.district} · {h.address || h.hospitalRegistrationId}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={h.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{h.verified ? "Verified" : "Unverified"}</Badge>
+                  </div>
                 </div>
-                <Badge className={h.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{h.verified ? "Verified" : "Unverified"}</Badge>
+                <div className="mt-2 flex gap-2">
+                  {!h.verified && (
+                    <Button size="sm" className="bg-emerald-600" loading={busy === `hosp:${h.id}`} onClick={() => verifyHospital(h.id)}>
+                      <CheckCircle2 className="h-3 w-3" /> Verify
+                    </Button>
+                  )}
+                  {h.verified && (
+                    <Button size="sm" variant="outline" loading={busy === `hosp-reject:${h.id}`} onClick={() => rejectHospital(h.id)}>
+                      <XCircle className="h-3 w-3" /> Revoke
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

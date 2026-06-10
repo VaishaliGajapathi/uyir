@@ -92,6 +92,40 @@ adminRouter.post("/admins", requireAdminOrVerifier, async (req: Request, res: an
   res.status(201).json(user);
 });
 
+// Close a request
+adminRouter.post("/requests/:id/close", requireAdminOrVerifier, async (req: Request, res: any) => {
+  await exec('UPDATE "BloodRequest" SET "status" = $1, "closedAt" = NOW() WHERE "id" = $2', ["closed", req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+});
+
+// Reject a request
+adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, async (req: Request, res: any) => {
+  const { notes } = req.body;
+  await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW() WHERE "id" = $3', ["rejected", notes || "", req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+});
+
+// Ban a user
+adminRouter.post("/ban-user/:id", requireAdminOrVerifier, async (req: Request, res: any) => {
+  await exec('UPDATE "User" SET "reputationScore" = -1000, "isAvailable" = false WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+});
+
+// Reject a hospital
+adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, async (req: Request, res: any) => {
+  await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Dismiss a fraud report
+adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, async (req: Request, res: any) => {
+  await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["dismissed", req.params.id]);
+  res.json({ ok: true });
+});
+
 // Legacy dashboard endpoint (kept for compatibility)
 adminRouter.get("/dashboard", requireAdminOrHospitalApprover, async (req: Request, res: any) => {
   const users = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User"');

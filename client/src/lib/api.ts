@@ -168,6 +168,9 @@ export const api = {
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
   adminGetAdmins: () => req<any[]>("/admin/admins"),
   adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
+  adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
+  adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
+  adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
   // hospital
   hospitalRegister: (data: { hospitalName: string; hospitalRegistrationId: string; district: string; address?: string; phone?: string; contactPerson: string; contactMobile: string; password: string }) => req<{ token: string; user: User; hospital: any }>("/auth/hospital/register", { method: "POST", body: JSON.stringify(data) }),
   getHealthTips: () => req("/ai/health-tips", { method: "POST" }),
