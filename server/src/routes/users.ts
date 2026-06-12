@@ -54,6 +54,13 @@ usersRouter.post("/me/push-subscription", requireAuth, async (req: AuthedRequest
   res.json({ ok: true });
 });
 
+// Test endpoint to send a push notification to the current user
+usersRouter.post("/me/test-push", requireAuth, async (req: AuthedRequest, res: any) => {
+  const { sendPushToUser } = await import("../lib/push.js");
+  const result = await sendPushToUser(req.userId!, "Test Notification", "This is a test notification from UYIR", { type: "test" });
+  res.json(result);
+});
+
 usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res: any) => {
   const documents = await query<any>('SELECT * FROM "DonorDocument" WHERE "donorId" = $1 ORDER BY "uploadedAt" DESC', [req.userId]);
   res.json(documents);

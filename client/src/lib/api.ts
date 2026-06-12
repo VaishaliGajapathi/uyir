@@ -176,6 +176,7 @@ export const api = {
   getHealthTips: () => req("/ai/health-tips", { method: "POST" }),
   // push notifications
   savePushSubscription: (subscription: PushSubscription) => req("/users/me/push-subscription", { method: "POST", body: JSON.stringify({ subscription }) }),
+  testPushNotification: () => req("/users/me/test-push", { method: "POST" }),
 };
 
 export function streamUrl(path: string) {

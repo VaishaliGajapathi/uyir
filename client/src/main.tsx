@@ -7,7 +7,7 @@ import { bootstrapNativeMobile } from "./lib/nativeMobile";
 void bootstrapNativeMobile();
 
 // Register service worker for push notifications
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch((error) => {
     console.error("[sw] Service worker registration failed:", error);
   });

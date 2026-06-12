@@ -41,6 +41,11 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
     return subscription;
   } catch (error: any) {
     console.error("[push] Failed to subscribe:", error);
+    if (error.name === "NotAllowedError") {
+      console.warn("[push] Notification permission denied by user");
+    } else if (error.name === "AbortError") {
+      console.warn("[push] Subscription aborted");
+    }
     return null;
   }
 }

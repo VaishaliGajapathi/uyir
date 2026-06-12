@@ -76,7 +76,10 @@ export function BottomNav() {
             </NavLink>
           )}
           <button onClick={handleBellClick} className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md transition text-slate-400 hover:bg-slate-50 relative">
-            <Bell className="h-4 w-4" />
+            <Bell className={`h-4 w-4 ${subscribed ? "text-uyir-600" : ""}`} />
+            {subscribed && (
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500"></span>
+            )}
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
                 {unreadCount > 9 ? "9+" : unreadCount}
@@ -142,7 +145,10 @@ export function BottomNav() {
             </NavLink>
           )}
           <button onClick={handleBellClick} className="flex flex-col items-center gap-1 p-2 rounded-xl transition text-slate-400 hover:bg-slate-50 relative">
-            <Bell className="h-6 w-6" />
+            <Bell className={`h-6 w-6 ${subscribed ? "text-uyir-600" : ""}`} />
+            {subscribed && (
+              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-green-500"></span>
+            )}
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
                 {unreadCount > 9 ? "9+" : unreadCount}
