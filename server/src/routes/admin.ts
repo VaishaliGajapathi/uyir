@@ -120,7 +120,7 @@ adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, asyncHandler(as
 
 // Ban a user
 adminRouter.post("/ban-user/:id", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
-  await exec('UPDATE "User" SET "reputationScore" = -1000, "isAvailable" = false WHERE "id" = $1', [req.params.id]);
+  await exec('UPDATE "User" SET "reputationScore" = -1000, "banned" = true WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
 }));
