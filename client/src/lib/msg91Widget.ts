@@ -1,14 +1,28 @@
 // MSG91 OTP Widget integration helpers
-// Widget script is loaded in index.html
+// Script is loaded dynamically when needed
 
-declare global {
-  interface Window {
-    initSendOTP?: (config: Record<string, unknown>) => void;
-    sendOTP?: (identifier: string) => void;
-    resendOTP?: () => void;
-    verifyOTP?: (otp: string) => void;
-    msg91Config?: Record<string, unknown>;
-  }
+const SCRIPT_URLS = [
+  "https://verify.msg91.com/otp-provider.js",
+  "https://verify.phone91.com/otp-provider.js",
+];
+
+function loadScript(urls: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    function attempt() {
+      const s = document.createElement("script");
+      s.src = urls[i];
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => {
+        i++;
+        if (i < urls.length) attempt();
+        else reject(new Error("Failed to load OTP widget script"));
+      };
+      document.head.appendChild(s);
+    }
+    attempt();
+  });
 }
 
 export interface Msg91OtpResult {
@@ -16,15 +30,30 @@ export interface Msg91OtpResult {
   mobile?: string;
 }
 
-export function initMsg91Widget(mobile: string, onSuccess: (data: Msg91OtpResult) => void, onFailure: (error: string) => void) {
-  if (typeof window.initSendOTP !== "function") {
-    onFailure("OTP widget not loaded yet. Please try again in a moment.");
+export async function initMsg91Widget(
+  mobile: string,
+  onSuccess: (data: Msg91OtpResult) => void,
+  onFailure: (error: string) => void
+) {
+  const win = window as any;
+
+  if (typeof win.initSendOTP !== "function") {
+    try {
+      await loadScript(SCRIPT_URLS);
+    } catch {
+      onFailure("Unable to load OTP widget. Please check your connection and try again.");
+      return;
+    }
+  }
+
+  if (typeof win.initSendOTP !== "function") {
+    onFailure("OTP widget failed to initialize.");
     return;
   }
 
   const cleanMobile = `91${mobile.replace(/\D/g, "").slice(-10)}`;
 
-  window.msg91Config = {
+  win.msg91Config = {
     widgetId: "3666676e5631333434353239",
     tokenAuth: "",
     identifier: cleanMobile,
@@ -42,10 +71,9 @@ export function initMsg91Widget(mobile: string, onSuccess: (data: Msg91OtpResult
     },
   };
 
-  window.initSendOTP(window.msg91Config);
+  win.initSendOTP(win.msg91Config);
 
-  // Trigger OTP sending immediately after init
-  if (typeof window.sendOTP === "function") {
-    window.sendOTP(cleanMobile);
+  if (typeof win.sendOTP === "function") {
+    win.sendOTP(cleanMobile);
   }
 }

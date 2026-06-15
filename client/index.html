@@ -20,22 +20,6 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBvG78k-27hBJKkmFP0AW1azxtFNPy8XRQ&libraries=places&loading=async"></script>
-    <!-- MSG91 OTP Widget Script — loaded without auto-init so we control it from React -->
-    <script>
-      (function loadOtpScript(urls) {
-        let i = 0;
-        function attempt() {
-          const s = document.createElement('script');
-          s.src = urls[i];
-          s.async = true;
-          s.onerror = () => {
-            i++;
-            if (i < urls.length) attempt();
-          };
-          document.head.appendChild(s);
-        }
-        attempt();
-      })(['https://verify.msg91.com/otp-provider.js', 'https://verify.phone91.com/otp-provider.js']);
-    </script>
+    <!-- MSG91 OTP widget loaded on-demand from React -->
   </body>
 </html>
