@@ -80,7 +80,8 @@ export function Onboarding() {
         setErr(error);
         setWidgetStep("idle");
         setLoading(false);
-      }
+      },
+      "signup"
     );
   }
 
@@ -120,7 +121,8 @@ export function Onboarding() {
         setErr(error);
         setWidgetStep("idle");
         setLoading(false);
-      }
+      },
+      "forgot"
     );
   }
 

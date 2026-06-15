@@ -33,9 +33,15 @@ export interface Msg91OtpResult {
 export async function initMsg91Widget(
   mobile: string,
   onSuccess: (data: Msg91OtpResult) => void,
-  onFailure: (error: string) => void
+  onFailure: (error: string) => void,
+  context: "signup" | "forgot" = "signup"
 ) {
   const win = window as any;
+
+  if (context !== "signup" && context !== "forgot") {
+    onFailure("OTP widget is only available during signup or forgot password.");
+    return;
+  }
 
   if (typeof win.initSendOTP !== "function") {
     try {
