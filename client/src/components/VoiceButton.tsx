@@ -75,7 +75,7 @@ export function VoiceButton({
             console.error("Voice transcription error:", err);
             const errorMsg = err.message || "Voice failed";
             if (errorMsg.includes("fetch") || errorMsg.includes("network") || errorMsg.includes("connection")) {
-              alert("Connection error. Please check if server is running at http://localhost:4000");
+              alert("Connection error. Please check if the server is running.");
             } else if (errorMsg.includes("Unauthorized") || errorMsg.includes("401")) {
               alert("Session expired or not logged in. Please login again to use voice features.");
             } else {
