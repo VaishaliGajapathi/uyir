@@ -67,5 +67,5 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 const port = Number(process.env.PORT) || 3000;
-const host = isProd ? "0.0.0.0" : "localhost";
+const host = "0.0.0.0";
 app.listen(port, host, () => console.log(`[uyir] API listening on http://${host}:${port}`));
