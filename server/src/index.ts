@@ -13,12 +13,7 @@ import { TN_DISTRICT_NAMES } from "./lib/districts.js";
 
 const app = express();
 app.use(cors({
-  origin: [
-    "https://uyirorg.netlify.app",
-    "https://uyirblooddonation.netlify.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ],
+  origin: true,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -55,5 +50,5 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: err?.message || "Internal error" });
 });
 
-const port = Number(process.env.PORT) || 4000;
-app.listen(port, () => console.log(`[uyir] API listening on http://localhost:${port}`));
+const port = Number(process.env.PORT) || 3000;
+app.listen(port, "localhost", () => console.log(`[uyir] API listening on http://localhost:${port}`));
