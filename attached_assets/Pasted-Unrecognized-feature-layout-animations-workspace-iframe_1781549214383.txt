@@ -1,0 +1,26 @@
+Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+injected.js:37 [vite] server connection lost. Polling for restart...
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+01qi0sa4y0oci.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 01qi0sa4y0oci.js:21
+injected.js:37 [vite] server connection lost. Polling for restart...
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:4000/api/ai/status:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+1701qi0sa4y0oci.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 01qi0sa4y0oci.js:21
+localhost:4000/api/auth/login:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+01qi0sa4y0oci.js:21 task queue exceeded allotted deadline by 51ms
+(anonymous) @ 01qi0sa4y0oci.js:21
+stallwart.build.js:1 stallwart: failed ping 1
