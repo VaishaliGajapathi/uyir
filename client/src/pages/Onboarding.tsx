@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
-import { initMsg91Widget } from "../lib/msg91Widget";
 
 function dashboardPathForRole(role?: string) {
   if (role === "hospital_approver") return "/hospital-dashboard";
@@ -13,7 +12,7 @@ function dashboardPathForRole(role?: string) {
   return "/home";
 }
 
-export function Onboarding() {
+export default function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
   const [view, setView] = useState<"login" | "signup" | "forgot" | "reset">("login");
@@ -25,33 +24,8 @@ export function Onboarding() {
   const [showLegalInfo, setShowLegalInfo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [widgetStep, setWidgetStep] = useState<"idle" | "sending" | "verifying" | "done">("idle");
-  const [widgetToken, setWidgetToken] = useState("");
-
-  // Listen for MSG91 widget events
-  useEffect(() => {
-    const onSuccess = (e: any) => {
-      const token = e?.detail?.accessToken || e?.detail?.token || e?.detail?.["access-token"] || "";
-      if (token) {
-        setWidgetToken(token);
-        setWidgetStep("done");
-      } else {
-        setErr("OTP verified but no access token received.");
-        setWidgetStep("idle");
-      }
-    };
-    const onFailure = (e: any) => {
-      setErr(e?.detail?.message || "OTP verification failed.");
-      setWidgetStep("idle");
-      setLoading(false);
-    };
-    window.addEventListener("msg91:otp:success", onSuccess);
-    window.addEventListener("msg91:otp:failure", onFailure);
-    return () => {
-      window.removeEventListener("msg91:otp:success", onSuccess);
-      window.removeEventListener("msg91:otp:failure", onFailure);
-    };
-  }, []);
+  const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
+  const [otpCode, setOtpCode] = useState("");
 
   async function handleLogin() {
     setErr(""); setLoading(true);
@@ -62,79 +36,56 @@ export function Onboarding() {
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  function handleSignup() {
+  async function handleSignup() {
     setErr("");
     if (mobile.length < 10 || !name || !password || !consent) {
       setErr(lang === "ta" ? "அனைத்து தகவல்களையும் உள்ளிடவும்" : "Please fill all fields");
       return;
     }
-    setWidgetStep("sending");
     setLoading(true);
-    initMsg91Widget(
-      mobile,
-      (data) => {
-        setWidgetToken(data.accessToken);
-        setWidgetStep("done");
-      },
-      (error) => {
-        setErr(error);
-        setWidgetStep("idle");
-        setLoading(false);
-      },
-      "signup"
-    );
+    try {
+      const r = await api.requestOtp(mobile, name);
+      if (r.exists && r.hasPassword) {
+        setErr(lang === "ta" ? "இந்த எண்ணு உளாத பதிவு செய்கிறது. உள்நுழை செய்க." : "This number is already registered. Please sign in.");
+        return;
+      }
+      setOtpStep("sent");
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function verifyWidgetSignup() {
-    if (!widgetToken) { setErr("OTP not verified yet."); return; }
+  async function verifySignup() {
+    if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
     setErr(""); setLoading(true);
     try {
-      const r = await api.widgetVerify({
-        mobile,
-        accessToken: widgetToken,
-        name,
-        role: "donor",
-        language: lang,
-        password,
-      });
+      const r = await api.verifyOtp({ mobile, code: otpCode, name, role: "donor", language: lang, password });
       login(r.token, r.user);
       nav(dashboardPathForRole(r.user.role));
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  function handleForgot() {
+  async function handleForgot() {
     setErr("");
     if (mobile.length < 10) {
       setErr(lang === "ta" ? "செல்லுபடியாகும் மொபைல் எண்ணை உள்ளிடவும்" : "Please enter a valid mobile number");
       return;
     }
-    setWidgetStep("sending");
     setLoading(true);
-    setView("reset");
-    initMsg91Widget(
-      mobile,
-      (data) => {
-        setWidgetToken(data.accessToken);
-        setWidgetStep("done");
-      },
-      (error) => {
-        setErr(error);
-        setWidgetStep("idle");
-        setLoading(false);
-      },
-      "forgot"
-    );
+    try {
+      await api.forgotPassword(mobile);
+      setOtpStep("sent");
+      setView("reset");
+    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function handleWidgetReset() {
-    if (!widgetToken) { setErr("OTP not verified yet."); return; }
+  async function handleReset() {
+    if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
     setErr(""); setLoading(true);
     try {
-      const r = await api.widgetReset({ mobile, accessToken: widgetToken, password });
+      const r = await api.resetPassword(mobile, otpCode, password);
       setView("login");
       setPassword("");
-      setWidgetToken("");
-      setWidgetStep("idle");
+      setOtpCode("");
+      setOtpStep("idle");
       alert(r.message);
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
@@ -152,7 +103,7 @@ export function Onboarding() {
             {(["ta", "en"] as Lang[]).map((l) => (
               <button key={l} onClick={() => setLang(l)}
                 className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${lang === l ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}>
-                {l === "ta" ? "\u0BA4\u0BAE\u0BBF\u0BB4\u0BCD" : "English"}
+                {l === "ta" ? "தமிழ்" : "English"}
               </button>
             ))}
           </div>
@@ -160,12 +111,12 @@ export function Onboarding() {
           {/* Login View */}
           {view === "login" && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "\u0B89\u0BB3\u0BCD\u0BA8\u0BC1\u0BB4\u0BC8" : "Sign In"}</h2>
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "உள்நுழை" : "Sign In"}</h2>
 
               {/* Phone Number */}
               <div>
                 <label className="block mb-1 text-xs font-medium text-slate-600">
-                  {lang === "ta" ? "\u0BAE\u0BCA\u0BAA\u0BC8\u0BB2\u0BCD \u0B8E\u0BA3\u0BCD" : "Phone Number"}
+                  {lang === "ta" ? "மொபைல் எண்" : "Phone Number"}
                 </label>
                 <div className="flex">
                   <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
@@ -183,12 +134,12 @@ export function Onboarding() {
               {/* Password */}
               <div>
                 <label className="block mb-1 text-xs font-medium text-slate-600">
-                  {lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD" : "Password"}
+                  {lang === "ta" ? "கடவுச்சொல்" : "Password"}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder={lang === "ta" ? "\u0B89\u0B99\u0BCD\u0B95\u0BB3\u0BCD \u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD\u0BB2\u0BC8 \u0B89\u0BB3\u0BCD\u0BB3\u0BBF\u0B9F\u0BB5\u0BC1\u0BAE\u0BCD" : "Enter your password"}
+                    placeholder={lang === "ta" ? "உங்கள் கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}
                     value={password} onChange={(e) => setPassword(String(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500"
                   />
@@ -200,23 +151,23 @@ export function Onboarding() {
               </div>
 
               <div className="text-right">
-                <button onClick={() => { setView("forgot"); setErr(""); setPassword(""); setWidgetStep("idle"); setWidgetToken(""); }}
+                <button onClick={() => { setView("forgot"); setErr(""); setPassword(""); setOtpStep("idle"); setOtpCode(""); }}
                   className="text-xs text-uyir-600 hover:underline">
-                  {lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD \u0BAE\u0BB1\u0B82\u0BA4\u0BC1\u0BB5\u0BBF\u0B9F\u0BCD\u0B9F\u0BC0\u0BB0\u0BCD\u0B95\u0BB3\u0BBE?" : "Forgot password?"}
+                  {lang === "ta" ? "கடவுச்சொல் மறந்துவிட்டீர்களா?" : "Forgot password?"}
                 </button>
               </div>
 
               <Button className="w-full" size="md" loading={loading}
                 disabled={mobile.length < 10 || password.length < 4}
                 onClick={handleLogin}>
-                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "\u0B89\u0BB3\u0BCD\u0BA8\u0BC1\u0BB4\u0BC8" : "Sign In"}
+                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "உள்நுழை" : "Sign In"}
               </Button>
 
               <div className="text-center text-sm">
-                <span className="text-slate-500">{lang === "ta" ? "\u0B95\u0BA3\u0B95\u0BCD\u0B95\u0BC1 \u0B87\u0BB2\u0BCD\u0BB2\u0BC8\u0BAF\u0BBE?" : "Don't have an account?"} </span>
-                <button onClick={() => { setView("signup"); setErr(""); setWidgetStep("idle"); setWidgetToken(""); }}
+                <span className="text-slate-500">{lang === "ta" ? "கணக்கு இல்லையா?" : "Don't have an account?"} </span>
+                <button onClick={() => { setView("signup"); setErr(""); setOtpStep("idle"); setOtpCode(""); }}
                   className="font-semibold text-uyir-600 hover:underline">
-                  {lang === "ta" ? "\u0BAA\u0BA4\u0BBF\u0BB5\u0BC1 \u0B9A\u0BC6\u0BAF\u0BCD\u0BAF\u0BB5\u0BC1\u0BAE\u0BCD" : "Sign up"}
+                  {lang === "ta" ? "பதிவு செய்யவும்" : "Sign up"}
                 </button>
               </div>
 
@@ -227,17 +178,17 @@ export function Onboarding() {
           {/* Signup View */}
           {view === "signup" && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "\u0BAA\u0BC1\u0BA4\u0BBF\u0BAF \u0BAA\u0BA4\u0BBF\u0BB5\u0BC1" : "Sign Up"}</h2>
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "புதிய பதிவு" : "Sign Up"}</h2>
 
               <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "\u0BAA\u0BC6\u0BAF\u0BB0\u0BCD" : "Name"}</label>
-                <input type="text" placeholder={lang === "ta" ? "\u0B89\u0B99\u0BCD\u0B95\u0BB3\u0BCD \u0BAA\u0BC6\u0BAF\u0BB0\u0BCD" : "Your name"}
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "பெயர்" : "Name"}</label>
+                <input type="text" placeholder={lang === "ta" ? "உங்கள் பெயர்" : "Your name"}
                   value={name} onChange={(e) => setName(String(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
               </div>
 
               <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "\u0BAE\u0BCA\u0BAA\u0BC8\u0BB2\u0BCD \u0B8E\u0BA3\u0BCD" : "Phone Number"}</label>
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "மொபைல் எண்" : "Phone Number"}</label>
                 <div className="flex">
                   <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
                     <span className="text-lg">🇮🇳</span>
@@ -250,10 +201,10 @@ export function Onboarding() {
               </div>
 
               <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD" : "Password"}</label>
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "கடவுச்சொல்" : "Password"}</label>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"}
-                    placeholder={lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD\u0BB2\u0BC8 \u0B89\u0BB3\u0BCD\u0BB3\u0BBF\u0B9F\u0BB5\u0BC1\u0BAE\u0BCD" : "Enter your password"}
+                    placeholder={lang === "ta" ? "கடவுச்சொல்லை உள்ளிடவும்" : "Enter your password"}
                     value={password} onChange={(e) => setPassword(String(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -271,48 +222,49 @@ export function Onboarding() {
                 <div className="flex-1">
                   <label htmlFor="consent" className="text-xs text-slate-600">
                     {lang === "ta"
-                      ? "\u0BA8\u0BBE\u0BA9\u0BCD \u0B87\u0BA8\u0BCD\u0BA4 \u0B87\u0BB0\u0BA4\u0BCD\u0BA4 \u0BA4\u0BBE\u0BA9\u0BA4\u0BC8 \u0B87\u0BB2\u0BB5\u0B9A\u0BCD\u0B9A\u0BAE\u0BBE\u0B95 \u0B95\u0BCA\u0B9F\u0BC1\u0B95\u0BCD\u0B95\u0BBF\u0BB1\u0BC7\u0BA9\u0BCD, \u0BAA\u0BA3\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BBE\u0B95 \u0B87\u0BB2\u0BCD\u0BB2. \u0B87\u0BA4\u0BC1 \u0B92\u0BB0\u0BC1 \u0BA8\u0BB2\u0BCD\u0BB2 \u0BA8\u0BCB\u0B95\u0BCD\u0B95\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BBE\u0B95 \u0BAE\u0B9F\u0BCD\u0B9F\u0BC1\u0BAE\u0BC7."
+                      ? "நான் இந்த இரத்த தானதை இலவசமாக கொடுக்கிறேன், பணத்திற்காக இல்ல. இது ஒரு நல்ல நோக்கத்திற்காக மட்டுமே."
                       : "I pledge to donate blood voluntarily without any monetary compensation. This is for a noble cause to save lives."}
                   </label>
                   <button type="button" onClick={() => setShowLegalInfo(true)}
                     className="ml-1 text-xs font-semibold text-uyir-600 hover:underline">
-                    {lang === "ta" ? "\u0BAE\u0BC7\u0BB2\u0BC1\u0BAE\u0BCD \u0BAA\u0B9F\u0BBF\u0B95\u0BCD\u0B95" : "Read more"}
+                    {lang === "ta" ? "மேலும் படிக்க" : "Read more"}
                   </button>
                 </div>
               </div>
 
-              {/* Widget status */}
-              {widgetStep === "sending" && (
+              {/* OTP Status */}
+              {otpStep === "sent" && (
                 <div className="rounded-md bg-blue-50 px-3 py-2 text-center">
-                  <p className="text-xs text-blue-700 flex items-center justify-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {lang === "ta" ? "OTP \u0BB5\u0BBF\u0B9C\u0B9F\u0BCD\u0B9F\u0BC8 \u0BA4\u0BBF\u0BB1\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1..." : "Opening OTP widget..."}
+                  <p className="text-xs text-blue-700">
+                    {lang === "ta" ? "OTP உங்கள் மொபைலுக்கு அனுப்பப்பட்டது." : "OTP sent to your mobile."}
                   </p>
                 </div>
               )}
 
-              {widgetStep === "done" && (
-                <div className="rounded-md bg-green-50 px-3 py-2 text-center">
-                  <p className="text-xs text-green-700">
-                    {lang === "ta" ? "\u0B92\u0BAA\u0BCD\u0BAA\u0BBF\u0B9F\u0BBF \u0B9A\u0BB0\u0BBF\u0BAA\u0BBE\u0BB0\u0BCD\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BCD\u0B9F\u0BA4\u0BC1!" : "OTP verified!"}
-                  </p>
+              {/* OTP Input */}
+              {otpStep === "sent" && (
+                <div>
+                  <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "OTP எண்" : "OTP Code"}</label>
+                  <input type="tel" inputMode="numeric" placeholder="123456" maxLength={6}
+                    value={otpCode} onChange={(e) => setOtpCode(String(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
                 </div>
               )}
 
               <Button className="w-full" size="md" loading={loading}
-                disabled={mobile.length < 10 || !name || !password || !consent || widgetStep === "sending"}
-                onClick={widgetStep === "done" ? verifyWidgetSignup : handleSignup}>
+                disabled={mobile.length < 10 || !name || !password || !consent || (otpStep === "sent" && otpCode.length < 6)}
+                onClick={otpStep === "sent" ? verifySignup : handleSignup}>
                 <Phone className="h-4 w-4" />
-                {widgetStep === "done"
-                  ? (lang === "ta" ? "\u0BAA\u0BA4\u0BBF\u0BB5\u0BC1 \u0B9A\u0BC6\u0BAF\u0BCD\u0BAF\u0BB5\u0BC1\u0BAE\u0BCD" : "Complete Signup")
-                  : (lang === "ta" ? "OTP \u0BAA\u0BC6\u0BB1\u0BC1" : "Get OTP")}
+                {otpStep === "sent"
+                  ? (lang === "ta" ? "பதிவு செய்யவும்" : "Complete Signup")
+                  : (lang === "ta" ? "OTP பெறு" : "Get OTP")}
               </Button>
 
               <div className="text-center text-sm">
-                <span className="text-slate-500">{lang === "ta" ? "\u0BAE\u0BC1\u0BA9\u0BCD\u0BA9\u0BBE\u0BB5\u0BBF\u0BA4\u0BAE\u0BCD \u0BAA\u0BA4\u0BBF\u0BB5\u0BC1?" : "Already have an account?"} </span>
-                <button onClick={() => { setView("login"); setErr(""); setWidgetStep("idle"); setWidgetToken(""); }}
+                <span className="text-slate-500">{lang === "ta" ? "முன்னாள் பதிவு?" : "Already have an account?"} </span>
+                <button onClick={() => { setView("login"); setErr(""); setOtpStep("idle"); setOtpCode(""); }}
                   className="font-semibold text-uyir-600 hover:underline">
-                  {lang === "ta" ? "\u0B89\u0BB3\u0BCD\u0BA8\u0BC1\u0BB4\u0BC8" : "Sign in"}
+                  {lang === "ta" ? "உள்நுழை" : "Sign in"}
                 </button>
               </div>
 
@@ -323,13 +275,13 @@ export function Onboarding() {
           {/* Forgot Password View */}
           {view === "forgot" && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD \u0BAE\u0BB1\u0B82\u0BA4\u0BC1\u0BB5\u0BBF\u0B9F\u0BCD\u0B9F\u0BC0\u0BB0\u0BCD\u0B95\u0BB3\u0BBE?" : "Forgot Password?"}</h2>
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "கடவுச்சொல் மறந்துவிட்டீர்களா?" : "Forgot Password?"}</h2>
               <p className="text-center text-sm text-slate-500">
-                {lang === "ta" ? "\u0B89\u0B99\u0BCD\u0B95\u0BB3\u0BCD \u0BAE\u0BCA\u0BAA\u0BC8\u0BB2\u0BCD \u0B8E\u0BA3\u0BCD\u0BA3\u0BC8 \u0B89\u0BB3\u0BCD\u0BB3\u0BBF\u0B9F\u0BB5\u0BC1\u0BAE\u0BCD, OTP \u0B85\u0BA9\u0BC1\u0BAA\u0BCD\u0BAA\u0BC1\u0BB5\u0BCB\u0BAE\u0BCD" : "Enter your mobile number to receive OTP"}
+                {lang === "ta" ? "உங்கள் மொபைல் எண்ணை உள்ளிடவும், OTP அனுப்புவோம்" : "Enter your mobile number to receive OTP"}
               </p>
 
               <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "\u0BAE\u0BCA\u0BAA\u0BC8\u0BB2\u0BCD \u0B8E\u0BA3\u0BCD" : "Phone Number"}</label>
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "மொபைல் எண்" : "Phone Number"}</label>
                 <div className="flex">
                   <div className="flex items-center gap-1 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 px-3">
                     <span className="text-lg">🇮🇳</span>
@@ -344,12 +296,12 @@ export function Onboarding() {
               <Button className="w-full" size="md" loading={loading}
                 disabled={mobile.length < 10}
                 onClick={handleForgot}>
-                <Phone className="h-4 w-4" /> {lang === "ta" ? "OTP \u0BAA\u0BC6\u0BB1\u0BC1" : "Get OTP"}
+                <Phone className="h-4 w-4" /> {lang === "ta" ? "OTP பெறு" : "Get OTP"}
               </Button>
 
-              <button onClick={() => { setView("login"); setErr(""); setWidgetStep("idle"); setWidgetToken(""); }}
+              <button onClick={() => { setView("login"); setErr(""); setOtpStep("idle"); setOtpCode(""); }}
                 className="w-full text-xs text-slate-400">
-                {lang === "ta" ? "\u0BA4\u0BBF\u0BB0\u0BC1\u0BAE\u0BCD\u0BAA\u0BC1" : "Back to Login"}
+                {lang === "ta" ? "திரும்பு" : "Back to Login"}
               </button>
 
               {err && <p className="text-center text-xs text-red-500">{err}</p>}
@@ -359,33 +311,31 @@ export function Onboarding() {
           {/* Reset Password View */}
           {view === "reset" && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "\u0BAA\u0BC1\u0BA4\u0BBF\u0BAF \u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD" : "Set New Password"}</h2>
+              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "புதிய கடவுச்சொல்" : "Set New Password"}</h2>
               <p className="text-center text-sm text-slate-500">
-                {lang === "ta" ? "OTP \u0BAE\u0BB1\u0BCD\u0BB1\u0BC1\u0BAE\u0BCD \u0BAA\u0BC1\u0BA4\u0BBF\u0BAF \u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD\u0BB2\u0BC8 \u0B89\u0BB3\u0BCD\u0BB3\u0BBF\u0B9F\u0BB5\u0BC1\u0BAE\u0BCD" : "OTP verified. Enter your new password"}
+                {lang === "ta" ? "OTP மற்றும் புதிய கடவுச்சொல்லை உள்ளிடவும்" : "Enter OTP and your new password"}
               </p>
 
-              {widgetStep === "sending" && (
+              {otpStep === "sent" && (
                 <div className="rounded-md bg-blue-50 px-3 py-2 text-center">
-                  <p className="text-xs text-blue-700 flex items-center justify-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {lang === "ta" ? "OTP \u0BB5\u0BBF\u0B9C\u0B9F\u0BCD\u0B9F\u0BC8 \u0BA4\u0BBF\u0BB1\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1..." : "Opening OTP widget..."}
-                  </p>
-                </div>
-              )}
-
-              {widgetStep === "done" && (
-                <div className="rounded-md bg-green-50 px-3 py-2 text-center">
-                  <p className="text-xs text-green-700">
-                    {lang === "ta" ? "\u0B92\u0BAA\u0BCD\u0BAA\u0BBF\u0B9F\u0BBF \u0B9A\u0BB0\u0BBF\u0BAA\u0BBE\u0BB0\u0BCD\u0B95\u0BCD\u0B95\u0BAA\u0BCD\u0BAA\u0B9F\u0BCD\u0B9F\u0BA4\u0BC1!" : "OTP verified!"}
+                  <p className="text-xs text-blue-700">
+                    {lang === "ta" ? "OTP உங்கள் மொபைலுக்கு அனுப்பப்பட்டது." : "OTP sent to your mobile."}
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "\u0BAA\u0BC1\u0BA4\u0BBF\u0BAF \u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD" : "New Password"}</label>
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "OTP எண்" : "OTP Code"}</label>
+                <input type="tel" inputMode="numeric" placeholder="123456" maxLength={6}
+                  value={otpCode} onChange={(e) => setOtpCode(String(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "புதிய கடவுச்சொல்" : "New Password"}</label>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"}
-                    placeholder={lang === "ta" ? "\u0BAA\u0BC1\u0BA4\u0BBF\u0BAF \u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD\u0BB2\u0BC8 \u0B89\u0BB3\u0BCD\u0BB3\u0BBF\u0B9F\u0BB5\u0BC1\u0BAE\u0BCD" : "Enter new password"}
+                    placeholder={lang === "ta" ? "புதிய கடவுச்சொல்லை உள்ளிடவும்" : "Enter new password"}
                     value={password} onChange={(e) => setPassword(String(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 p-3 pr-10 text-sm outline-none focus:border-uyir-500" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -396,14 +346,14 @@ export function Onboarding() {
               </div>
 
               <Button className="w-full" size="md" loading={loading}
-                disabled={widgetStep !== "done" || password.length < 4}
-                onClick={handleWidgetReset}>
-                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "\u0B95\u0B9F\u0BB5\u0BC1\u0B9A\u0BCD\u0B9A\u0BCA\u0BB2\u0BCD \u0BAE\u0BBE\u0BB1\u0BCD\u0BB1\u0BC1" : "Reset Password"}
+                disabled={otpCode.length < 6 || password.length < 4}
+                onClick={handleReset}>
+                <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "கடவுச்சொல் மாற்று" : "Reset Password"}
               </Button>
 
-              <button onClick={() => { setView("login"); setErr(""); setWidgetStep("idle"); setWidgetToken(""); setPassword(""); }}
+              <button onClick={() => { setView("login"); setErr(""); setOtpStep("idle"); setOtpCode(""); setPassword(""); }}
                 className="w-full text-xs text-slate-400">
-                {lang === "ta" ? "\u0BA4\u0BBF\u0BB0\u0BC1\u0BAE\u0BCD\u0BAA\u0BC1" : "Back to Login"}
+                {lang === "ta" ? "திரும்பு" : "Back to Login"}
               </button>
 
               {err && <p className="text-center text-xs text-red-500">{err}</p>}
@@ -418,7 +368,7 @@ export function Onboarding() {
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="mb-4 text-lg font-bold text-slate-800">
-                {lang === "ta" ? "\u0B87\u0BB0\u0BA4\u0BCD\u0BA4 \u0BB5\u0BBF\u0BB1\u0BCD\u0BAA\u0BA9\u0BC8 - \u0B9A\u0B9F\u0BCD\u0B9F \u0B8E\u0B9A\u0BCD\u0B9A\u0BB0\u0BBF\u0B95\u0BCD\u0B95\u0BC8" : "Blood Selling - Legal Warning"}
+                {lang === "ta" ? "இரத்த் விற்பனை - சட்ட எச்சரிக்கை" : "Blood Selling - Legal Warning"}
               </h3>
               <button onClick={() => setShowLegalInfo(false)}
                 className="mb-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -429,33 +379,43 @@ export function Onboarding() {
             </div>
             <div className="space-y-3 text-sm text-slate-600">
               <p className="font-semibold text-red-600">
-                {lang === "ta" ? "\u26A0\uFE0F \u0BAE\u0BC1\u0B95\u0BCD\u0B95\u0BBF\u0BAF \u0B9A\u0B9F\u0BCD\u0B9F \u0B8E\u0B9A\u0BCD\u0B9A\u0BB0\u0BBF\u0B95\u0BCD\u0B95\u0BC8" : "\u26A0\uFE0F Important Legal Warning"}
+                {lang === "ta" ? "⚠️ முக்கிய சட்ட எச்சரிக்கை" : "⚠️ Important Legal Warning"}
               </p>
               <p>
                 {lang === "ta"
-                  ? "\u0B87\u0BA8\u0BCD\u0BA4\u0BBF\u0BAF\u0BBE\u0BB5\u0BBF\u0BB2\u0BCD, \u0B87\u0BB0\u0BA4\u0BCD\u0BA4\u0BC8 \u0BAA\u0BA3\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BBE\u0B95 \u0BB5\u0BBF\u0BB1\u0BCD\u0BAA\u0BA9\u0BC8 \u0B9A\u0BC6\u0BAF\u0BCD\u0BB5\u0BA4\u0BC1 \u0B95\u0BC1\u0BB1\u0BCD\u0BB1\u0BAE\u0BCD \u0BAE\u0BB1\u0BCD\u0BB1\u0BC1\u0BAE\u0BCD \u0BA4\u0BA3\u0BCD\u0B9F\u0BA9\u0BC8\u0B95\u0BCD\u0B95\u0BC1\u0BB0\u0BBF\u0BAF \u0B9A\u0BC6\u0BAF\u0BB2\u0BCD."
+                  ? "இந்தியாவில், இரத்தை பணத்திற்காக விற்பனை செய்வது குற்றம் மற்றும் தண்டனைக்குரிய செயல்."
                   : "In India, selling blood for money is a criminal offense punishable by law."}
               </p>
-              <p className="font-semibold text-slate-700">
+              <p>
                 {lang === "ta"
-                  ? "\u0B87\u0BA4\u0BC1 \u0B92\u0BB0\u0BC1 \u0B87\u0BB2\u0BB5\u0B9A\u0BCD\u0B9A\u0BAE\u0BBE\u0BA9 \u0BAA\u0BA3\u0BCD\u0BAA\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0BAE\u0BCD \u0BAE\u0B9F\u0BCD\u0B9F\u0BC1\u0BAE\u0BC7 \u0B87\u0BB2\u0BB5\u0B9A\u0BCD\u0B9A\u0BAE\u0BBE\u0B95 \u0BA4\u0BBE\u0BA9\u0BAE\u0BCD \u0B9A\u0BC6\u0BAF\u0BCD\u0BAF\u0BAA\u0BCD\u0BAA\u0B9F\u0BC1\u0B95\u0BBF\u0BB1\u0BA4\u0BC1."
-                  : "This is a completely voluntary service and should be done only as a donation."}
+                  ? "இந்திய தண்டனை சட்டம் 1860, பிரிவு 370: மனித வணிகம் (கிட்னி, இரத்த், உறுப்புகள்) தடை செய்யப்பட்டுள்ளது."
+                  : "Indian Penal Code 1860, Section 370: Human trafficking (kidney, blood, organs) is prohibited."}
               </p>
               <p>
                 {lang === "ta"
-                  ? "\u0B89\u0B99\u0BCD\u0B95\u0BB3\u0BCD \u0B87\u0BB0\u0BA4\u0BCD\u0BA4\u0BC8 \u0BA4\u0BBE\u0BA9\u0BAE\u0BCD \u0BA4\u0BC7\u0BB5\u0BC8\u0BAF\u0BBF\u0BB2\u0BCD \u0BB5\u0BC6\u0BA3\u0BCD\u0B9F\u0BBF\u0B9A\u0BCD\u0B9A\u0BAE\u0BCD \u0BAE\u0BC2\u0BB2\u0BAE\u0BCD \u0BAE\u0BB0\u0BC1\u0BA8\u0BCD\u0BA4\u0BC1\u0BB5\u0BBF\u0B9F\u0BC1\u0B99\u0BCD\u0B95\u0BB3\u0BCD."
-                  : "Your voluntary donation will help save lives."}
+                  ? "National Blood Transfusion Council (NBTC) & National AIDS Control Organization (NACO): இரத்த் விற்பனைக்கு தடை விதிக்கப்பட்டுள்ளது."
+                  : "National Blood Transfusion Council (NBTC) & National AIDS Control Organization (NACO): Blood selling is banned."}
+              </p>
+              <p className="font-semibold text-green-600">
+                {lang === "ta" ? "✅ சட்டபூர்வமான மாற்று:" : "✅ Legal Alternative:"}
+              </p>
+              <p>
+                {lang === "ta"
+                  ? "• இரத்த் தானம் - இலவசமாக வழங்குவது மட்டுமே சட்டபூர்வமானது"
+                  : "• Blood donation - Only voluntary donation is legal"}
+              </p>
+              <p>
+                {lang === "ta"
+                  ? "• தன்னார்வ இரத்த் தானம் - உயிர்களை காப்பாற்ற உதவும்"
+                  : "• Voluntary donation helps save lives"}
+              </p>
+              <p className="text-xs text-slate-400">
+                {lang === "ta" ? "இதை படித்ததற்கு நன்றி." : "Thank you for reading."}
               </p>
             </div>
-            <button onClick={() => setShowLegalInfo(false)}
-              className="mt-4 w-full rounded-lg bg-uyir-600 py-2 text-sm font-semibold text-white hover:bg-uyir-700">
-              {lang === "ta" ? "\u0BA4\u0BC6\u0BB0\u0BBF\u0BA8\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BCB\u0BB1\u0BC7\u0BA9\u0BCD" : "I Understand"}
-            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-export default Onboarding;

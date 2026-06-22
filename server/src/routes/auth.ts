@@ -63,6 +63,8 @@ authRouter.post("/otp/widget-verify", async (req: any, res: any) => {
   res.json({ token, user });
 });
 
+import { sendOTP } from "../lib/msg91.js";
+
 authRouter.post("/otp/request", async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15), name: z.string().optional() });
   const parse = schema.safeParse(req.body);
@@ -77,9 +79,15 @@ authRouter.post("/otp/request", async (req: any, res: any) => {
     return res.json({ ok: true, exists: true, hasPassword: false, user: existingUser, message: "User exists, set password" });
   }
 
-  const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
   console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
+
+  const sent = await sendOTP(mobile, code, parse.data.name || undefined);
+  if (!sent) {
+    console.warn(`[otp] MSG91 failed to send OTP to ${mobile}.`);
+  }
+
   res.json({ ok: true, devOtp: code, exists: false, user: null });
 });
 
@@ -154,9 +162,15 @@ authRouter.post("/forgot-password", async (req: any, res: any) => {
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (!user) return res.status(404).json({ error: "User not found. Please sign up first." });
 
-  const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
   console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
+
+  const sent = await sendOTP(mobile, code);
+  if (!sent) {
+    console.warn(`[otp] MSG91 failed to send forgot-password OTP to ${mobile}.`);
+  }
+
   res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
 });
 
