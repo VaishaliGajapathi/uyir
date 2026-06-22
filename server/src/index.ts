@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
@@ -74,9 +75,11 @@ app.use("/admin", adminRouter);
 // Serve static frontend in production
 if (isProd) {
   const clientDist = path.resolve(__dirname, "../public");
-  app.use(express.static(clientDist));
+  const clientDistFallback = path.resolve(__dirname, "../../client/dist");
+  const staticDir = fs.existsSync(clientDist) ? clientDist : clientDistFallback;
+  app.use(express.static(staticDir));
   app.get("*", (_req: Request, res: Response) => {
-    res.sendFile(path.join(clientDist, "index.html"));
+    res.sendFile(path.join(staticDir, "index.html"));
   });
 } else {
   app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server." }));

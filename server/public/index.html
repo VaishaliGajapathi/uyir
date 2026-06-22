@@ -24,5 +24,16 @@
   <body>
     <div id="root"></div>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBvG78k-27hBJKkmFP0AW1azxtFNPy8XRQ&libraries=places&loading=async"></script>
+    <script>
+      // Force unregister old service workers and clear cached assets
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+      }
+      if (caches) {
+        caches.keys().then(names => names.forEach(n => caches.delete(n)));
+      }
+    </script>
   </body>
 </html>
