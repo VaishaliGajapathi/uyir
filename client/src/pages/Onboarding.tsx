@@ -27,6 +27,7 @@ export default function Onboarding() {
   const [err, setErr] = useState("");
   const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
   const [otpCode, setOtpCode] = useState("");
+  const [devOtp, setDevOtp] = useState("");
 
   async function handleLogin() {
     setErr(""); setLoading(true);
@@ -50,6 +51,7 @@ export default function Onboarding() {
         setErr(lang === "ta" ? "இந்த எண்ணு உளாத பதிவு செய்கிறது. உள்நுழை செய்க." : "This number is already registered. Please sign in.");
         return;
       }
+      if (r.devOtp) setDevOtp(r.devOtp);
       setOtpStep("sent");
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
@@ -239,6 +241,11 @@ export default function Onboarding() {
                   <p className="text-xs text-blue-700">
                     {lang === "ta" ? "OTP உங்கள் மொபைலுக்கு அனுப்பப்பட்டது." : "OTP sent to your mobile."}
                   </p>
+                  {devOtp && (
+                    <p className="mt-1 text-[10px] text-blue-500">
+                      {lang === "ta" ? "படிதார் OTP: " : "Dev OTP: "}<span className="font-mono font-bold">{devOtp}</span>
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -248,7 +255,7 @@ export default function Onboarding() {
                   <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "OTP எண்" : "OTP Code"}</label>
                   <input type="tel" inputMode="numeric" placeholder="123456" maxLength={6}
                     value={otpCode} onChange={(e) => setOtpCode(String(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
+                    className="w-full rounded-lg border border-slate-300 p-3 text-sm text-center tracking-widest font-mono text-lg outline-none focus:border-uyir-500" />
                 </div>
               )}
 
@@ -260,6 +267,13 @@ export default function Onboarding() {
                   ? (lang === "ta" ? "பதிவு செய்யவும்" : "Complete Signup")
                   : (lang === "ta" ? "OTP பெறு" : "Get OTP")}
               </Button>
+
+              {/* Resend OTP */}
+              {otpStep === "sent" && !loading && (
+                <button type="button" onClick={handleSignup} className="w-full text-xs text-uyir-600 hover:underline">
+                  {lang === "ta" ? "OTP மீண்டும் அனுப்பவும்" : "Resend OTP"}
+                </button>
+              )}
 
               <div className="text-center text-sm">
                 <span className="text-slate-500">{lang === "ta" ? "முன்னாள் பதிவு?" : "Already have an account?"} </span>

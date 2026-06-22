@@ -6,63 +6,6 @@ import bcrypt from "bcryptjs";
 
 export const authRouter = Router();
 
-// MSG91 OTP Widget — server-side access token verification
-authRouter.post("/otp/widget-verify", async (req: any, res: any) => {
-  const schema = z.object({
-    mobile: z.string().min(10).max(15),
-    accessToken: z.string().min(1),
-    name: z.string().optional(),
-    role: z.enum(["donor", "requester", "verifier", "admin", "ngo_admin"]).optional(),
-    language: z.enum(["ta", "en"]).optional(),
-    password: z.string().min(4).optional(),
-  });
-  const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
-
-  const { accessToken, name, role, language, password } = parse.data;
-  const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
-  const authKey = process.env.MSG91_AUTH_KEY;
-
-  if (!authKey) {
-    return res.status(500).json({ error: "MSG91 not configured. Please contact support." });
-  }
-
-  // Verify access token with MSG91 server-side API
-  try {
-    const verifyRes = await fetch("https://control.msg91.com/api/v5/widget/verifyAccessToken", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authkey: authKey, "access-token": accessToken }),
-    });
-    const verifyData = await verifyRes.json();
-
-    if (verifyData.type !== "success") {
-      console.log("[otp/widget-verify] MSG91 token verification failed:", verifyData);
-      return res.status(400).json({ error: "OTP verification failed. Please try again." });
-    }
-  } catch (err) {
-    console.error("[otp/widget-verify] MSG91 API error:", err);
-    return res.status(500).json({ error: "Unable to verify OTP. Please try again later." });
-  }
-
-  // Token verified — create or update user
-  let user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
-  const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
-
-  if (!user) {
-    user = await queryOne<any>(
-      'INSERT INTO "User" ("id","mobile","name","role","language","password","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,NOW()) RETURNING *',
-      [mobile, name || "UYIR User", role || "donor", language || "ta", hashedPassword]
-    );
-  } else if (!user.password && hashedPassword) {
-    await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
-    user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
-  }
-
-  const token = signToken(user!.id, user!.role);
-  res.json({ token, user });
-});
-
 import { sendOTP } from "../lib/msg91.js";
 
 authRouter.post("/otp/request", async (req: any, res: any) => {
@@ -107,50 +50,6 @@ authRouter.post("/login", async (req: any, res: any) => {
 
   const token = signToken(user.id, user.role);
   res.json({ token, user });
-});
-
-// MSG91 OTP Widget — forgot-password reset
-authRouter.post("/otp/widget-reset", async (req: any, res: any) => {
-  const schema = z.object({
-    mobile: z.string().min(10).max(15),
-    accessToken: z.string().min(1),
-    password: z.string().min(4),
-  });
-  const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
-
-  const { accessToken, password } = parse.data;
-  const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
-  const authKey = process.env.MSG91_AUTH_KEY;
-
-  if (!authKey) {
-    return res.status(500).json({ error: "MSG91 not configured. Please contact support." });
-  }
-
-  // Verify access token with MSG91 server-side API
-  try {
-    const verifyRes = await fetch("https://control.msg91.com/api/v5/widget/verifyAccessToken", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authkey: authKey, "access-token": accessToken }),
-    });
-    const verifyData = await verifyRes.json();
-
-    if (verifyData.type !== "success") {
-      console.log("[otp/widget-reset] MSG91 token verification failed:", verifyData);
-      return res.status(400).json({ error: "OTP verification failed. Please try again." });
-    }
-  } catch (err) {
-    console.error("[otp/widget-reset] MSG91 API error:", err);
-    return res.status(500).json({ error: "Unable to verify OTP. Please try again later." });
-  }
-
-  const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
-  if (!user) return res.status(404).json({ error: "User not found" });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
-  res.json({ ok: true, message: "Password reset successfully" });
 });
 
 authRouter.post("/forgot-password", async (req: any, res: any) => {
