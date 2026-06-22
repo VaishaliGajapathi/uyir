@@ -15,7 +15,7 @@ UYIR is a **Capacitor** hybrid mobile app built on React + Vite. The same codeba
 1. **Node.js 20+** with npm
 2. **Android Studio** (with SDK Manager)
 3. **JDK 17** (Android Studio bundles this)
-4. **Android SDK** (minimum API 22, target API 34)
+4. **Android SDK** (minimum API 22, target API 36)
 
 ### Install Capacitor CLI
 ```bash
