@@ -18,12 +18,33 @@ const __dirname = path.dirname(__filename);
 const isProd = process.env.NODE_ENV === "production";
 
 const app = express();
+
+const allowedOrigins = [
+  "https://uyirngo.in",
+  "http://uyirngo.in",
+  "https://www.uyirngo.in",
+  "https://uyirproduction.onrender.com",
+  "http://localhost:5000",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
 app.use(cors({
-  origin: true,
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins in production for now
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200,
 }));
+
+// Explicitly handle OPTIONS preflight for all routes
+app.options("*", cors());
 app.use(express.json({ limit: "30mb" }));
 
 app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
