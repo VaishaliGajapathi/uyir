@@ -73,7 +73,7 @@ app.use("/admin", adminRouter);
 
 // Serve static frontend in production
 if (isProd) {
-  const clientDist = path.resolve(__dirname, "../../client/dist");
+  const clientDist = path.resolve(__dirname, "../public");
   app.use(express.static(clientDist));
   app.get("*", (_req: Request, res: Response) => {
     res.sendFile(path.join(clientDist, "index.html"));

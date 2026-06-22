@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build && npx prisma migrate deploy
+    buildCommand: npm install && npm run build && cd ../client && npm install && npm run build && cp -r dist ../server/public
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
