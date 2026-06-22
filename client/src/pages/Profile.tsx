@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle, Navigation, MapPin, X } from "lucide-react";
 import { api } from "../lib/api";
@@ -45,8 +45,26 @@ export function Profile() {
   const [confirmed, setConfirmed] = useState(false);
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [certificateOpen, setCertificateOpen] = useState(false);
+  const [donations, setDonations] = useState<any[]>([]);
+  const [loadingDonations, setLoadingDonations] = useState(false);
   const isDonorSetup = searchParams.get("completeDonor") === "1";
   const missingDonorFields = getMissingDonorFields(user, form, lang);
+
+  // Fetch donation history
+  useEffect(() => {
+    if (!user) return;
+    setLoadingDonations(true);
+    api.myAlerts()
+      .then((responses) => {
+        const completed = (responses || []).filter((r: any) => r.status === "completed");
+        setDonations(completed);
+      })
+      .catch(() => setDonations([]))
+      .finally(() => setLoadingDonations(false));
+  }, [user]);
+
+  const hasDonations = donations.length > 0;
+  const latestDonation = hasDonations ? donations[0] : null;
 
   // Detect changes in form
   const checkChanges = () => {
@@ -226,11 +244,9 @@ export function Profile() {
             </div>
           </div>
         </div>
-        {user?.role === "donor" && (
-          <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setCertificateOpen(true)}>
-            <Award className="h-4 w-4" /> {lang === "ta" ? "தானதானம் சான்றிதழ் பார்க்க" : "View Donation Certificate"}
-          </Button>
-        )}
+        <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setCertificateOpen(true)}>
+          <Award className="h-4 w-4" /> {lang === "ta" ? "தானதானம் சான்றிதழ் பார்க்க" : "View Donation Certificate"}
+        </Button>
       </Card>
 
       {isDonorSetup && (
@@ -505,11 +521,13 @@ export function Profile() {
         <DonationCertificate
           donorName={user?.name || "Donor"}
           bloodGroup={user?.bloodGroup || "Unknown"}
-          donationDate={new Date().toISOString()}
-          hospitalName={lang === "ta" ? "UYIR இரத்த வங்கி" : "UYIR Blood Bank"}
+          donationDate={hasDonations ? latestDonation?.completedAt || new Date().toISOString() : new Date().toISOString()}
+          hospitalName={hasDonations ? latestDonation?.hospitalName || (lang === "ta" ? "UYIR இரத்த வங்கி" : "UYIR Blood Bank") : (lang === "ta" ? "UYIR இரத்த வங்கி" : "UYIR Blood Bank")}
           district={user?.district || "Tamil Nadu"}
-          certificateId={`UYIR-DEMO-${user?.id?.slice(-6) || "TEST"}`}
+          certificateId={hasDonations ? `UYIR-${latestDonation?.id?.slice(-6) || user?.id?.slice(-6) || "TEST"}` : `UYIR-TEMPLATE-${user?.id?.slice(-6) || "TEST"}`}
           onClose={() => setCertificateOpen(false)}
+          downloadable={hasDonations}
+          nonDonorMessage={lang === "ta" ? "நீங்கள் இன்னும் இரத்ததானம் செய்யவில்லை. சான்றிதழை பதிவிறக்க, முதலில் இரத்ததானம் செய்யுங்கள்." : "You haven't donated yet. Donate blood to earn and download your certificate."}
         />
       </Sheet>
     </div>

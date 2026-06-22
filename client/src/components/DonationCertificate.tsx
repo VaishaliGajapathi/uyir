@@ -12,6 +12,8 @@ interface DonationCertificateProps {
   district: string;
   certificateId: string;
   onClose?: () => void;
+  downloadable?: boolean;
+  nonDonorMessage?: string;
 }
 
 export function DonationCertificate({
@@ -22,11 +24,17 @@ export function DonationCertificate({
   district,
   certificateId,
   onClose,
+  downloadable = true,
+  nonDonorMessage,
 }: DonationCertificateProps) {
   const { lang } = useApp();
   const certificateRef = useRef<HTMLDivElement>(null);
 
   async function downloadCertificate() {
+    if (!downloadable) {
+      alert(nonDonorMessage || "You need to donate blood first to download this certificate.");
+      return;
+    }
     if (!certificateRef.current) return;
     try {
       const canvas = await html2canvas(certificateRef.current, {
@@ -169,7 +177,7 @@ Join UYIR and save lives! 🙏
       {/* Action Buttons */}
       <div className="space-y-3">
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={downloadCertificate}>
+          <Button className="flex-1" onClick={downloadCertificate} disabled={!downloadable}>
             <Download className="h-4 w-4" /> Download
           </Button>
           {onClose && (
