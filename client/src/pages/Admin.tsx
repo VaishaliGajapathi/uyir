@@ -363,6 +363,7 @@ export function Admin() {
                 >
                   <option value="admin">Admin</option>
                   <option value="verifier">Verifier</option>
+                  <option value="ngo_admin">NGO Admin</option>
                 </select>
                 <input
                   type="password"

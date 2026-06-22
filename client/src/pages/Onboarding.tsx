@@ -9,6 +9,7 @@ import type { Lang } from "../lib/constants";
 function dashboardPathForRole(role?: string) {
   if (role === "hospital_approver") return "/hospital-dashboard";
   if (role === "admin" || role === "verifier") return "/admin";
+  if (role === "ngo_admin") return "/ngoadmin";
   return "/home";
 }
 

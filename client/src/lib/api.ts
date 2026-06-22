@@ -171,6 +171,7 @@ export const api = {
   adminRejectRequest: (id: string, notes: string) => req(`/admin/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
   adminGetAdmins: () => req<any[]>("/admin/admins"),
+  adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
   adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   // hospital
   hospitalRegister: (data: { hospitalName: string; hospitalRegistrationId: string; district: string; address?: string; phone?: string; contactPerson: string; contactMobile: string; password: string }) => req<{ token: string; user: User; hospital: any }>("/auth/hospital/register", { method: "POST", body: JSON.stringify(data) }),

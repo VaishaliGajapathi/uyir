@@ -15,6 +15,7 @@ const Nearby = lazy(() => import("./pages/Nearby"));
 const Impact = lazy(() => import("./pages/Impact"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
+const NgoAdmin = lazy(() => import("./pages/NgoAdmin"));
 const Terms = lazy(() => import("./pages/Terms"));
 const HospitalLogin = lazy(() => import("./pages/HospitalLogin"));
 const HospitalRegister = lazy(() => import("./pages/HospitalRegister"));
@@ -29,12 +30,13 @@ function dashboardPathForRole(user: User | null) {
   if (!user) return "/";
   if (user.role === "hospital_approver") return "/hospital-dashboard";
   if (user.role === "admin" || user.role === "verifier") return "/admin";
+  if (user.role === "ngo_admin") return "/ngoadmin";
   return "/home";
 }
 
 function AppShell({ children }: { children: ReactNode }) {
   const { user } = useApp();
-  const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier";
+  const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier" && user?.role !== "ngo_admin";
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {showEndUserShell && <BottomNav />}
@@ -73,9 +75,10 @@ function Inner() {
         <Route path="/impact" element={protectedElement(<Impact />)} />
         <Route path="/profile" element={protectedElement(<Profile />)} />
         <Route path="/admin" element={protectedElement(<Admin />)} />
+        <Route path="/ngoadmin" element={protectedElement(<NgoAdmin />)} />
         <Route path="/hospital-dashboard" element={protectedElement(<HospitalDashboard />)} />
         <Route path="/ratings" element={protectedElement(<Ratings />)} />
-        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital_approver") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
+        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital_approver" || user.role === "ngo_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

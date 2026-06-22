@@ -12,7 +12,7 @@ authRouter.post("/otp/widget-verify", async (req: any, res: any) => {
     mobile: z.string().min(10).max(15),
     accessToken: z.string().min(1),
     name: z.string().optional(),
-    role: z.enum(["donor", "requester", "verifier", "admin"]).optional(),
+    role: z.enum(["donor", "requester", "verifier", "admin", "ngo_admin"]).optional(),
     language: z.enum(["ta", "en"]).optional(),
     password: z.string().min(4).optional(),
   });
@@ -196,7 +196,7 @@ authRouter.post("/reset-password", async (req: any, res: any) => {
 authRouter.post("/otp/verify", async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), code: z.coerce.string().length(6),
-    name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin"]).optional(),
+    name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin","ngo_admin"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
   });
   const parse = schema.safeParse(req.body);
