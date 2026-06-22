@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Droplet, HeartHandshake, ChevronRight, Quote, ToggleLeft, ToggleRight } from "lucide-react";
+import { NotificationBell } from "../components/NotificationBell";
 import { api, type BloodRequest } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card } from "../components/ui";
@@ -84,8 +85,11 @@ export function Home() {
             <p className="text-xs text-slate-500">{lang === "ta" ? "வணக்கம்" : "Hi"}, {user?.name?.split(" ")[0]}</p>
           </div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-uyir-50 text-lg font-bold text-uyir-700">
-          {user?.bloodGroup || "?"}
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-uyir-50 text-lg font-bold text-uyir-700">
+            {user?.bloodGroup || "?"}
+          </div>
         </div>
       </header>
 
