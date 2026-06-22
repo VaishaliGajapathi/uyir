@@ -7,7 +7,7 @@ export const usersRouter = Router();
 usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.userId]);
   if (!user) return res.status(404).json({ error: "Not found" });
-  const badges = await query<any>('SELECT * FROM "DonorBadge" WHERE "userId" = $1 ORDER BY "awardedDate" DESC', [req.userId]);
+  const badges = await query<any>('SELECT * FROM "DonorBadge" WHERE "donorId" = $1 ORDER BY "awardedDate" DESC', [req.userId]);
   res.json({ ...user, badges });
 });
 
