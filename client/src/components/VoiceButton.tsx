@@ -57,37 +57,86 @@ export function VoiceButton({
         setState("processing");
         onResult(transcript, null);
         setState("idle");
-      } else {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const rec = new MediaRecorder(stream);
-        chunksRef.current = [];
-        rec.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
-        rec.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          setState("processing");
-          try {
-            const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-            console.log("Sending audio blob, size:", blob.size);
-            const res = await api.transcribe(blob, mode, language);
-            console.log("Transcription result:", res);
-            onResult(res.text, res.parsed);
-          } catch (err: any) {
-            console.error("Voice transcription error:", err);
-            const errorMsg = err.message || "Voice failed";
-            if (errorMsg.includes("fetch") || errorMsg.includes("network") || errorMsg.includes("connection")) {
-              alert("Connection error. Please check if the server is running.");
-            } else if (errorMsg.includes("Unauthorized") || errorMsg.includes("401")) {
-              alert("Session expired or not logged in. Please login again to use voice features.");
-            } else {
-              alert(errorMsg + ". Please check the AI server and voice configuration.");
-            }
-          } finally {
-            setState("idle");
-          }
-        };
-        rec.start();
-        recRef.current = rec;
+        return;
       }
+
+      // Try browser Web Speech API first (no backend needed)
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = language === "ta" ? "ta-IN" : "en-IN";
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setState("processing");
+          onResult(transcript, null);
+          setState("idle");
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Web Speech API error:", event.error);
+          if (event.error === "not-allowed") {
+            alert("Microphone permission denied.");
+          } else {
+            // Fallback to backend fal.ai
+            startBackendRecording();
+          }
+          setState("idle");
+        };
+
+        recognition.onend = () => {
+          if (state === "recording") setState("idle");
+        };
+
+        recognition.start();
+        return;
+      }
+
+      // Fallback to backend fal.ai
+      startBackendRecording();
+    } catch (err) {
+      console.error("Microphone error:", err);
+      alert("Microphone permission required or not available.");
+      setState("idle");
+    }
+  }
+
+  async function startBackendRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setState("processing");
+        try {
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          console.log("Sending audio blob, size:", blob.size);
+          const res = await api.transcribe(blob, mode, language);
+          console.log("Transcription result:", res);
+          onResult(res.text, res.parsed);
+        } catch (err: any) {
+          console.error("Voice transcription error:", err);
+          const errorMsg = err.message || "Voice failed";
+          if (errorMsg.includes("fetch") || errorMsg.includes("network") || errorMsg.includes("connection")) {
+            alert("Connection error. Please check if the server is running.");
+          } else if (errorMsg.includes("Unauthorized") || errorMsg.includes("401")) {
+            alert("Session expired or not logged in. Please login again to use voice features.");
+          } else if (errorMsg.includes("FAL_KEY") || errorMsg.includes("STT not configured")) {
+            alert("AI voice service is not configured. Please set up FAL_KEY in server settings.");
+          } else {
+            alert(errorMsg + ". Please check the AI server and voice configuration.");
+          }
+        } finally {
+          setState("idle");
+        }
+      };
+      rec.start();
+      recRef.current = rec;
     } catch (err) {
       console.error("Microphone error:", err);
       alert("Microphone permission required or not available.");

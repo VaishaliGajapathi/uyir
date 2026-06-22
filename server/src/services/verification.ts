@@ -439,9 +439,52 @@ Provide:
 
 Return ONLY JSON: {"tips":["tip1","tip2"],"predictions":["pred1","pred2"],"postDonationTips":["tip1","tip2","tip3"]}`;
 
-    const model = gemini.getGenerativeModel({ model: MODELS.gemini });
-    const res = await model.generateContent([{ text: prompt }]);
-    const out = extractJson<{ tips: string[]; predictions: string[]; postDonationTips: string[] }>(res.response.text());
+    let out: { tips: string[]; predictions: string[]; postDonationTips: string[] } | null = null;
+
+    // Try fal.ai first
+    if (hasFal) {
+      try {
+        const falResult = await callFalAI(MODELS.falText, {
+          prompt,
+          max_tokens: 1024,
+          temperature: 0.3,
+        });
+        out = extractJson<{ tips: string[]; predictions: string[]; postDonationTips: string[] }>(
+          falResult?.output || falResult?.text || falResult?.content || JSON.stringify(falResult)
+        );
+        if (out) console.log("[health] fal.ai generated tips successfully");
+      } catch (e) {
+        console.warn("[health] fal.ai failed:", (e as Error).message);
+      }
+    }
+
+    // Fallback to Gemini
+    if (!out && gemini) {
+      try {
+        const model = gemini.getGenerativeModel({ model: MODELS.gemini });
+        const res = await model.generateContent([{ text: prompt }]);
+        out = extractJson<{ tips: string[]; predictions: string[]; postDonationTips: string[] }>(res.response.text());
+        if (out) console.log("[health] Gemini generated tips successfully");
+      } catch (e) {
+        console.warn("[health] Gemini failed:", (e as Error).message);
+      }
+    }
+
+    // Fallback to OpenAI
+    if (!out && openai) {
+      try {
+        const res = await openai.chat.completions.create({
+          model: MODELS.text,
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+        });
+        out = extractJson(res.choices[0]?.message?.content || "");
+        if (out) console.log("[health] OpenAI generated tips successfully");
+      } catch (e) {
+        console.warn("[health] OpenAI failed:", (e as Error).message);
+      }
+    }
 
     const predictions = out?.predictions || (bmi ? [`BMI: ${bmi.toFixed(1)} (${bmiCategory})`, "Good health status"] : ["Good health status"]);
 

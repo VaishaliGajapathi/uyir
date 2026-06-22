@@ -12,7 +12,7 @@ usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 });
 
 usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
-  const allowed = ["name","language","district","taluk","bloodGroup","gender","isPlateletDonor","shareLocation","role","notificationsEnabled","voiceEnabled","locationEnabled","pincode"];
+  const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","role","notificationsEnabled","voiceEnabled","locationEnabled","pincode","weight","height","hemoglobinLevel","sleepHours","drinkingHabits","smokingHabits"];
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {
