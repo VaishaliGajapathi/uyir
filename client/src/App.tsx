@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
 import { BottomNav } from "./components/BottomNav";
 import { LiveAlertBanner } from "./components/LiveAlertBanner";
@@ -87,10 +87,10 @@ function Inner() {
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppProvider>
         <Inner />
       </AppProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

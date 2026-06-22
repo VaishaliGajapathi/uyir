@@ -1,0 +1,2 @@
+json_key_file("") # Path to Google Play JSON key file
+package_name("com.uyir.blood")

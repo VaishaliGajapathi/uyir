@@ -7,10 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "mobile:build": "vite build && cap copy",
-    "mobile:sync": "vite build && cap sync",
+    "mobile:build": "NODE_ENV=production vite build && cap copy",
+    "mobile:sync": "NODE_ENV=production vite build && cap sync",
     "mobile:android": "cap open android",
-    "mobile:ios": "cap open ios"
+    "mobile:ios": "cap open ios",
+    "android:build": "NODE_ENV=production vite build && cap sync && cd android && ./gradlew assembleRelease",
+    "android:build-debug": "NODE_ENV=production vite build && cap sync && cd android && ./gradlew assembleDebug",
+    "android:bundle": "NODE_ENV=production vite build && cap sync && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/app": "^6.0.0",
