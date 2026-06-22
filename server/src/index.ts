@@ -74,13 +74,31 @@ app.use("/admin", adminRouter);
 
 // Serve static frontend in production
 if (isProd) {
-  const clientDist = path.resolve(__dirname, "../public");
-  const clientDistFallback = path.resolve(__dirname, "../../client/dist");
-  const staticDir = fs.existsSync(clientDist) ? clientDist : clientDistFallback;
-  app.use(express.static(staticDir));
-  app.get("*", (_req: Request, res: Response) => {
-    res.sendFile(path.join(staticDir, "index.html"));
+  const possiblePaths = [
+    path.resolve(__dirname, "../public"),
+    path.resolve(__dirname, "../../client/dist"),
+    path.resolve(__dirname, "../../dist"),
+    path.resolve(__dirname, "../../../client/dist"),
+    "/opt/render/project/src/client/dist",
+    "/opt/render/project/src/server/public",
+    "/opt/render/project/src/server/dist/public",
+  ];
+  const staticDir = possiblePaths.find((p) => {
+    const exists = fs.existsSync(path.join(p, "index.html"));
+    if (exists) console.log(`[static] Found frontend at: ${p}`);
+    return exists;
   });
+  if (staticDir) {
+    app.use(express.static(staticDir));
+    app.get("*", (_req: Request, res: Response) => {
+      res.sendFile(path.join(staticDir, "index.html"));
+    });
+  } else {
+    console.error("[static] No frontend build found. Checked:", possiblePaths);
+    app.get("*", (_req: Request, res: Response) => {
+      res.status(503).json({ error: "Frontend not built. Please rebuild and deploy." });
+    });
+  }
 } else {
   app.get("/", (_req: Request, res: any) => res.json({ service: "UYIR API", message: "Backend API server." }));
 }
