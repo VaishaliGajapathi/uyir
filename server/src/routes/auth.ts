@@ -4,6 +4,8 @@ import { query, queryOne, exec } from "../db.js";
 import { signToken } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
 
+import { sendOTP } from "../lib/msg91.js";
+
 export const authRouter = Router();
 
 function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
@@ -26,9 +28,15 @@ authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
     return res.json({ ok: true, exists: true, hasPassword: false, user: existingUser, message: "User exists, set password" });
   }
 
-  const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
   console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
+
+  const sent = await sendOTP(mobile, code, parse.data.name || undefined);
+  if (!sent) {
+    console.warn(`[otp] MSG91 failed to send OTP to ${mobile}.`);
+  }
+
   res.json({ ok: true, devOtp: code, exists: false, user: null });
 }));
 
@@ -59,9 +67,15 @@ authRouter.post("/forgot-password", asyncHandler(async (req: any, res: any) => {
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (!user) return res.status(404).json({ error: "User not found. Please sign up first." });
 
-  const code = "123456";
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 24 * 60 * 60 * 1000)]);
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
   console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
+
+  const sent = await sendOTP(mobile, code);
+  if (!sent) {
+    console.warn(`[otp] MSG91 failed to send forgot-password OTP to ${mobile}.`);
+  }
+
   res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
 }));
 
@@ -90,7 +104,7 @@ authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
 authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), code: z.coerce.string().length(6),
-    name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin"]).optional(),
+    name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin","ngo_admin"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
   });
   const parse = schema.safeParse(req.body);
@@ -148,7 +162,7 @@ authRouter.post("/hospital/register", asyncHandler(async (req: any, res: any) =>
   if (existingApprover) return res.status(400).json({ error: "Hospital approver with this registration ID already exists" });
 
   const { TN_DISTRICTS } = await import("../lib/districts.js");
-  const districtData = Object.values(TN_DISTRICTS).find((d) => d.name === district);
+  const districtData = Object.values(TN_DISTRICTS).find((d: any) => d.name === district);
   const lat = districtData?.lat ?? 11.0;
   const lng = districtData?.lng ?? 78.0;
 

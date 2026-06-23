@@ -1,0 +1,46 @@
+[ai] gemini model gemini-1.5-flash-latest failed, trying next: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+[ai] gemini model gemini-1.5-flash failed, trying next: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+[ai] gemini failed, trying openai: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+[ai] openai failed: 401 Incorrect API key provided: sk-your-*********************-key. You can find your API key at https://platform.openai.com/account/api-keys.
+[STT] Parsed result: null
+[STT] LLM parsing failed, using regex fallback
+[STT] Regex parsing result: { patientAge: 5, bloodGroup: 'O+', componentType: 'whole_blood' }
+/opt/render/project/src/server/node_modules/pg/lib/client.js:646
+          Error.captureStackTrace(err)
+                ^
+error: column "userId" does not exist
+    at /opt/render/project/src/server/node_modules/pg/lib/client.js:646:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async query (file:///opt/render/project/src/server/dist/db.js:9:24)
+    at async file:///opt/render/project/src/server/dist/routes/users.js:9:20 {
+  length: 106,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '34',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3822',
+  routine: 'errorMissingColumn'
+}
+Node.js v24.14.1
+==> Running 'npm start'
+> uyir-server@0.1.0 start
+> node dist/index.js
+[ai] Environment variables loaded: {
+  hasOpenAI: true,
+  hasGemini: true,
+  hasFalKey: true,
+  hasFalApiKey: false,
+  finalFalKey: true
+}
+[ai] Configuring fal.ai client with key length: 69
+[uyir] API listening on http://0.0.0.0:4000

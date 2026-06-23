@@ -1,0 +1,262 @@
+
+Skip to main content
+
+
+U
+Switch teams
+Upgrade
+
+V
+Projects
+uyirngo.in
+Switch projects
+
+News
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Support
+Project navigation
+Project overview
+Project configuration
+Deploys
+Preview Servers
+Agent runs
+Logs & metrics
+Web security
+Domain management
+Forms
+Blobs
+Database
+Deploy detailsYour deploy failed due to an error
+Deploy failed for uyirorg
+A failure prevented us from deploying your project.
+Why did it fail?
+Today at 12:54 AM
+
+Production: production@HEAD
+
+Retry
+Deploy settings
+Delete deploy
+Fancy a game?
+This deploy is done, but hey, you can still play if you want to!
+
+Play game
+Deploy log
+Why did it fail?
+
+
+
+
+Maximize log
+
+Loading…
+Analyzing the errors...
+Need more help? Go to Ask Netlify
+
+Retry diagnostics
+Netlify uses AI to analyze and generate solutions to fix deploy failures. It may not always understand the full context or produce a reliable, accurate answer. To learn more, please refer to our docs.
+
+Did you find this helpful? Your feedback helps improve this feature.
+
+
+
+Initializing
+Failed
+12:54:47 AM: build-image version: ac6eb13fbf000e5c09ad677efd8b7c3c2d0142b6 (noble-new-builds)
+12:54:47 AM: buildbot version: a4e69ecd307ba0c352dfef5d0d39913f2dec70dc
+12:54:47 AM: Fetching cached dependencies
+12:54:47 AM: Starting to download cache of 35.1MB (Last modified: 2026-06-12 11:33:12 +0000 UTC)
+12:54:47 AM: Downloaded cache in 249ms
+12:54:48 AM: Failed during stage 'preparing repo': Unable to access repository. The repository may have been deleted, the branch may not exist, or permissions may have changed: For more information, visit https://docs.netlify.com/configure-builds/troubleshooting-tips/#build-fails-with-error-128: Host key verification failed.
+
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+: exit status 128
+12:54:48 AM: Extracted cache in 601ms
+12:54:48 AM: Fetched cache in 893ms
+12:54:48 AM: Starting to prepare the repo for build
+12:54:48 AM: User git error while checking for ref refs/heads/production
+12:54:48 AM: Failing build: Failed to prepare repo
+Building
+Complete
+Deploying
+Skipped
+Cleanup
+Skipped
+Post-processing
+Skipped
+Docs
+Pricing
+Support
+Blog
+Changelog
+Terms
+© 2026 Netlify
+

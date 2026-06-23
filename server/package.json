@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "prestart": "node -e \"const fs=require('fs'); const path=require('path'); const pub=path.resolve('public'); const dist=path.resolve('../client/dist'); if(!fs.existsSync(pub)&&fs.existsSync(dist)){ try{fs.cpSync(dist,pub,{recursive:true}); console.log('[prestart] Copied client/dist to public/');}catch(e){console.log('[prestart] Copy failed:',e.message);} } else { console.log('[prestart] public/ exists or client/dist missing, skipping copy'); }\"",
     "start": "node dist/index.js"
   },
   "dependencies": {

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#dc2626" />
+    <meta name="description" content="Connect blood donors with those in need across Tamil Nadu. Real-time blood donation platform." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="UYIR" />
+    <link rel="apple-touch-icon" href="/uyir-logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>UYIR — Tamil Nadu Blood & Platelet Network</title>
+    <script type="module" crossorigin src="/assets/index-DGa2x0sA.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C6eMXmJW.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBvG78k-27hBJKkmFP0AW1azxtFNPy8XRQ&libraries=places&loading=async"></script>
+    <script>
+      // Force unregister old service workers and clear cached assets
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+      }
+      if (caches) {
+        caches.keys().then(names => names.forEach(n => caches.delete(n)));
+      }
+    </script>
+  </body>
+</html>

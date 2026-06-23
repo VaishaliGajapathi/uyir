@@ -50,8 +50,24 @@ export function requireAdminOrVerifier(req: AuthedRequest, res: Response, next: 
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
   try {
     const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
-    if (decoded.role !== "admin" && decoded.role !== "verifier") {
+    if (decoded.role !== "admin" && decoded.role !== "verifier" && decoded.role !== "ngo_admin") {
       return res.status(403).json({ error: "Forbidden: Admin or verifier required" });
+    }
+    req.userId = decoded.userId;
+    req.role = decoded.role;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+export function requireAdminOrNgo(req: AuthedRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
+    if (decoded.role !== "admin" && decoded.role !== "verifier" && decoded.role !== "ngo_admin" && decoded.role !== "hospital_approver") {
+      return res.status(403).json({ error: "Forbidden: Admin, NGO, or hospital approver required" });
     }
     req.userId = decoded.userId;
     req.role = decoded.role;

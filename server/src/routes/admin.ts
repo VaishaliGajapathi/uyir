@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { query, queryOne, exec } from "../db.js";
-import { requireAuth, requireAdminOrHospitalApprover, requireAdminOrVerifier } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo } from "../middleware/auth.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -15,28 +15,33 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
 }
 
 // Stats for dashboard overview
-adminRouter.get("/stats", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
-  const totalDonors = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["donor"]);
-  const totalRequests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
-  const pendingVerifications = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" = $1', ["pending_verification"]);
-  const activeRequests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" IN ($1,$2,$3)', ["verified", "alert_sent", "donor_accepted"]);
-  const fraudReports = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "FraudReport"');
-  const livesSaved = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
+adminRouter.get("/stats", requireAdminOrNgo, asyncHandler(async (_req: Request, res: Response) => {
+  const users = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User"');
+  const donors = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["donor"]);
+  const requests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
+  const pending = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" = $1', ["pending_verification"]);
+  const active = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" NOT IN ($1,$2,$3)', ["closed", "rejected", "completed"]);
+  const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
+  const reports = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "FraudReport"');
+  const hospitals = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "Hospital"');
+  const ngoUsers = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["ngo_admin"]);
   res.json({
-    totalDonors: totalDonors?.cnt || 0,
-    totalRequests: totalRequests?.cnt || 0,
-    pendingVerifications: pendingVerifications?.cnt || 0,
-    activeRequests: activeRequests?.cnt || 0,
-    fraudReports: fraudReports?.cnt || 0,
-    livesSaved: livesSaved?.cnt || 0,
+    totalUsers: users?.cnt || 0,
+    totalDonors: donors?.cnt || 0,
+    totalRequests: requests?.cnt || 0,
+    pendingVerifications: pending?.cnt || 0,
+    activeRequests: active?.cnt || 0,
+    completedDonations: completed?.cnt || 0,
+    livesSaved: completed?.cnt || 0,
+    fraudReports: reports?.cnt || 0,
+    totalHospitals: hospitals?.cnt || 0,
+    totalNgoAdmins: ngoUsers?.cnt || 0,
   });
 }));
 
 // Donors list
 adminRouter.get("/donors", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
-  console.log("[admin] fetching donors...");
   const donors = await query<any>('SELECT * FROM "User" WHERE "role" = $1 ORDER BY "createdAt" DESC', ["donor"]);
-  console.log(`[admin] donors fetched: ${donors.length} records`);
   res.json(donors);
 }));
 
@@ -64,6 +69,12 @@ adminRouter.post("/hospitals/:id/verify", requireAdminOrVerifier, asyncHandler(a
   res.json({ ok: true });
 }));
 
+// Reject a hospital
+adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
+  await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 // Fraud reports
 adminRouter.get("/fraud-reports", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
   const reports = await query<any>('SELECT * FROM "FraudReport" ORDER BY "createdAt" DESC', []);
@@ -73,6 +84,12 @@ adminRouter.get("/fraud-reports", requireAdminOrVerifier, asyncHandler(async (_r
 // Action a fraud report
 adminRouter.post("/reports/:id/action", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["actioned", req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Dismiss a fraud report
+adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
+  await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["dismissed", req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -87,15 +104,16 @@ adminRouter.post("/verify-request/:id", requireAdminOrVerifier, asyncHandler(asy
 
 // Admin users list
 adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
-  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2) ORDER BY "createdAt" DESC', ["admin", "verifier"]);
+  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo_admin"]);
   res.json(admins);
 }));
 
 // Create admin user
 adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
   const { name, mobile, role, password } = req.body;
+  if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   const bcrypt = await import("bcryptjs");
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
   const user = await queryOne<any>(
     'INSERT INTO "User" ("id","name","mobile","password","role","language","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,true,NOW()) RETURNING *',
     [name, mobile.replace(/\D/g, "").slice(-10), hashedPassword, role || "admin", "ta"]
@@ -125,20 +143,8 @@ adminRouter.post("/ban-user/:id", requireAdminOrVerifier, asyncHandler(async (re
   res.json(updated);
 }));
 
-// Reject a hospital
-adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
-  await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
-  res.json({ ok: true });
-}));
-
-// Dismiss a fraud report
-adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
-  await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["dismissed", req.params.id]);
-  res.json({ ok: true });
-}));
-
 // Legacy dashboard endpoint (kept for compatibility)
-adminRouter.get("/dashboard", requireAdminOrHospitalApprover, asyncHandler(async (_req: Request, res: Response) => {
+adminRouter.get("/dashboard", requireAdminOrNgo, asyncHandler(async (_req: Request, res: Response) => {
   const users = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User"');
   const requests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
   const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);

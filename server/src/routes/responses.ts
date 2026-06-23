@@ -109,9 +109,9 @@ responsesRouter.post("/:id/complete", requireAuth, async (req: AuthedRequest, re
   const milestones: Record<number, string> = { 1: "Life Saver", 5: "Silver Hero", 10: "Gold Hero", 25: "UYIR Champion", 50: "Tamil Nadu Life Saver" };
   const badge = milestones[donor!.donationCount];
   if (badge) {
-    const exists = await queryOne<any>('SELECT * FROM "DonorBadge" WHERE "userId" = $1 AND "badgeName" = $2 LIMIT 1', [donor!.id, badge]);
+    const exists = await queryOne<any>('SELECT * FROM "DonorBadge" WHERE "donorId" = $1 AND "badgeName" = $2 LIMIT 1', [donor!.id, badge]);
     if (!exists) {
-      await exec('INSERT INTO "DonorBadge" ("id","userId","badgeName","awardedDate") VALUES (gen_random_uuid(),$1,$2,NOW())', [donor!.id, badge]);
+      await exec('INSERT INTO "DonorBadge" ("id","donorId","badgeName","awardedDate") VALUES (gen_random_uuid(),$1,$2,NOW())', [donor!.id, badge]);
     }
   }
   await exec('UPDATE "BloodRequest" SET "status"=$1, "closedAt"=NOW() WHERE "id"=$2', ["completed", resp.requestId]);

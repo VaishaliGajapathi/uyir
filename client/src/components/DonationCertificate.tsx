@@ -13,6 +13,8 @@ interface DonationCertificateProps {
   certificateId: string;
   hasDonated?: boolean;
   onClose?: () => void;
+  downloadable?: boolean;
+  nonDonorMessage?: string;
 }
 
 export function DonationCertificate({
@@ -24,11 +26,17 @@ export function DonationCertificate({
   certificateId,
   hasDonated = false,
   onClose,
+  downloadable = true,
+  nonDonorMessage,
 }: DonationCertificateProps) {
   const { lang } = useApp();
   const certificateRef = useRef<HTMLDivElement>(null);
 
   async function downloadCertificate() {
+    if (!downloadable) {
+      alert(nonDonorMessage || "You need to donate blood first to download this certificate.");
+      return;
+    }
     if (!certificateRef.current) return;
     try {
       const canvas = await html2canvas(certificateRef.current, {

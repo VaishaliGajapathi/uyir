@@ -3,8 +3,8 @@ services:
     name: uyir-server
     runtime: node
     rootDir: server
-    buildCommand: npm install && npm run build
-    startCommand: npm run db:migrate && npm start
+    buildCommand: npm install && npm run build && cd ../client && npm install && npm run build && rm -rf ../server/public && mkdir -p ../server/public && cp -r dist/* ../server/public/
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

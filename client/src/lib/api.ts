@@ -48,6 +48,8 @@ export interface User {
   pincode?: string; // Auto-filled from geolocation
   lat?: number; lng?: number;
   notificationsEnabled?: boolean; voiceEnabled?: boolean; locationEnabled?: boolean;
+  weight?: number; height?: number; hemoglobinLevel?: number; sleepHours?: number;
+  drinkingHabits?: string; smokingHabits?: string;
   documents?: DonorDocument[];
   hospitalName?: string;
   hospitalRegistrationId?: string;
@@ -167,8 +169,8 @@ export const api = {
   adminRejectRequest: (id: string, notes: string) => req(`/admin/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
   adminGetAdmins: () => req<any[]>("/admin/admins"),
-  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
+  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
   // hospital

@@ -70,11 +70,12 @@ export async function callFalAI(modelId: string, input: any): Promise<any> {
  ].filter(Boolean) as string[]));
 
 export const MODELS = {
-  stt: "fal-ai/elevenlabs/speech-to-text/scribe-v2", // ElevenLabs Scribe V2 for fast speech-to-text with Tamil/English support
+  stt: "fal-ai/elevenlabs/speech-to-text/scribe-v2",
   text: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
   vision: process.env.OPENAI_VISION_MODEL || "gpt-4o",
   gemini: GEMINI_TEXT_MODELS[0] || "gemini-1.5-pro",
   geminiVision: GEMINI_VISION_MODELS[0] || "gemini-1.5-pro",
+  falText: process.env.FAL_TEXT_MODEL || "fal-ai/llama-3-8b-instruct",
 };
 
 // Extract first JSON object from an LLM text response.
