@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { query, queryOne, exec } from "../db.js";
+import { queryOne, exec } from "../db.js";
 import { signToken } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
 
-import { sendOTP } from "../lib/msg91.js";
+import { verifyAccessToken } from "../lib/msg91.js";
 
 export const authRouter = Router();
 
@@ -12,6 +12,21 @@ function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
   return (req: any, res: any, next: any) => {
     Promise.resolve(fn(req, res)).catch(next);
   };
+}
+
+// Verifies an OTP for a given mobile. OTP send/verify is handled client-side by
+// the production MSG91 OTP Widget, which returns a signed access token. We
+// validate that token here against MSG91 — there is no demo/test bypass.
+async function verifyOtpForMobile(mobile: string, accessToken?: string): Promise<boolean> {
+  if (!accessToken) return false;
+  const result = await verifyAccessToken(accessToken);
+  if (!result.ok) return false;
+  // If MSG91 returns the verified identifier, ensure it matches the mobile.
+  if (result.mobile && result.mobile !== mobile) {
+    console.warn(`[otp] access token mobile mismatch: token=${result.mobile} req=${mobile}`);
+    return false;
+  }
+  return true;
 }
 
 authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
@@ -28,16 +43,9 @@ authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
     return res.json({ ok: true, exists: true, hasPassword: false, user: existingUser, message: "User exists, set password" });
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
-  console.log(`[otp] Signup OTP for ${mobile}: ${code}`);
-
-  const sent = await sendOTP(mobile, code, parse.data.name || undefined);
-  if (!sent) {
-    console.warn(`[otp] MSG91 failed to send OTP to ${mobile}.`);
-  }
-
-  res.json({ ok: true, devOtp: code, exists: false, user: null });
+  // OTP is sent client-side via the MSG91 OTP Widget. Nothing to do here
+  // except confirm the number is available for signup.
+  res.json({ ok: true, exists: false, user: null });
 }));
 
 authRouter.post("/login", asyncHandler(async (req: any, res: any) => {
@@ -67,43 +75,32 @@ authRouter.post("/forgot-password", asyncHandler(async (req: any, res: any) => {
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (!user) return res.status(404).json({ error: "User not found. Please sign up first." });
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  await exec('INSERT INTO "OtpCode" ("id","mobile","code","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW())', [mobile, code, new Date(Date.now() + 10 * 60 * 1000)]);
-  console.log(`[otp] Forgot password OTP for ${mobile}: ${code}`);
-
-  const sent = await sendOTP(mobile, code);
-  if (!sent) {
-    console.warn(`[otp] MSG91 failed to send forgot-password OTP to ${mobile}.`);
-  }
-
-  res.json({ ok: true, devOtp: code, message: "OTP sent for password reset" });
+  // OTP is sent client-side via the MSG91 OTP Widget. We only confirm the
+  // user exists so the client can proceed with widget verification.
+  res.json({ ok: true, message: "Proceed with OTP verification" });
 }));
 
 authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
-  const schema = z.object({ mobile: z.string().min(10), code: z.coerce.string().length(6), password: z.string().min(4) });
+  const schema = z.object({ mobile: z.string().min(10), accessToken: z.string(), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
-  const { code, password } = parse.data;
+  const { accessToken, password } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
 
-  const isDemoCode = code === "123456";
-  if (!isDemoCode) {
-    const otp = await queryOne<any>('SELECT * FROM "OtpCode" WHERE "mobile" = $1 AND "code" = $2 AND "expiresAt" > NOW() ORDER BY "createdAt" DESC LIMIT 1', [mobile, code]);
-    if (!otp) return res.status(400).json({ error: "Invalid or expired OTP" });
-  }
+  const verified = await verifyOtpForMobile(mobile, accessToken);
+  if (!verified) return res.status(400).json({ error: "Invalid or expired OTP" });
 
   const user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (!user) return res.status(404).json({ error: "User not found" });
 
   const hashedPassword = await bcrypt.hash(password, 10);
   await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
-  await exec('DELETE FROM "OtpCode" WHERE "mobile" = $1', [mobile]);
   res.json({ ok: true, message: "Password reset successfully" });
 }));
 
 authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
-    mobile: z.string().min(10), code: z.coerce.string().length(6),
+    mobile: z.string().min(10), accessToken: z.string(),
     name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin","ngo_admin"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
   });
@@ -112,19 +109,13 @@ authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
     console.log("[otp/verify] validation failed:", parse.error.flatten());
     return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   }
-  const { code, name, role, language, password } = parse.data;
+  const { accessToken, name, role, language, password } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
 
-  // Demo mode: static OTP bypass (remove when MSG91 is configured)
-  const isDemoCode = code === "123456";
-  if (!isDemoCode) {
-    const otp = await queryOne<any>('SELECT * FROM "OtpCode" WHERE "mobile" = $1 AND "code" = $2 AND "expiresAt" > NOW() ORDER BY "createdAt" DESC LIMIT 1', [mobile, code]);
-    if (!otp) {
-      console.log(`[otp/verify] OTP not found for ${mobile}, code=${code}`);
-      return res.status(400).json({ error: "Invalid or expired OTP" });
-    }
-  } else {
-    console.log(`[otp/verify] Demo OTP accepted for ${mobile}`);
+  const verified = await verifyOtpForMobile(mobile, accessToken);
+  if (!verified) {
+    console.log(`[otp/verify] verification failed for ${mobile}`);
+    return res.status(400).json({ error: "Invalid or expired OTP" });
   }
 
   let user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
@@ -139,7 +130,6 @@ authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
     await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
     user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   }
-  await exec('DELETE FROM "OtpCode" WHERE "mobile" = $1', [mobile]);
 
   const token = signToken(user!.id, user!.role);
   res.json({ token, user });

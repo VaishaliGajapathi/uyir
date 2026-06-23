@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
+import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp } from "../lib/msg91";
 import { useApp } from "../contexts/AppContext";
 import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
@@ -27,7 +28,6 @@ export default function Onboarding() {
   const [err, setErr] = useState("");
   const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
   const [otpCode, setOtpCode] = useState("");
-  const [devOtp, setDevOtp] = useState("");
 
   async function handleLogin() {
     setErr(""); setLoading(true);
@@ -51,7 +51,7 @@ export default function Onboarding() {
         setErr(lang === "ta" ? "இந்த எண்ணு உளாத பதிவு செய்கிறது. உள்நுழை செய்க." : "This number is already registered. Please sign in.");
         return;
       }
-      if (r.devOtp) setDevOtp(r.devOtp);
+      await sendWidgetOtp(mobile);
       setOtpStep("sent");
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
@@ -60,7 +60,8 @@ export default function Onboarding() {
     if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
     setErr(""); setLoading(true);
     try {
-      const r = await api.verifyOtp({ mobile, code: otpCode, name, role: "donor", language: lang, password });
+      const accessToken = await verifyWidgetOtp(otpCode);
+      const r = await api.verifyOtp({ mobile, accessToken, name, role: "donor", language: lang, password });
       login(r.token, r.user);
       nav(dashboardPathForRole(r.user.role));
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
@@ -75,6 +76,7 @@ export default function Onboarding() {
     setLoading(true);
     try {
       await api.forgotPassword(mobile);
+      await sendWidgetOtp(mobile);
       setOtpStep("sent");
       setView("reset");
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
@@ -84,7 +86,8 @@ export default function Onboarding() {
     if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
     setErr(""); setLoading(true);
     try {
-      const r = await api.resetPassword(mobile, otpCode, password);
+      const accessToken = await verifyWidgetOtp(otpCode);
+      const r = await api.resetPassword(mobile, accessToken, password);
       setView("login");
       setPassword("");
       setOtpCode("");
@@ -241,11 +244,6 @@ export default function Onboarding() {
                   <p className="text-xs text-blue-700">
                     {lang === "ta" ? "OTP உங்கள் மொபைலுக்கு அனுப்பப்பட்டது." : "OTP sent to your mobile."}
                   </p>
-                  {devOtp && (
-                    <p className="mt-1 text-[10px] text-blue-500">
-                      {lang === "ta" ? "படிதார் OTP: " : "Dev OTP: "}<span className="font-mono font-bold">{devOtp}</span>
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -270,7 +268,7 @@ export default function Onboarding() {
 
               {/* Resend OTP */}
               {otpStep === "sent" && !loading && (
-                <button type="button" onClick={handleSignup} className="w-full text-xs text-uyir-600 hover:underline">
+                <button type="button" onClick={() => { setErr(""); retryWidgetOtp().catch((e: any) => setErr(e.message)); }} className="w-full text-xs text-uyir-600 hover:underline">
                   {lang === "ta" ? "OTP மீண்டும் அனுப்பவும்" : "Resend OTP"}
                 </button>
               )}

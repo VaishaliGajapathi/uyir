@@ -104,12 +104,12 @@ export interface BloodRequest {
 
 export const api = {
   // auth
-  requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; devOtp: string; exists: boolean; hasPassword?: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
+  requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; exists: boolean; hasPassword?: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),
   login: (mobile: string, password: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile, password }) }),
   hospitalLogin: (data: { hospitalName: string; hospitalRegistrationId: string; mobile?: string }) => req<{ token: string; user: User }>("/auth/hospital/login", { method: "POST", body: JSON.stringify(data) }),
-  forgotPassword: (mobile: string) => req<{ ok: boolean; devOtp: string; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ mobile }) }),
-  resetPassword: (mobile: string, code: string, password: string) => req<{ ok: boolean; message: string }>("/auth/reset-password", { method: "POST", body: JSON.stringify({ mobile, code, password }) }),
+  forgotPassword: (mobile: string) => req<{ ok: boolean; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ mobile }) }),
+  resetPassword: (mobile: string, accessToken: string, password: string) => req<{ ok: boolean; message: string }>("/auth/reset-password", { method: "POST", body: JSON.stringify({ mobile, accessToken, password }) }),
   // users
   me: () => req<User>("/users/me"),
   updateMe: (data: Partial<User>) => req<User>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
