@@ -11,8 +11,6 @@ channel = "stable-25_05"
 [userenv.shared]
 PORT = "3000"
 NODE_ENV = "production"
-JWT_SECRET = "9f406c74302234699783bb48ac470f7ff2d177f6a97bd9dcd51d4eb4a0dd0270"
-MSG91_AUTH_KEY = "523489TNvwBf77VKz6a258520P1"
 
 [workflows]
 runButton = "Project"

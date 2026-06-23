@@ -3,6 +3,8 @@ dist/
 build/
 .env
 .env.local
+.env.production
+.env.development
 *.log
 server/prisma/*.db
 server/prisma/*.db-journal
