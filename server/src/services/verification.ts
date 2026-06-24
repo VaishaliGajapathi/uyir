@@ -1,5 +1,7 @@
 import { gemini, openai, falOpenRouter, MODELS, completeJSON, extractJson, hasGemini, hasFalOpenRouter, hasOpenAI, GEMINI_VISION_MODELS } from "../lib/ai.js";
 
+import { hasFal, callFalAI } from "../lib/ai.js";
+
 export interface VerificationResult {
   score: number; // 0-100
   verified: boolean;

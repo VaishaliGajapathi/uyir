@@ -1,5 +1,7 @@
 import webpush from "web-push";
 
+import type { PushSubscription as WebPushSubscription } from "web-push";
+
 // Configure VAPID keys
 webpush.setVapidDetails(
   "mailto:contact@uyir.org",
@@ -9,16 +11,25 @@ webpush.setVapidDetails(
 
 export interface PushSubscription {
   endpoint: string;
+  expirationTime?: number | null;
   keys: {
     p256dh: string;
     auth: string;
   };
 }
 
+function toWebPushSubscription(subscription: PushSubscription): WebPushSubscription {
+  return {
+    endpoint: subscription.endpoint,
+    expirationTime: subscription.expirationTime ?? null,
+    keys: subscription.keys,
+  };
+}
+
 export async function sendPushNotification(subscription: PushSubscription, title: string, body: string, data?: any) {
   try {
     const payload = JSON.stringify({ title, body, data });
-    await webpush.sendNotification(subscription, payload);
+    await webpush.sendNotification(toWebPushSubscription(subscription), payload);
     return { success: true };
   } catch (error: any) {
     console.error("[push] Failed to send notification:", error.message);
