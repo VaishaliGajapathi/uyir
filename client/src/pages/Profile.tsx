@@ -42,7 +42,6 @@ export function Profile() {
   const [showNotificationWarning, setShowNotificationWarning] = useState(false);
   const [pendingNotificationToggle, setPendingNotificationToggle] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [certificateOpen, setCertificateOpen] = useState(false);
   const [donations, setDonations] = useState<any[]>([]);
@@ -103,12 +102,6 @@ export function Profile() {
           ? `இந்த விவரங்கள் அவசியம்: ${missingDonorFields.join(", ")}`
           : `These details are required: ${missingDonorFields.join(", ")}`
       );
-      return;
-    }
-    if (!confirmed) {
-      alert(lang === "ta" 
-        ? "தயவுசெய்து உங்கள் வயது 18-65, எடை 45kg மேல் என்பதை உறுதிப்படுத்தவும்."
-        : "Please confirm you are 18-65 years old and above 45kg.");
       return;
     }
     setBusy(true);
@@ -383,20 +376,6 @@ export function Profile() {
           />
           <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தானம் செய்யவில்லை என்றால் விட்டுவிடவும்" : "Leave blank if never donated"}</p>
         </div>
-
-        <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-            className="mt-0.5 h-4 w-4"
-          />
-          <div className="text-[10px] text-slate-600">
-            <p className="font-semibold text-slate-700">
-              {lang === "ta" ? "நான் 18-65 வயது, 45kg மேல் எடை, இன்று ஆரோக்கியமாக உள்ளேன்" : "I confirm I am 18-65 years, above 45kg, and feeling well today"}
-            </p>
-          </div>
-        </label>
 
         {(hasChanges || isDonorSetup) && (
           <Button className="w-full py-0.5 text-[9px]" loading={busy} onClick={save}>
