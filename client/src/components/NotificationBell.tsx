@@ -46,23 +46,26 @@ export function NotificationBell() {
     setLoading(true);
     api.myAlerts()
       .then((r) => {
-        const mapped: AlertItem[] = r.map((resp: any) => ({
+        const mapped: AlertItem[] = (r || []).map((resp: any) => ({
           id: resp.id,
-          requestId: resp.requestId,
-          bloodGroup: resp.bloodGroup,
-          hospitalName: resp.hospitalName,
-          district: resp.district,
-          emergencyLevel: resp.emergencyLevel,
-          unitsRequired: resp.unitsRequired,
-          componentType: resp.componentType,
+          requestId: resp.requestId || resp.request?.id,
+          bloodGroup: resp.bloodGroup || resp.request?.bloodGroup,
+          hospitalName: resp.hospitalName || resp.request?.hospitalName,
+          district: resp.district || resp.request?.district,
+          emergencyLevel: resp.emergencyLevel || resp.request?.emergencyLevel,
+          unitsRequired: resp.unitsRequired || resp.request?.unitsRequired,
+          componentType: resp.componentType || resp.request?.componentType,
           status: resp.status,
-          createdAt: resp.createdAt,
+          createdAt: resp.createdAt || resp.request?.createdAt,
           distanceKm: resp.distanceKm,
           etaMinutes: resp.etaMinutes,
         }));
         setAlerts(mapped);
       })
-      .catch(() => {})
+      .catch((e) => {
+        console.error("Failed to load alerts:", e);
+        setAlerts([]);
+      })
       .finally(() => setLoading(false));
   }, [open]);
 

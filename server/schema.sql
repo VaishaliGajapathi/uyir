@@ -22,6 +22,7 @@ CREATE TABLE "User" (
     "password" TEXT,
     "role" TEXT NOT NULL DEFAULT 'donor',
     "language" TEXT NOT NULL DEFAULT 'ta',
+    "ngoName" TEXT,
     "district" TEXT,
     "taluk" TEXT,
     "bloodGroup" TEXT,

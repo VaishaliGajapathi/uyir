@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
-import { isNativeMobile, startSpeechRecognition, stopSpeechRecognition } from "../lib/nativeStt";
+import { isNativeMobile, startSpeechRecognition } from "../lib/nativeStt";
 
 // Records mic audio and sends to Whisper STT, returning transcript + parsed structure.
 export function VoiceButton({
@@ -46,6 +46,18 @@ export function VoiceButton({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  async function deliverResult(text: string, parsed: any = null) {
+    let nextParsed = parsed;
+    if (mode === "request" && text.trim() && (!nextParsed || Object.keys(nextParsed).length === 0)) {
+      try {
+        nextParsed = await api.parseRequest(text);
+      } catch (err) {
+        console.error("Voice parse error:", err);
+      }
+    }
+    onResult(text, nextParsed);
+  }
+
   async function start() {
     const useNative = isNativeMobile();
     setState("recording");
@@ -55,7 +67,7 @@ export function VoiceButton({
         const sttLang = language === "ta" ? "ta-IN" : "en-IN";
         const transcript = await startSpeechRecognition(sttLang);
         setState("processing");
-        onResult(transcript, null);
+        await deliverResult(transcript);
         setState("idle");
         return;
       }
@@ -72,8 +84,7 @@ export function VoiceButton({
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           setState("processing");
-          onResult(transcript, null);
-          setState("idle");
+          void deliverResult(transcript).finally(() => setState("idle"));
         };
 
         recognition.onerror = (event: any) => {
@@ -118,7 +129,7 @@ export function VoiceButton({
           console.log("Sending audio blob, size:", blob.size);
           const res = await api.transcribe(blob, mode, language);
           console.log("Transcription result:", res);
-          onResult(res.text, res.parsed);
+          await deliverResult(res.text, res.parsed);
         } catch (err: any) {
           console.error("Voice transcription error:", err);
           const errorMsg = err.message || "Voice failed";

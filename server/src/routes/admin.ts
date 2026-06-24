@@ -5,6 +5,8 @@ import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo } from "../middl
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
+const ADMIN_ROLES = ["admin", "verifier", "ngo_admin"] as const;
+
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch((err) => {
@@ -110,13 +112,20 @@ adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Req
 
 // Create admin user
 adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
-  const { name, mobile, role, password } = req.body;
+  const { name, mobile, role, password, district, ngoName } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
+  if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
+  if (role === "ngo_admin" && (!district || !ngoName)) {
+    return res.status(400).json({ error: "district and ngoName are required for NGO admins" });
+  }
   const bcrypt = await import("bcryptjs");
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+  const sanitizedMobile = mobile.replace(/\D/g, "").slice(-10);
+  const existingUser = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [sanitizedMobile]);
+  if (existingUser) return res.status(400).json({ error: "User with this mobile already exists" });
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","password","role","language","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,true,NOW()) RETURNING *',
-    [name, mobile.replace(/\D/g, "").slice(-10), hashedPassword, role || "admin", "ta"]
+    'INSERT INTO "User" ("id","name","mobile","password","role","language","verified","district","ngoName","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,true,$6,$7,NOW()) RETURNING *',
+    [name, sanitizedMobile, hashedPassword, role, "ta", role === "ngo_admin" ? district : null, role === "ngo_admin" ? ngoName : null]
   );
   res.status(201).json(user);
 }));

@@ -13,6 +13,8 @@ import { aiRouter } from "./routes/ai.js";
 import { impactRouter } from "./routes/impact.js";
 import { streamRouter } from "./routes/stream.js";
 import { adminRouter } from "./routes/admin.js";
+import { ngoRouter } from "./routes/ngo.js";
+import { exec } from "./db.js";
 import { TN_DISTRICT_NAMES } from "./lib/districts.js";
 
 process.on("uncaughtException", (err) => console.error("[FATAL] uncaughtException:", err));
@@ -24,6 +26,10 @@ const isProd = process.env.NODE_ENV === "production";
 
 const app = express();
 
+async function ensureRuntimeSchema() {
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoName" TEXT');
+}
+
 const allowedOrigins = [
   "https://uyirngo.in",
   "http://uyirngo.in",
@@ -32,6 +38,9 @@ const allowedOrigins = [
   "http://localhost:5000",
   "http://localhost:3000",
   "http://localhost:5173",
+  "http://localhost",
+  "capacitor://localhost",
+  "http://10.0.2.2",
 ];
 
 app.use(cors({
@@ -67,6 +76,7 @@ app.use("/api/ai", aiRouter);
 app.use("/api/impact", impactRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/ngo", ngoRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/requests", requestsRouter);
@@ -75,6 +85,7 @@ app.use("/ai", aiRouter);
 app.use("/impact", impactRouter);
 app.use("/stream", streamRouter);
 app.use("/admin", adminRouter);
+app.use("/ngo", ngoRouter);
 
 // Serve static frontend in production
 if (isProd) {
@@ -114,4 +125,12 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 const port = Number(process.env.PORT) || 3000;
 const host = "0.0.0.0";
-app.listen(port, host, () => console.log(`[uyir] API listening on http://${host}:${port}`));
+
+ensureRuntimeSchema()
+  .then(() => {
+    app.listen(port, host, () => console.log(`[uyir] API listening on http://${host}:${port}`));
+  })
+  .catch((err) => {
+    console.error("[startup] failed to ensure runtime schema", err);
+    process.exit(1);
+  });

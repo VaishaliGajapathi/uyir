@@ -10,22 +10,25 @@ export function HospitalLogin() {
   const { login } = useApp();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
-    hospitalName: "",
-    hospitalRegistrationId: "",
     mobile: "",
+    password: "",
   });
   const [err, setErr] = useState("");
 
   async function handleLogin() {
-    if (!form.hospitalName || !form.hospitalRegistrationId) {
-      setErr("Hospital name and registration ID are required");
+    if (!form.mobile || !form.password) {
+      setErr("Mobile and password are required");
       return;
     }
 
     setBusy(true);
     setErr("");
     try {
-      const res = await api.hospitalLogin(form);
+      const res = await api.login(form.mobile, form.password);
+      if (res.user.role !== "hospital_approver") {
+        setErr("This account is not a hospital approver");
+        return;
+      }
       login(res.token, res.user);
       nav("/hospital-dashboard");
     } catch (e: any) {
@@ -48,28 +51,21 @@ export function HospitalLogin() {
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Hospital Name</label>
-            <Input
-              placeholder="Enter hospital name"
-              value={form.hospitalName}
-              onChange={(e) => setForm({ ...form, hospitalName: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Hospital Registration ID</label>
-            <Input
-              placeholder="Enter registration ID"
-              value={form.hospitalRegistrationId}
-              onChange={(e) => setForm({ ...form, hospitalRegistrationId: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Mobile Number (Optional)</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Mobile Number</label>
             <Input
               placeholder="Enter mobile number"
               inputMode="numeric"
               value={form.mobile}
               onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+            <Input
+              type="password"
+              placeholder="Enter password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
           </div>
 

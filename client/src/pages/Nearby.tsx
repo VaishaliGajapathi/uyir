@@ -45,7 +45,7 @@ export function Nearby() {
         distanceKm: a.distanceKm ?? null,
         etaMinutes: a.etaMinutes ?? null,
         responseId: a.id,
-      }));
+      })).filter((a: any) => a.request); // Filter out alerts with missing request data
 
       setItems(normalized);
     } finally {
@@ -134,10 +134,10 @@ export function Nearby() {
                 </div>
                 <div className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-uyir-50 text-xl font-extrabold text-uyir-700">{r.bloodGroup}</div>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-uyir-50 text-xl font-extrabold text-uyir-700">{r?.bloodGroup || "?"}</div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-800">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ").replace("whole blood", "blood")}</p>
-                      <p className="flex items-center gap-1 truncate text-sm text-slate-500"><MapPin className="h-3.5 w-3.5" /> {r.hospitalName}, {r.district}</p>
+                      <p className="font-bold text-slate-800">{r?.unitsRequired || 0} unit(s) · {r?.componentType?.replace("_", " ").replace("whole blood", "blood") || "blood"}</p>
+                      <p className="flex items-center gap-1 truncate text-sm text-slate-500"><MapPin className="h-3.5 w-3.5" /> {r?.hospitalName || "Unknown"}, {r?.district || "Unknown"}</p>
                       <div className="mt-0.5 flex gap-3 text-[11px] text-slate-400">
                         {a.distanceKm != null && <span>{a.distanceKm} km away</span>}
                         {a.etaMinutes != null && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />~{a.etaMinutes} min</span>}
@@ -154,8 +154,8 @@ export function Nearby() {
                   {a.status === "accepted" && a.responseId && (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                        <span>You accepted · contact {r.contactPerson}</span>
-                        <a href={`tel:${r.contactNumber}`} className="font-bold underline">Call</a>
+                        <span>You accepted · contact {r?.contactPerson || "hospital"}</span>
+                        <a href={`tel:${r?.contactNumber || ""}`} className="font-bold underline">Call</a>
                       </div>
                       <Button className="w-full" loading={busy === a.id} onClick={() => act(a.id, async () => { const res = await api.completeResponse(a.responseId); if (res.newBadge) alert(`Donation complete! New badge: ${res.newBadge}`); })}>
                         <Droplet className="h-4 w-4" /> Mark donation complete
@@ -177,8 +177,8 @@ export function Nearby() {
               <Card key={d.id} className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-700">{d.request.patientName} · {d.request.bloodGroup}</p>
-                    <p className="text-xs text-slate-400">{d.request.hospitalName} · {new Date(d.completedAt).toLocaleDateString()}</p>
+                    <p className="text-sm font-semibold text-slate-700">{d.request?.patientName || "Unknown"} · {d.request?.bloodGroup || "Unknown"}</p>
+                    <p className="text-xs text-slate-400">{d.request?.hospitalName || "Unknown"} · {new Date(d.completedAt).toLocaleDateString()}</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => showCertificate(d)}>
                     <Award className="h-4 w-4" /> Certificate

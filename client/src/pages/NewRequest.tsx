@@ -23,6 +23,7 @@ export function NewRequest() {
   const [err, setErr] = useState("");
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [skipDocument, setSkipDocument] = useState(false);
   const [form, setForm] = useState<any>({
     patientFirstName: "", patientAge: null, patientGender: null, bloodGroup: "O+", componentType: "whole_blood", unitsRequired: 1,
     hospitalName: "", district: "",
@@ -183,9 +184,9 @@ export function NewRequest() {
     setErr(""); setBusy(true);
     try {
       const patientName = form.patientFirstName.trim();
-      const payload = { 
-        ...form, 
-        patientName, 
+      const payload = {
+        ...form,
+        patientName,
         unitsRequired: Number(form.unitsRequired),
         contactNumber: user?.mobile || "",
         contactPerson: user?.name || ""
@@ -193,7 +194,23 @@ export function NewRequest() {
       const r = await api.createRequest(payload);
       setRequestId(r.id);
       setPhase("documents");
-    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      // Handle backend field errors gracefully
+      if (e.message && typeof e.message === 'string') {
+        try {
+          const parsed = JSON.parse(e.message);
+          if (parsed.fieldErrors && (parsed.fieldErrors.lat || parsed.fieldErrors.lng)) {
+            setErr(lang === "ta"
+              ? "தயவுசெய்து இடத்தைப் பெறவும் (Capture Location) பொத்தானை அழுத்தவும்."
+              : "Please click the Capture Location button to set your location.");
+            return;
+          }
+        } catch {
+          // Not JSON, use original message
+        }
+      }
+      setErr(e.message);
+    } finally { setBusy(false); }
   }
 
   async function uploadDoc(e: any) {
@@ -247,12 +264,7 @@ export function NewRequest() {
 
   async function runVerify() {
     if (!requestId) return;
-    if ((!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable) {
-      setErr(lang === "ta"
-        ? `ஆவணம் சரிபார்க்கப்படவில்லை. தெளிவான மருத்துவமனை ஆவணத்தை மீண்டும் பதிவேற்றவும் (${MIN_DOCUMENT_VERIFY_SCORE}% அல்லது அதற்கு மேல் தேவை).`
-        : `Document verification has not passed yet. Please upload a clearer valid hospital document (${MIN_DOCUMENT_VERIFY_SCORE}% or above required).`);
-      return;
-    }
+    // Allow manual verification regardless of document score
     setPhase("verifying"); setBusy(true);
     try {
       const res: any = await api.verifyRequest(requestId);
@@ -452,6 +464,24 @@ export function NewRequest() {
                 ? "நோயாளியின் சமீபத்திய admission slip, prescription, admission நேரத்தில் கட்டிய hospital bill/receipt அல்லது doctor referral letter ஐ பதிவேற்றவும்."
                 : "Upload the patient's recent admission slip, prescription, hospital bill/receipt paid during admission, or doctor referral letter. AI will check the patient name, date, hospital identity, and registration details."}
             </p>
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
+              <input
+                type="checkbox"
+                checked={skipDocument}
+                onChange={(e) => setSkipDocument(e.target.checked)}
+                className="mt-0.5 h-4 w-4"
+              />
+              <div className="text-xs text-slate-600">
+                <p className="font-semibold text-slate-700">
+                  {lang === "ta" ? "ஆவணம் இல்லாமல் தொடரவும் (கைமுறை சரிபார்ப்பு)" : "Continue without document (manual verification)"}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  {lang === "ta"
+                    ? "நீங்கள் மருத்துவமனை ஆவணம் இல்லாமல் தொடரலாம். இந்த கோரிக்கை NGO அல்லது நிர்வாகியால் கைமுறையாக சரிபார்க்கப்படும்."
+                    : "You can continue without uploading a document. This request will be manually verified by NGO or admin."}
+                </p>
+              </div>
+            </label>
             <div className="mt-3 flex gap-3">
               <label className="flex-1 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-8 text-slate-500">
                 <Upload className="h-7 w-7" />
@@ -474,11 +504,11 @@ export function NewRequest() {
                 <p className="mt-1 text-xs">{docResult.notes}</p>
               </div>
             )}
-            {(!docResult || ((!docResult.verified || Number(docResult.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable)) && (
+            {(!docResult || (!docResult.verified || Number(docResult.score || 0) < MIN_DOCUMENT_VERIFY_SCORE)) && !skipDocument && (
               <p className="mt-3 text-xs text-amber-700">
                 {lang === "ta"
-                  ? `அடுத்த படிக்கு செல்ல ஆவணம் AI மூலம் சரிபார்க்கப்பட்டு குறைந்தது ${MIN_DOCUMENT_VERIFY_SCORE}% மதிப்பெண் பெற வேண்டும்.`
-                  : `To continue, the uploaded document must be AI-verified and score at least ${MIN_DOCUMENT_VERIFY_SCORE}%.`}
+                  ? `ஆவணம் AI சரிபார்ப்பில் தோல்வியடைந்தது. இருப்பினும், கைமுறை சரிபார்ப்புக்குத் தொடரலாம்.`
+                  : `Document AI verification failed. You can still continue for manual verification.`}
               </p>
             )}
             {documentAiUnavailable && (
@@ -494,10 +524,10 @@ export function NewRequest() {
             className="w-full"
             size="lg"
             loading={busy}
-            disabled={!docResult || ((!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) && !documentAiUnavailable)}
+            disabled={false}
             onClick={runVerify}
           >
-            <ShieldCheck className="h-4 w-4" /> {documentAiUnavailable ? (lang === "ta" ? "கைமுறை சரிபார்ப்புக்கு தொடரவும்" : "Continue to manual review") : (lang === "ta" ? "சரிபார்த்து தொடரவும்" : "Verify & Continue")}
+            <ShieldCheck className="h-4 w-4" /> {skipDocument || !docResult || (!docResult?.verified || Number(docResult?.score || 0) < MIN_DOCUMENT_VERIFY_SCORE) ? (lang === "ta" ? "கைமுறை சரிபார்ப்புக்கு தொடரவும்" : "Continue to manual review") : (lang === "ta" ? "சரிபார்த்து தொடரவும்" : "Verify & Continue")}
           </Button>
         </div>
       )}
@@ -519,7 +549,7 @@ export function NewRequest() {
             <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-2xl font-extrabold ${verification.verified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
               {verification.score}%
             </div>
-            <p className="mt-3 font-bold text-slate-800">{verification.verified ? "Verified Emergency" : "Needs human review"}</p>
+            <p className="mt-3 font-bold text-slate-800">{verification.verified ? "Verified Emergency" : "Manual verification required"}</p>
             <p className="mt-1 text-sm text-slate-500">{verification.notes}</p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {Object.entries(verification.checks).map(([k, v]) => (
@@ -570,7 +600,7 @@ export function NewRequest() {
             </Button>
           ) : (
             <Button variant="outline" className="w-full" size="lg" onClick={() => nav(`/request/${requestId}`)}>
-              <CheckCircle2 className="h-4 w-4" /> Submit for NGO verification
+              <CheckCircle2 className="h-4 w-4" /> Submit to Admin
             </Button>
           )}
         </div>

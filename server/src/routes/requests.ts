@@ -109,16 +109,32 @@ requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: 
     return new Date(doc.uploadedAt).getTime() > new Date(latest.uploadedAt).getTime() ? doc : latest;
   }, null) : null;
   if (!latestDocument) return res.status(400).json({ error: "Please upload a hospital document before verification." });
+  
+  // Allow manual verification regardless of AI result
   const documentAiUnavailable = Number(latestDocument.aiScore || 0) === 0 && String(latestDocument.aiNotes || "").includes("Automatic document verification could not run");
-  if (!documentAiUnavailable && (!latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE)) {
-    return res.status(400).json({ error: `Document verification failed. Upload a clearer valid hospital document (minimum score ${MIN_DOCUMENT_VERIFY_SCORE}%). Latest result: ${latestDocument.aiScore}%${latestDocument.aiNotes ? ` - ${latestDocument.aiNotes}` : ""}` });
-  }
+  const aiFailed = !latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE;
+  
   const baseResult = await verifyRequest(request, documents.length > 0);
-  const result = documentAiUnavailable ? { ...baseResult, verified: false, notes: `${baseResult.notes} Automatic document AI verification is unavailable, so this request requires NGO/manual review before alerts are sent.`, checks: { ...baseResult.checks, documentAutoVerificationUnavailable: true } } : baseResult;
-  const status = result.verified ? "verified" : "pending_verification";
-  await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [result.score, result.notes, status, request.id]);
+  
+  // If AI failed or unavailable, mark for manual review but don't block
+  if (documentAiUnavailable || aiFailed) {
+    const result = { 
+      ...baseResult, 
+      verified: false, 
+      notes: `${baseResult.notes} ${documentAiUnavailable ? "Automatic document AI verification is unavailable" : `AI verification failed (score: ${latestDocument.aiScore}%)`}, so this request requires NGO/manual review before alerts are sent.`, 
+      checks: { ...baseResult.checks, documentAutoVerificationUnavailable: documentAiUnavailable, aiVerificationFailed: aiFailed } 
+    };
+    const status = "pending_verification";
+    await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [result.score, result.notes, status, request.id]);
+    const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [request.id]);
+    return res.json({ request: updated, verification: result });
+  }
+  
+  // AI passed, proceed normally
+  const status = baseResult.verified ? "verified" : "pending_verification";
+  await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [baseResult.score, baseResult.notes, status, request.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [request.id]);
-  res.json({ request: updated, verification: result });
+  res.json({ request: updated, verification: baseResult });
 });
 
 requestsRouter.post("/:id/approve", requireAuth, async (req: AuthedRequest, res: any) => {

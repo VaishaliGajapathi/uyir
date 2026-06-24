@@ -5,6 +5,15 @@ export function isNativeMobile() {
   return Capacitor.isNativePlatform();
 }
 
+function extractTranscript(matches: any): string {
+  if (!Array.isArray(matches) || matches.length === 0) return "";
+  const first = matches[0];
+  if (typeof first === "string") return first;
+  if (first && typeof first.transcript === "string") return first.transcript;
+  if (Array.isArray(first) && typeof first[0]?.transcript === "string") return first[0].transcript;
+  return "";
+}
+
 export async function startSpeechRecognition(
   language: "en-IN" | "ta-IN" = "en-IN"
 ): Promise<string> {
@@ -17,36 +26,35 @@ export async function startSpeechRecognition(
     throw new Error("Speech recognition not available on this device");
   }
 
-  const { permission } = await SpeechRecognition.requestPermissions();
-  if (permission !== "granted") {
+  const permissions = await SpeechRecognition.requestPermissions();
+  if (permissions.speechRecognition !== "granted") {
     throw new Error("Microphone permission denied");
   }
 
   await SpeechRecognition.start({
     language,
     popup: false,
-    partialResults: false,
+    partialResults: true,
     maxResults: 1,
   });
 
   return new Promise((resolve, reject) => {
+    let resolved = false;
+
     SpeechRecognition.addListener("partialResults", (data) => {
-      // Ignore partial results, wait for final
-    });
-
-    SpeechRecognition.addListener("results", (data) => {
-      const transcript = data.matches?.[0]?.[0]?.transcript;
-      if (transcript) {
+      const transcript = extractTranscript(data.matches);
+      if (!resolved && transcript) {
+        resolved = true;
         resolve(transcript);
-      } else {
-        reject(new Error("No speech detected"));
+        void stopSpeechRecognition();
       }
-      void stopSpeechRecognition();
     });
 
-    SpeechRecognition.addListener("error", (error) => {
-      reject(new Error(error.error || "Speech recognition failed"));
-      void stopSpeechRecognition();
+    SpeechRecognition.addListener("listeningState", (data) => {
+      if (!resolved && data.status === "stopped") {
+        reject(new Error("No speech detected"));
+        void stopSpeechRecognition();
+      }
     });
   });
 }

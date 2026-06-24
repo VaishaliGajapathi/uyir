@@ -39,6 +39,7 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 
 export interface User {
   id: string; name: string; mobile: string; role: string; language: string;
+  ngoName?: string;
   district?: string; taluk?: string; bloodGroup?: string; gender?: string; age?: number;
   dob?: string; // Date of birth
   isPlateletDonor: boolean; shareLocation: boolean;
@@ -107,7 +108,6 @@ export const api = {
   requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; exists: boolean; hasPassword?: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),
   login: (mobile: string, password: string) => req<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ mobile, password }) }),
-  hospitalLogin: (data: { hospitalName: string; hospitalRegistrationId: string; mobile?: string }) => req<{ token: string; user: User }>("/auth/hospital/login", { method: "POST", body: JSON.stringify(data) }),
   forgotPassword: (mobile: string) => req<{ ok: boolean; message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ mobile }) }),
   resetPassword: (mobile: string, accessToken: string, password: string) => req<{ ok: boolean; message: string }>("/auth/reset-password", { method: "POST", body: JSON.stringify({ mobile, accessToken, password }) }),
   // users
@@ -170,9 +170,17 @@ export const api = {
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
   adminGetAdmins: () => req<any[]>("/admin/admins"),
   adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
-  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
+  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string; district?: string; ngoName?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
+  // ngo
+  ngoStats: () => req<{ district: string; ngoName?: string | null; totalUsers: number; totalDonors: number; totalRequests: number; pendingVerifications: number; activeRequests: number; completedDonations: number; livesSaved: number; totalHospitals: number }>("/ngo/stats"),
+  ngoRequests: () => req<any[]>("/ngo/requests"),
+  ngoPendingVerification: () => req<any[]>("/ngo/pending-verification"),
+  ngoHospitals: () => req<any[]>("/ngo/hospitals"),
+  ngoVerifyRequest: (id: string, approved: boolean, notes: string) => req(`/ngo/verify-request/${id}`, { method: "POST", body: JSON.stringify({ approved, notes }) }),
+  ngoVerifyHospital: (id: string) => req(`/ngo/hospitals/${id}/verify`, { method: "POST" }),
+  ngoRejectHospital: (id: string) => req(`/ngo/hospitals/${id}/reject`, { method: "POST" }),
   // hospital
   hospitalRegister: (data: { hospitalName: string; hospitalRegistrationId: string; district: string; address?: string; phone?: string; contactPerson: string; contactMobile: string; password: string }) => req<{ token: string; user: User; hospital: any }>("/auth/hospital/register", { method: "POST", body: JSON.stringify(data) }),
   getHealthTips: () => req("/ai/health-tips", { method: "POST" }),

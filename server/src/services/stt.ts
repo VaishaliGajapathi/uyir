@@ -35,6 +35,7 @@ export async function transcribeAudio(buffer: Buffer, filename = "audio.webm", l
 export interface ParsedRequest {
   patientName?: string;
   patientAge?: number;
+  patientGender?: string;
   bloodGroup?: string;
   componentType?: string;
   unitsRequired?: number;
@@ -71,17 +72,82 @@ export interface ParsedRequest {
    return undefined;
  }
 
- function extractPatientAge(text: string): number | undefined {
-   const numeric = text.match(/\bage\s*(?:is\s*)?(\d{1,3})\b/i) || text.match(/\b(\d{1,3})\s*(?:years?\s*old|years?|age)\b/i);
-   if (numeric) return Number(numeric[1]);
-   const words = text.match(/\b((?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and)(?:\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and))*)\s+(?:age|years?\s*old|years?)\b/i);
-   return words ? parseWordNumber(words[1]) : undefined;
+ function extractPatientGender(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  if (/\bfemale\b|\bwoman\b|\blady\b|\bgirl\b|\bபெண்\b|\bபெண்பா\b/i.test(lower)) return "female";
+  if (/\bmale\b|\bman\b|\bgent\b|\bboy\b|\bஆண்\b|\bஆண்பா\b/i.test(lower)) return "male";
+  return undefined;
+}
+
+function extractEmergencyLevel(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  if (/\bimmediate\b|\burgent\b|\bcritical\b|\bnow\b|\basap\b|\bஉடனடிக்கை\b|\bஅவசர\b/i.test(lower)) return "red";
+  if (/\b8\s*hour\b|\b8\s*hrs\b|\bwithin\s*8\b|\bஎட்டு\s*மணி\b/i.test(lower)) return "orange";
+  if (/\b24\s*hour\b|\b24\s*hrs\b|\btomorrow\b|\bநாளை\b|\b24\s*மணி\b/i.test(lower)) return "green";
+  return undefined;
+}
+
+function extractDistrict(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  // Town to district mapping for Tamil Nadu
+  const townToDistrict: Record<string, string> = {
+    "arakkonam": "Vellore",
+    "vellore": "Vellore",
+    "ranipet": "Ranipet",
+    "tirupathur": "Tirupathur",
+    "chennai": "Chennai",
+    "coimbatore": "Coimbatore",
+    "madurai": "Madurai",
+    "trichy": "Tiruchirappalli",
+    "salem": "Salem",
+    "tirunelveli": "Tirunelveli",
+    "erode": "Erode",
+    "thoothukudi": "Thoothukudi",
+    "dindigul": "Dindigul",
+    "kanchipuram": "Kanchipuram",
+    "chengalpattu": "Chengalpattu",
+    "cuddalore": "Cuddalore",
+    "kanyakumari": "Kanniyakumari",
+    "namakkal": "Namakkal",
+    "tiruppur": "Tiruppur",
+    "thanjavur": "Thanjavur",
+    "nagapattinam": "Nagapattinam",
+    "viluppuram": "Viluppuram",
+    "ariyalur": "Ariyalur",
+    "kallakurichi": "Kallakurichi",
+    "perambalur": "Perambalur",
+    "dharmapuri": "Dharmapuri",
+    "krishnagiri": "Krishnagiri",
+    "sivagangai": "Sivaganga",
+    "virudhunagar": "Virudhunagar",
+    "ramanathapuram": "Ramanathapuram",
+    "theni": "Theni",
+    "karur": "Karur",
+    "nagarkoil": "Kanniyakumari",
+  };
+  
+  for (const [town, district] of Object.entries(townToDistrict)) {
+    if (lower.includes(town)) return district;
+  }
+  return undefined;
+}
+
+function extractPatientAge(text: string): number | undefined {
+  const numeric = text.match(/\bage\s*(?:is\s*)?(\d{1,3})\b/i) || text.match(/\b(\d{1,3})\s*(?:years?\s*old|years?|age)\b/i);
+  if (numeric) return Number(numeric[1]);
+  
+  // Tamil age patterns: "வயது 33", "ஏஜ் 33", "நோயாளியின் வயது 33"
+  const tamilAge = text.match(/(?:வயது|ஏஜ்|வயதுக்கு)\s*(\d{1,3})/i) || text.match(/(?:நோயாளியின்\s*வயது|பேஷன்ட்\s*ஏஜ்)\s*(\d{1,3})/i);
+  if (tamilAge) return Number(tamilAge[1]);
+  
+  const words = text.match(/\b((?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and)(?:\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and))*)\s+(?:age|years?\s*old|years?)\b/i);
+  return words ? parseWordNumber(words[1]) : undefined;
  }
 
  function cleanHospitalName(value?: string): string | undefined {
    let text = String(value || "").replace(/["(),]/g, " ").replace(/\s+/g, " ").trim();
    if (!text) return undefined;
-   text = text.replace(/^(?:க்கு|ிக்கு|for|at|in|age|blood|unit|units|need|needs|required|patient|name|is|positive|negative|plus|minus|தேவைப்படுது|தேவை|ரெண்டு|இரண்டு|ஒரு|ஒன்று|two|three|four|five|six|seven|eight|nine|ten|thirty|forty|fifty|sixty|seventy|eighty|ninety|\d+\s*)+/i, "").trim();
+   text = text.replace(/^(?:க்கு|ிக்கு|for|at|in|age|blood|unit|units|need|needs|required|patient|name|is|positive|negative|plus|minus|தேவைப்படுது|தேவை|ரெண்டு|இரண்டு|ஒரு|ஒன்று|two|three|four|five|six|seven|eight|nine|ten|thirty|forty|fifty|sixty|seventy|eighty|ninety|\d+\s*|நோயாளியின்|பெயர்|வயது|ஏஜ்|பேஷன்|நேம்|பெண்|ஆண்|உடனடிக்கை|அவசர|மணி|நாளை|இரத்தம்|தேவை)+/i, "").trim();
    if (/\bmedical\b$/i.test(text)) text = `${text} Hospital`;
    return text || undefined;
  }
@@ -90,8 +156,11 @@ export interface ParsedRequest {
    return {
      ...parsed,
      patientAge: parsed.patientAge || extractPatientAge(text),
+     patientGender: parsed.patientGender || extractPatientGender(text),
      bloodGroup: normalizeBloodGroup(parsed.bloodGroup || text) || parsed.bloodGroup,
      hospitalName: cleanHospitalName(parsed.hospitalName) || cleanHospitalName(text.match(/([^.\n,]*\b(?:medical college hospital|medical college|hospital|clinic|nursing home|medical center|medical centre|health centre|health center|health city)\b)/i)?.[1]),
+     district: parsed.district || extractDistrict(text),
+     emergencyLevel: parsed.emergencyLevel || extractEmergencyLevel(text),
    };
  }
 
@@ -99,18 +168,27 @@ export interface ParsedRequest {
 export async function parseRequestFromText(text: string): Promise<ParsedRequest> {
   const prompt = `You convert a spoken blood/platelet request (Tamil or English) into JSON.
 Text: "${text}"
-Return ONLY JSON with keys: patientName, patientAge, bloodGroup (one of A+,A-,B+,B-,AB+,AB-,O+,O-),
+Return ONLY JSON with keys: patientName, patientAge, patientGender (male|female), bloodGroup (one of A+,A-,B+,B-,AB+,AB-,O+,O-),
 componentType (whole_blood|platelets|plasma), unitsRequired (number),
-hospitalName, district (Tamil Nadu district in English), emergencyLevel (green|orange|red).
-hospitalName must be only the clean hospital name without filler speech words.
-Omit keys you cannot infer.`;
+hospitalName, district (Tamil Nadu district in English, e.g., Vellore, Chennai, Coimbatore), emergencyLevel (green|orange|red).
+Rules:
+- Tamil patterns: "நோயாளியின் பெயர்" or "பேஷன் நேம்" or "பெயர்" → patientName
+- Tamil patterns: "நோயாளியின் வயது" or "வயது" or "ஏஜ்" → patientAge
+- Tamil patterns: "பெண்" or "பெண்பா" → female, "ஆண்" or "ஆண்பா" → male
+- Tamil patterns: "உடனடிக்கை" or "அவசர" → red, "எட்டு மணி" → orange, "24 மணி" or "நாளை" → green
+- Tamil numbers: ஒன்று=1, இரண்டு=2, மூன்று=3, நான்கு=4, ஐந்து=5, ஆறு=6, ஏழு=7, எட்டு=8, ஒன்பது=9, பத்து=10
+- patientGender: extract "male", "female", "man", "woman", "boy", "girl" from text
+- emergencyLevel: "immediate/urgent/critical" -> red, "8 hours/within 8" -> orange, "24 hours/tomorrow" -> green
+- district: map towns to districts (Arakkonam -> Vellore, etc.)
+- hospitalName: only the clean hospital name without filler words
+- Omit keys you cannot infer from the text.`;
   console.log("[STT] Parsing request with prompt:", prompt);
   const out = await completeJSON(prompt);
   console.log("[STT] Parsed result:", out);
   
-  // Fallback to regex parsing if LLM fails
-  if (!out || Object.keys(out).length === 0) {
-    console.log("[STT] LLM parsing failed, using regex fallback");
+  // Fallback to regex parsing if LLM fails or missing critical fields
+  if (!out || Object.keys(out).length === 0 || (!out.patientName && !out.patientAge)) {
+    console.log("[STT] LLM parsing failed or missing critical fields, using regex fallback");
     return sanitizeParsedRequest(parseRequestWithRegex(text), text);
   }
   
@@ -122,10 +200,16 @@ function parseRequestWithRegex(text: string): ParsedRequest {
   const result: ParsedRequest = {};
   const lowerText = text.toLowerCase();
   
-  // Extract patient name (Tamil: name before "க்கு", English: "for" or "name is")
-  const nameMatch = text.match(/([a-zA-Z\u0B80-\u0BFF]+)\s*க்கு|patient\s*([a-zA-Z\u0B80-\u0BFF]+)|name\s*is\s*([a-zA-Z\u0B80-\u0BFF]+)/i);
-  if (nameMatch) result.patientName = (nameMatch[1] || nameMatch[2] || nameMatch[3]).trim();
+  // Extract patient name (Tamil: after "நோயாளியின் பெயர்" or "பேஷன் நேம்" or "பெயர்")
+  // English: first word if it looks like a name, or before "age", "for", "க்கு"
+  const tamilNameMatch = text.match(/(?:நோயாளியின்\s*பெயர்|பேஷன்\s*நேம்|பெயர்|patient\s*name)\s+([\u0B80-\u0BFFa-zA-Z]+)/i);
+  const englishNameMatch = text.match(/^([\u0B80-\u0BFFa-zA-Z]+)\s+(?:age|வயது|is)/i) || text.match(/([\u0B80-\u0BFFa-zA-Z]+)\s*க்கு|patient\s*([\u0B80-\u0BFFa-zA-Z]+)|name\s*is\s*([\u0B80-\u0BFFa-zA-Z]+)/i);
+  if (tamilNameMatch) result.patientName = tamilNameMatch[1].trim();
+  else if (englishNameMatch) result.patientName = (englishNameMatch[1] || englishNameMatch[2] || englishNameMatch[3]).trim();
   result.patientAge = extractPatientAge(text);
+  result.patientGender = extractPatientGender(text);
+  result.emergencyLevel = extractEmergencyLevel(text);
+  result.district = extractDistrict(text);
   
   // Extract blood group
   const bloodGroup = normalizeBloodGroup(text);
@@ -163,12 +247,9 @@ function parseRequestWithRegex(text: string): ParsedRequest {
   const hospitalMatch = text.match(/([^.\n,]*\b(?:medical college hospital|medical college|hospital|clinic|nursing home|medical center|medical centre|health centre|health center|health city)\b)/i);
   if (hospitalMatch) result.hospitalName = cleanHospitalName(hospitalMatch[1]);
   
-  // Extract district (common Tamil Nadu districts)
-  const districts = ["chennai", "coimbatore", "madurai", "trichy", "salem", "tirunelveli", "vellore", "erode", "thoothukudi", "dindigul", "kanchipuram", "cuddalore", "kanyakumari", "namakkal", "tiruppur", "thanjavur", "nagapattinam", "viluppuram", "ariyalur", "kallakurichi", "perambalur", "chengalpattu", "ranipet", "tirupathur", "dharmapuri", "krishnagiri", "sivagangai", "virudhunagar", "ramanathapuram", "theni", "karur", "nagarkoil"];
-  const districtMatch = districts.find(d => lowerText.includes(d));
-  if (districtMatch) {
-    // Capitalize first letter
-    result.district = districtMatch.charAt(0).toUpperCase() + districtMatch.slice(1);
+  // Extract district (common Tamil Nadu districts and town-to-district mapping)
+  if (!result.district) {
+    result.district = extractDistrict(text);
   }
   
   // Default component type

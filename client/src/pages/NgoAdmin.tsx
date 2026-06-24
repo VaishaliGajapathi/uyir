@@ -44,9 +44,9 @@ export function NgoAdmin() {
     setLoading(true);
     try {
       const [s, r, h] = await Promise.all([
-        api.adminStats(),
-        api.adminRequests(),
-        api.adminHospitals(),
+        api.ngoStats(),
+        api.ngoRequests(),
+        api.ngoHospitals(),
       ]);
       setStats(s);
       setRequests(r);
@@ -61,7 +61,7 @@ export function NgoAdmin() {
   async function verifyHospital(id: string) {
     setBusy(id);
     try {
-      await api.adminVerifyHospital(id);
+      await api.ngoVerifyHospital(id);
       await loadAll();
     } catch (e: any) {
       alert(e.message);
@@ -100,7 +100,7 @@ export function NgoAdmin() {
               {lang === "ta" ? "NGO நிர்வாக மையம்" : "NGO Admin Dashboard"}
             </h1>
             <p className="text-xs text-slate-500">
-              {lang === "ta" ? "கோரிக்கைகள் & மருத்துவமனைகள் - முழு காட்சி" : "Requests & Hospitals — Full View"}
+              {user?.ngoName || "NGO"} · {stats?.district || user?.district || "District"}
             </p>
           </div>
         </div>
@@ -159,28 +159,28 @@ export function NgoAdmin() {
             <h3 className="mb-3 font-bold text-slate-800">
               {lang === "ta" ? "மாவட்டத்தின்படி மருத்துவமனைகள்" : "Hospitals by District"}
             </h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Object.entries(districtCounts.hospitals).map(([district, count]) => (
-                <div key={district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-sm font-medium text-slate-700">{district}</span>
-                  <Badge className="bg-emerald-100 text-emerald-700">{count as number}</Badge>
-                </div>
-              ))}
-            </div>
+            <div className="mb-3 flex flex-wrap gap-2 text-xs">
+            {(Object.entries(districtCounts.hospitals) as [string, number][]).map(([district, count]) => (
+              <div key={district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="text-sm font-medium text-slate-700">{district}</span>
+                <Badge className="bg-emerald-100 text-emerald-700">{count}</Badge>
+              </div>
+            ))}
+          </div>
           </Card>
 
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">
               {lang === "ta" ? "மாவட்டத்தின்படி கோரிக்கைகள்" : "Requests by District"}
             </h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Object.entries(districtCounts.requests).map(([district, count]) => (
-                <div key={district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-sm font-medium text-slate-700">{district}</span>
-                  <Badge className="bg-red-100 text-red-700">{count as number}</Badge>
-                </div>
-              ))}
-            </div>
+            <div className="mb-3 flex flex-wrap gap-2 text-xs">
+            {(Object.entries(districtCounts.requests) as [string, number][]).map(([district, count]) => (
+              <div key={district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="text-sm font-medium text-slate-700">{district}</span>
+                <Badge className="bg-red-100 text-red-700">{count}</Badge>
+              </div>
+            ))}
+          </div>
           </Card>
 
           <Card className="p-4">
@@ -208,7 +208,7 @@ export function NgoAdmin() {
             {lang === "ta" ? "அனைத்து கோரிக்கைகள்" : "All Requests"} ({requests.length})
           </h3>
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
-            {Object.entries(statusCounts).map(([status, count]) => (
+            {(Object.entries(statusCounts) as [string, number][]).map(([status, count]) => (
               <span key={status} className={`rounded-full px-3 py-1 font-semibold ${statusClass(status)}`}>
                 {status.replace(/_/g, " ")}: {count}
               </span>

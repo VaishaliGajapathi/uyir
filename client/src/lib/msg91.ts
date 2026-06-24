@@ -1,14 +1,9 @@
-// MSG91 OTP Widget integration (client-side).
-// Loads the MSG91 OTP provider script, initialises the widget with
-// exposeMethods=true, and wraps the callback-based window methods
-// (sendOtp / verifyOtp / retryOtp) in promises.
-//
+// MSG91 OTP Widget - Custom UI integration
+// Uses exposeMethods=true to get sendOtp, verifyOtp, retryOtp on window
 // On successful verifyOtp, MSG91 returns a signed access token which we
-// forward to our backend (/auth/otp/verify or /auth/reset-password) where it
-// is validated via the MSG91 verifyAccessToken API.
+// forward to our backend (/auth/otp/verify or /auth/reset-password) for validation
 
-// Production MSG91 OTP Widget — intentionally hardcoded so every environment
-// (dev, prod, all branches) uses the same live widget, never a test/demo one.
+// Production MSG91 OTP Widget credentials
 const WIDGET_ID = "3666676e5631333434353239";
 const TOKEN_AUTH = "523489TNvwBf77VKz6a258520P1";
 
@@ -22,9 +17,9 @@ declare global {
 }
 
 let initPromise: Promise<void> | null = null;
+let currentReqId: string | null = null;
 
 function initWidget(): Promise<void> {
-  if (typeof window.sendOtp === "function") return Promise.resolve();
   if (initPromise) return initPromise;
 
   initPromise = new Promise<void>((resolve, reject) => {
@@ -36,40 +31,41 @@ function initWidget(): Promise<void> {
       failure: () => {},
     };
 
-    const existing = document.getElementById("msg91-otp-provider") as HTMLScriptElement | null;
-    if (existing) {
-      const start = Date.now();
-      const poll = setInterval(() => {
-        if (typeof window.initSendOTP === "function") {
-          clearInterval(poll);
-          window.initSendOTP(configuration);
-          resolve();
-        } else if (Date.now() - start > 10000) {
-          clearInterval(poll);
-          reject(new Error("MSG91 widget failed to initialise"));
-        }
-      }, 100);
-      return;
-    }
+    // Load script with fallback URLs
+    const urls = [
+      "https://verify.msg91.com/otp-provider.js",
+      "https://verify.phone91.com/otp-provider.js"
+    ];
 
-    const script = document.createElement("script");
-    script.id = "msg91-otp-provider";
-    script.type = "text/javascript";
-    script.src = "https://verify.msg91.com/otp-provider.js";
-    script.onload = () => {
-      try {
+    let i = 0;
+    function attempt() {
+      const s = document.createElement("script");
+      s.src = urls[i];
+      s.async = true;
+      s.onload = () => {
         if (typeof window.initSendOTP === "function") {
           window.initSendOTP(configuration);
-          resolve();
-        } else {
-          reject(new Error("MSG91 widget script loaded but initSendOTP is missing"));
+          // Wait for methods to be exposed
+          setTimeout(() => {
+            if (typeof window.sendOtp === "function") {
+              resolve();
+            } else {
+              reject(new Error("MSG91 widget initialized but methods not exposed"));
+            }
+          }, 500);
         }
-      } catch (e) {
-        reject(e as Error);
-      }
-    };
-    script.onerror = () => reject(new Error("Failed to load MSG91 OTP widget"));
-    document.body.appendChild(script);
+      };
+      s.onerror = () => {
+        i++;
+        if (i < urls.length) {
+          attempt();
+        } else {
+          reject(new Error("Failed to load MSG91 OTP widget from all URLs"));
+        }
+      };
+      document.head.appendChild(s);
+    }
+    attempt();
   });
 
   return initPromise;
@@ -79,42 +75,71 @@ function formatIdentifier(mobile: string): string {
   return `91${mobile.replace(/\D/g, "").slice(-10)}`;
 }
 
-export async function sendWidgetOtp(mobile: string): Promise<void> {
+// Initialize widget on module load
+void initWidget();
+
+// Send OTP using MSG91 custom UI
+export async function sendWidgetOtp(mobile: string): Promise<string> {
   await initWidget();
-  return new Promise<void>((resolve, reject) => {
-    if (typeof window.sendOtp !== "function") return reject(new Error("OTP widget not ready"));
+  return new Promise<string>((resolve, reject) => {
+    if (typeof window.sendOtp !== "function") {
+      return reject(new Error("OTP widget not ready"));
+    }
     window.sendOtp(
       formatIdentifier(mobile),
-      () => resolve(),
+      (data: any) => {
+        // Store reqId for verify/retry
+        currentReqId = typeof data === "string" ? data : data?.reqId || data?.requestId;
+        resolve(currentReqId || "sent");
+      },
       (error: any) => reject(new Error(error?.message || "Failed to send OTP"))
     );
   });
 }
 
+// Verify OTP using MSG91 custom UI
 export async function verifyWidgetOtp(otp: string): Promise<string> {
   await initWidget();
   return new Promise<string>((resolve, reject) => {
-    if (typeof window.verifyOtp !== "function") return reject(new Error("OTP widget not ready"));
+    if (typeof window.verifyOtp !== "function") {
+      return reject(new Error("OTP widget not ready"));
+    }
+    console.log("[msg91] Calling verifyOtp with:", otp, "reqId:", currentReqId);
     window.verifyOtp(
       otp,
       (data: any) => {
-        const accessToken = typeof data === "string" ? data : data?.message || data?.accessToken;
-        if (accessToken) resolve(accessToken);
-        else reject(new Error("OTP verified but no access token returned"));
+        console.log("[msg91] verifyOtp success callback:", data);
+        const accessToken = typeof data === "string" ? data : data?.message || data?.accessToken || data?.token;
+        if (accessToken) {
+          currentReqId = null;
+          console.log("[msg91] Access token extracted:", accessToken);
+          resolve(accessToken);
+        } else {
+          console.error("[msg91] No access token in response:", data);
+          reject(new Error("OTP verified but no access token returned"));
+        }
       },
-      (error: any) => reject(new Error(error?.message || "Invalid OTP"))
+      (error: any) => {
+        console.error("[msg91] verifyOtp error callback:", error);
+        reject(new Error(error?.message || "Invalid OTP"));
+      },
+      currentReqId || undefined
     );
   });
 }
 
+// Retry OTP using MSG91 custom UI
 export async function retryWidgetOtp(): Promise<void> {
   await initWidget();
   return new Promise<void>((resolve, reject) => {
-    if (typeof window.retryOtp !== "function") return reject(new Error("OTP widget not ready"));
+    if (typeof window.retryOtp !== "function") {
+      return reject(new Error("OTP widget not ready"));
+    }
     window.retryOtp(
-      null,
+      "11", // SMS channel code
       () => resolve(),
-      (error: any) => reject(new Error(error?.message || "Failed to resend OTP"))
+      (error: any) => reject(new Error(error?.message || "Failed to resend OTP")),
+      currentReqId || undefined
     );
   });
 }

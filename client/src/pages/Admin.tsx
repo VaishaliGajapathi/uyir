@@ -18,10 +18,11 @@ export function Admin() {
   const [fraudReports, setFraudReports] = useState<any[]>([]);
   const [hospitals, setHospitals] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", role: "admin", password: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", role: "admin", password: "", district: "", ngoName: "" });
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
@@ -78,6 +79,10 @@ export function Admin() {
     if (user?.role !== "admin" && user?.role !== "verifier") return;
     loadAll();
   }, [user]);
+
+  useEffect(() => {
+    api.districts().then(setDistricts).catch(() => {});
+  }, []);
 
   async function loadAll() {
     setLoading(true);
@@ -197,11 +202,15 @@ export function Admin() {
       alert("Please fill all required fields");
       return;
     }
+    if (adminForm.role === "ngo_admin" && (!adminForm.ngoName || !adminForm.district)) {
+      alert("Please provide NGO name and district for NGO admin");
+      return;
+    }
     setBusy("createAdmin");
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", role: "admin", password: "" });
+      setAdminForm({ name: "", mobile: "", role: "admin", password: "", district: "", ngoName: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -664,6 +673,27 @@ export function Admin() {
                   value={adminForm.password}
                   onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
                 />
+                {adminForm.role === "ngo_admin" && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="NGO Name"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.ngoName}
+                      onChange={(e) => setAdminForm({ ...adminForm, ngoName: e.target.value })}
+                    />
+                    <select
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.district}
+                      onChange={(e) => setAdminForm({ ...adminForm, district: e.target.value })}
+                    >
+                      <option value="">Select district</option>
+                      {districts.map((district) => (
+                        <option key={district} value={district}>{district}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button size="sm" loading={busy === "createAdmin"} onClick={createAdmin}>Create</Button>
@@ -677,6 +707,9 @@ export function Admin() {
                 <div>
                   <p className="text-sm font-semibold text-slate-700">{a.name}</p>
                   <p className="text-xs text-slate-400">{a.mobile} · {a.role} · {timeAgo(a.createdAt)}</p>
+                  {a.role === "ngo_admin" && (
+                    <p className="text-xs text-slate-400">{a.ngoName} · {a.district}</p>
+                  )}
                 </div>
                 <Badge className={a.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}>{a.role}</Badge>
               </div>

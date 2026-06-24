@@ -47,8 +47,6 @@ export function Profile() {
   const [certificateOpen, setCertificateOpen] = useState(false);
   const [donations, setDonations] = useState<any[]>([]);
   const [loadingDonations, setLoadingDonations] = useState(false);
-  const [healthTips, setHealthTips] = useState<any>(null);
-  const [loadingHealthTips, setLoadingHealthTips] = useState(false);
   const isDonorSetup = searchParams.get("completeDonor") === "1";
   const missingDonorFields = getMissingDonorFields(user, form, lang);
 
@@ -78,16 +76,7 @@ export function Profile() {
       form.lastDonationDate !== user.lastDonationDate ||
       form.notificationsEnabled !== user.notificationsEnabled ||
       form.voiceEnabled !== user.voiceEnabled ||
-      form.locationEnabled !== user.locationEnabled ||
-      form.age !== user.age ||
-      form.dob !== user.dob ||
-      form.gender !== user.gender ||
-      form.weight !== user.weight ||
-      form.height !== user.height ||
-      form.hemoglobinLevel !== user.hemoglobinLevel ||
-      form.sleepHours !== user.sleepHours ||
-      form.drinkingHabits !== user.drinkingHabits ||
-      form.smokingHabits !== user.smokingHabits;
+      form.locationEnabled !== user.locationEnabled;
     setHasChanges(changed);
     return changed;
   };
@@ -106,19 +95,6 @@ export function Profile() {
       newForm.locationEnabled !== user.locationEnabled;
     setHasChanges(changed);
   };
-
-  async function loadHealthTips() {
-    if (loadingHealthTips) return;
-    setLoadingHealthTips(true);
-    try {
-      const tips = await api.getHealthTips();
-      setHealthTips(tips);
-    } catch (e: any) {
-      alert(e.message || "Failed to load health tips");
-    } finally {
-      setLoadingHealthTips(false);
-    }
-  }
 
   async function save() {
     if (missingDonorFields.length > 0) {
@@ -408,65 +384,6 @@ export function Profile() {
           <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தானம் செய்யவில்லை என்றால் விட்டுவிடவும்" : "Leave blank if never donated"}</p>
         </div>
 
-        <div className="border-t border-slate-200 pt-3">
-          <p className="mb-2 text-xs font-semibold text-slate-700">{lang === "ta" ? "ஆரோக்கிய தரவு (விருப்பம்)" : "Health Data (Optional)"}</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "வயது" : "Age"}</label>
-              <input type="number" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.age || ""} onChange={(e) => handleFormChange("age", e.target.value ? Number(e.target.value) : null)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "பிறந்த தேதி" : "Date of Birth"}</label>
-              <input type="date" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.dob ? new Date(form.dob).toISOString().split('T')[0] : ""} onChange={(e) => handleFormChange("dob", e.target.value || null)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "பாலினம்" : "Gender"}</label>
-              <select className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.gender || ""} onChange={(e) => handleFormChange("gender", e.target.value || null)}>
-                <option value="">{lang === "ta" ? "தேர்வு" : "Select"}</option>
-                <option value="male">{lang === "ta" ? "ஆண்" : "Male"}</option>
-                <option value="female">{lang === "ta" ? "பெண்" : "Female"}</option>
-                <option value="other">{lang === "ta" ? "மற்ற" : "Other"}</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "எடை (kg)" : "Weight (kg)"}</label>
-              <input type="number" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.weight || ""} onChange={(e) => handleFormChange("weight", e.target.value ? Number(e.target.value) : null)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "உயரம் (cm)" : "Height (cm)"}</label>
-              <input type="number" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.height || ""} onChange={(e) => handleFormChange("height", e.target.value ? Number(e.target.value) : null)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "ஹீமோகுளோபின் (g/dL)" : "Hemoglobin (g/dL)"}</label>
-              <input type="number" step="0.1" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.hemoglobinLevel || ""} onChange={(e) => handleFormChange("hemoglobinLevel", e.target.value ? Number(e.target.value) : null)} />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "தூங்கும் நேரம் (மணி)" : "Sleep Hours"}</label>
-              <input type="number" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.sleepHours || ""} onChange={(e) => handleFormChange("sleepHours", e.target.value ? Number(e.target.value) : null)} />
-            </div>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "குடிப்பழக்கம்" : "Drinking Habits"}</label>
-              <select className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.drinkingHabits || ""} onChange={(e) => handleFormChange("drinkingHabits", e.target.value || null)}>
-                <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                <option value="none">{lang === "ta" ? "இல்லை" : "None"}</option>
-                <option value="occasional">{lang === "ta" ? "சிலநேரம்" : "Occasional"}</option>
-                <option value="regular">{lang === "ta" ? "தொடர்ந்து" : "Regular"}</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-slate-500">{lang === "ta" ? "புகைப்பழக்கம்" : "Smoking Habits"}</label>
-              <select className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" value={form.smokingHabits || ""} onChange={(e) => handleFormChange("smokingHabits", e.target.value || null)}>
-                <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                <option value="none">{lang === "ta" ? "இல்லை" : "None"}</option>
-                <option value="occasional">{lang === "ta" ? "சிலநேரம்" : "Occasional"}</option>
-                <option value="regular">{lang === "ta" ? "தொடர்ந்து" : "Regular"}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2">
           <input
             type="checkbox"
@@ -487,10 +404,6 @@ export function Profile() {
           </Button>
         )}
       </Card>
-
-      <p className="mb-3 text-[10px] text-slate-500 text-center">
-        {lang === "ta" ? "குறிப்பு: இறுதி தகுதி மருத்துவமனையில் மருத்துவரால் சரிபார்க்கப்படும். UYIR ஆரோக்கிய தரவை சேமிக்காது." : "Note: Final eligibility checked by doctor at hospital. UYIR does not store health data."}
-      </p>
 
       {/* Notification Preferences */}
       <Card className="mb-4 p-4">
@@ -589,70 +502,17 @@ export function Profile() {
         </div>
       )}
 
-      {/* Health Tips */}
-      <Card className="mb-4 space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">{lang === "ta" ? "ஆரோக்கிய குறிப்புகள்" : "Health Tips"}</h3>
-          <Button size="sm" variant="outline" onClick={loadHealthTips} loading={loadingHealthTips}>
-            {lang === "ta" ? "AI ஆரோக்கியம்" : "AI Health Check"}
-          </Button>
-        </div>
-        {healthTips && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Badge className={healthTips.eligible ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}>
-                {healthTips.eligible ? (lang === "ta" ? "தகுதி" : "Eligible") : (lang === "ta" ? "தகுதி இல்லை" : "Not Eligible")}
-              </Badge>
-              <span className="text-xs text-slate-500">{healthTips.eligibilityReason}</span>
-              <span className="ml-auto text-xs font-bold text-uyir-600">{healthTips.eligibilityScore}/100</span>
-            </div>
-            {healthTips.bmi && (
-              <div className="rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                BMI: {healthTips.bmi.toFixed(1)} ({healthTips.bmiCategory})
-              </div>
-            )}
-            <div>
-              <p className="mb-1 text-xs font-semibold text-slate-700">{lang === "ta" ? "குறிப்புகள்" : "Tips"}</p>
-              <ul className="space-y-1">
-                {(healthTips.tips || []).map((tip: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-uyir-400" />
-                    {tip}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold text-slate-700">{lang === "ta" ? "முன்னறிவிப்புகள்" : "Predictions"}</p>
-              <ul className="space-y-1">
-                {(healthTips.predictions || []).map((p: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold text-slate-700">{lang === "ta" ? "தானத்திற்கு பிறகு" : "Post-Donation"}</p>
-              <ul className="space-y-1">
-                {(healthTips.postDonationTips || []).map((t: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-        {!healthTips && !loadingHealthTips && (
-          <p className="text-xs text-slate-400">{lang === "ta" ? "உங்கள் ஆரோக்கிய தரவை சேமித்து, AI ஆரோக்கியக் குறிப்புகளைப் பெறுங்கள்." : "Save your health data and click AI Health Check for personalized tips."}</p>
-        )}
-      </Card>
-
       <Card className="space-y-2 p-4">
         <h3 className="mb-2 font-bold text-slate-800">{lang === "ta" ? "ஆதரவு" : "Support"}</h3>
+        <div className="flex items-center justify-center gap-4 py-2 text-xs text-slate-600">
+          <a href="tel:+919940874198" className="flex items-center gap-1 hover:text-uyir-600 transition">
+            +91 9940874198
+          </a>
+          <span className="text-slate-300">|</span>
+          <a href="mailto:support@uyirngo.in" className="flex items-center gap-1 hover:text-uyir-600 transition">
+            support@uyirngo.in
+          </a>
+        </div>
         <Button variant="outline" className="w-full" onClick={() => nav("/rate-us")}>
           <Award className="h-4 w-4" /> {lang === "ta" ? "எங்களை மதிப்பிடுங்கள்" : "Rate Us"}
         </Button>

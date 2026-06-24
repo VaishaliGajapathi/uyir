@@ -57,14 +57,22 @@ export default function Onboarding() {
   }
 
   async function verifySignup() {
-    if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
+    if (!otpCode || otpCode.length < 4) { setErr("Please enter the OTP."); return; }
     setErr(""); setLoading(true);
     try {
+      console.log("[Onboarding] Verifying OTP with MSG91...");
       const accessToken = await verifyWidgetOtp(otpCode);
+      console.log("[Onboarding] MSG91 access token received:", accessToken);
+      console.log("[Onboarding] Calling backend verifyOtp...");
       const r = await api.verifyOtp({ mobile, accessToken, name, role: "donor", language: lang, password });
+      console.log("[Onboarding] Backend response:", r);
       login(r.token, r.user);
+      console.log("[Onboarding] Navigating to dashboard:", dashboardPathForRole(r.user.role));
       nav(dashboardPathForRole(r.user.role));
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) {
+      console.error("[Onboarding] Verification error:", e);
+      setErr(e.message);
+    } finally { setLoading(false); }
   }
 
   async function handleForgot() {
@@ -83,7 +91,7 @@ export default function Onboarding() {
   }
 
   async function handleReset() {
-    if (!otpCode || otpCode.length < 6) { setErr("Please enter the 6-digit OTP."); return; }
+    if (!otpCode || otpCode.length < 4) { setErr("Please enter the OTP."); return; }
     setErr(""); setLoading(true);
     try {
       const accessToken = await verifyWidgetOtp(otpCode);
@@ -107,7 +115,7 @@ export default function Onboarding() {
           {/* Language Toggle */}
           <div className="mb-4 flex gap-2">
             {(["ta", "en"] as Lang[]).map((l) => (
-              <button key={l} onClick={() => setLang(l)}
+              <button key={l} onClick={() => { setLang(l); setErr(""); }}
                 className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${lang === l ? "bg-uyir-600 text-white" : "bg-slate-100 text-slate-500"}`}>
                 {l === "ta" ? "தமிழ்" : "English"}
               </button>
@@ -251,14 +259,14 @@ export default function Onboarding() {
               {otpStep === "sent" && (
                 <div>
                   <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "OTP எண்" : "OTP Code"}</label>
-                  <input type="tel" inputMode="numeric" placeholder="123456" maxLength={6}
+                  <input type="tel" inputMode="numeric" placeholder="1234" maxLength={6}
                     value={otpCode} onChange={(e) => setOtpCode(String(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 p-3 text-sm text-center tracking-widest font-mono text-lg outline-none focus:border-uyir-500" />
                 </div>
               )}
 
               <Button className="w-full" size="md" loading={loading}
-                disabled={mobile.length < 10 || !name || !password || !consent || (otpStep === "sent" && otpCode.length < 6)}
+                disabled={mobile.length < 10 || !name || !password || !consent || (otpStep === "sent" && otpCode.length < 4)}
                 onClick={otpStep === "sent" ? verifySignup : handleSignup}>
                 <Phone className="h-4 w-4" />
                 {otpStep === "sent"
@@ -359,7 +367,7 @@ export default function Onboarding() {
               </div>
 
               <Button className="w-full" size="md" loading={loading}
-                disabled={otpCode.length < 6 || password.length < 4}
+                disabled={otpCode.length < 4 || password.length < 4}
                 onClick={handleReset}>
                 <ShieldCheck className="h-4 w-4" /> {lang === "ta" ? "கடவுச்சொல் மாற்று" : "Reset Password"}
               </Button>

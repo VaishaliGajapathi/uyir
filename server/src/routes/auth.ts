@@ -101,7 +101,7 @@ authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
 authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), accessToken: z.string(),
-    name: z.string().optional(), role: z.enum(["donor","requester","verifier","admin","ngo_admin"]).optional(),
+    name: z.string().optional(), role: z.enum(["donor","requester"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
   });
   const parse = schema.safeParse(req.body);
