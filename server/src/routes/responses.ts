@@ -14,9 +14,14 @@ responsesRouter.get("/mine", requireAuth, async (req: AuthedRequest, res: any) =
 });
 
 responsesRouter.post("/for-request/:requestId/accept", requireAuth, async (req: AuthedRequest, res: any) => {
+  if (req.role !== "donor") return res.status(403).json({ error: "Only donors can accept requests" });
   const request = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.requestId]);
   if (!request) return res.status(404).json({ error: "Request not found" });
+  if (request.createdById === req.userId) return res.status(400).json({ error: "You cannot accept your own request" });
   if (["completed", "closed"].includes(request.status)) return res.status(400).json({ error: "Request is already closed or completed" });
+  if (!["verified", "alert_sent", "donor_accepted"].includes(String(request.status || ""))) {
+    return res.status(400).json({ error: "This request is not yet verified for donor acceptance" });
+  }
 
   let resp = await queryOne<any>('SELECT * FROM "DonorResponse" WHERE "requestId" = $1 AND "donorId" = $2 LIMIT 1', [req.params.requestId, req.userId]);
   if (resp) {

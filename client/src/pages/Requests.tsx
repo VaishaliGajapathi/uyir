@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Filter } from "lucide-react";
 import { api, type BloodRequest } from "../lib/api";
+import { useApp } from "../contexts/AppContext";
 import { Card, Button, Spinner } from "../components/ui";
 import { emergencyMeta, statusMeta, timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS } from "../lib/constants";
 
 export function Requests() {
   const nav = useNavigate();
+  const { user } = useApp();
   const [list, setList] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -49,13 +51,14 @@ export function Requests() {
       {loading ? <Spinner /> : list.length === 0 ? (
         <div className="rounded-2xl bg-white py-16 text-center">
           <Filter className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-          <p className="text-sm text-slate-400">No verified requests match.</p>
+          <p className="text-sm text-slate-400">No requests match these filters.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {list.map((r) => {
             const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
             const sm = statusMeta[r.status];
+            const isOwnRequest = r.createdById === user?.id;
             return (
               <Card key={r.id} className={`overflow-hidden ring-1 ${em.ring} ring-opacity-30`}>
                 <button className="flex w-full items-center gap-3 p-4 text-left" onClick={() => nav(`/request/${r.id}`)}>
@@ -63,6 +66,7 @@ export function Requests() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate font-bold text-slate-800">{r.patientName}</p>
+                      {isOwnRequest && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">My request</span>}
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${em.color}`}>{em.label}</span>
                     </div>
                     <p className="truncate text-sm text-slate-500">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ")}</p>
@@ -71,7 +75,7 @@ export function Requests() {
                 </button>
                 <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2">
                   {sm && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sm.color}`}>{sm.label}</span>}
-                  <span className="text-[11px] text-slate-400">{r._count?.responses ?? 0} donors alerted</span>
+                  <span className="text-[11px] text-slate-400">{isOwnRequest ? "Visible to you" : user?.role === "donor" ? "Visible in your district" : `${r._count?.responses ?? 0} donors alerted`}</span>
                 </div>
               </Card>
             );
