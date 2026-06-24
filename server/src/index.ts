@@ -34,6 +34,7 @@ const allowedOrigins = [
   "https://uyirngo.in",
   "http://uyirngo.in",
   "https://www.uyirngo.in",
+  "https://uyirngo.netlify.app",
   "https://uyirproduction.onrender.com",
   "http://localhost:5000",
   "http://localhost:3000",
