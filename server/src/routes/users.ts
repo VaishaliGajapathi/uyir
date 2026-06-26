@@ -20,22 +20,22 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     taluk: z.string().optional(),
     bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
     gender: z.enum(["male", "female"]).optional(),
-    age: z.number().int().min(18).max(100).optional(),
+    age: z.union([z.number().int().min(18).max(100), z.null()]).optional(),
     isPlateletDonor: z.boolean().optional(),
     shareLocation: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
     voiceEnabled: z.boolean().optional(),
     locationEnabled: z.boolean().optional(),
     pincode: z.string().optional(),
-    weight: z.number().positive().optional(),
-    height: z.number().positive().optional(),
-    hemoglobinLevel: z.number().positive().optional(),
-    sleepHours: z.number().int().min(0).max(24).optional(),
+    weight: z.union([z.number().positive(), z.null()]).optional(),
+    height: z.union([z.number().positive(), z.null()]).optional(),
+    hemoglobinLevel: z.union([z.number().positive(), z.null()]).optional(),
+    sleepHours: z.union([z.number().int().min(0).max(24), z.null()]).optional(),
     drinkingHabits: z.string().optional(),
     smokingHabits: z.string().optional(),
-    lastDonationDate: z.string().optional(),
-    dob: z.string().optional(),
-  });
+    lastDonationDate: z.union([z.string(), z.null()]).optional(),
+    dob: z.union([z.string(), z.null()]).optional(),
+  }).passthrough();
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   
