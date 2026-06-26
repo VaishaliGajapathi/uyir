@@ -2,12 +2,21 @@ import webpush from "web-push";
 
 import type { PushSubscription as WebPushSubscription } from "web-push";
 
-// Configure VAPID keys
-webpush.setVapidDetails(
-  "mailto:contact@uyir.org",
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Configure VAPID keys only if both are set
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+let pushEnabled = false;
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    "mailto:contact@uyir.org",
+    vapidPublicKey,
+    vapidPrivateKey
+  );
+  pushEnabled = true;
+} else {
+  console.warn("[push] VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY not set — web push notifications disabled");
+}
 
 export interface PushSubscription {
   endpoint: string;
@@ -27,6 +36,7 @@ function toWebPushSubscription(subscription: PushSubscription): WebPushSubscript
 }
 
 export async function sendPushNotification(subscription: PushSubscription, title: string, body: string, data?: any) {
+  if (!pushEnabled) return { success: false, reason: "push_disabled" };
   try {
     const payload = JSON.stringify({ title, body, data });
     await webpush.sendNotification(toWebPushSubscription(subscription), payload);
