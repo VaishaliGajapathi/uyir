@@ -34,6 +34,71 @@ export function NewRequest() {
   useEffect(() => { api.districts().then(setDistricts).catch(() => {}); }, []);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
+  function extractVoicePatientName(text: string) {
+    const match = text.match(/(?:நோயாளியின்\s*பெயர்|பேஷன்(?:ட்)?\s*நேம்|patient\s*name|பெயர்|name)\s*(?:is|:|வந்து)?\s*([\u0B80-\u0BFFa-zA-Z]+(?:\s+[\u0B80-\u0BFFa-zA-Z]+){0,3})/i);
+    if (!match) return undefined;
+    return match[1].replace(/(?:\b(?:age|years?|old|blood|group|unit|units|required|need(?:ed|s)?)\b|வயது|ஏஜ்|இயர்ஸ்|ஓல்ட்|யூனிட்|தேவை).*$/i, "").trim() || undefined;
+  }
+
+  function extractVoiceAge(text: string) {
+    const numeric = text.match(/\bage\s*(?:is\s*)?(\d{1,3})\b/i)
+      || text.match(/\b(\d{1,3})\s*(?:years?\s*old|years?|age|இயர்ஸ்\s*ஓல்ட்|இயர்ஸ்|வருஷம்|வயசு|வயது)\b/i)
+      || text.match(/(?:வயது|ஏஜ்|வயசு)\s*(?:வந்து\s*)?(\d{1,3})/i);
+    return numeric ? Number(numeric[1]) : undefined;
+  }
+
+  function extractVoiceGender(text: string) {
+    if (/\bfemale\b|\bwoman\b|\bgirl\b|\bபெண்\b|\bபெண்பா\b/i.test(text)) return "female";
+    if (/\bmale\b|\bman\b|\bboy\b|\bஆண்\b|\bஆண்பா\b/i.test(text)) return "male";
+    return undefined;
+  }
+
+  function extractVoiceBloodGroup(text: string) {
+    const direct = text.match(/\b(AB|A|B|O)\s*([+-])\b/i);
+    if (direct) return `${direct[1].toUpperCase()}${direct[2]}`;
+    const spoken = text.match(/\b(AB|A|B|O)\s*(positive|negative|plus|minus)\b/i);
+    if (spoken) return `${spoken[1].toUpperCase()}${/negative|minus/i.test(spoken[2]) ? "-" : "+"}`;
+    const normalized = text.replace(/blood\s*group|பிளட்\s*குரூப்|இரத்த\s*வகை|ரத்த\s*வகை/gi, " ").replace(/\s+/g, " ").trim();
+    const spokenTamil = [
+      { regex: /(?:\bab\b|a\s*b|ஏ\s*பி|ஏபி|எபி)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "AB+" },
+      { regex: /(?:\bab\b|a\s*b|ஏ\s*பி|ஏபி|எபி)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "AB-" },
+      { regex: /(?:\ba\b|ஏ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "A+" },
+      { regex: /(?:\ba\b|ஏ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "A-" },
+      { regex: /(?:\bb\b|பி|பீ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "B+" },
+      { regex: /(?:\bb\b|பி|பீ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "B-" },
+      { regex: /(?:\bo\b|ஓ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "O+" },
+      { regex: /(?:\bo\b|ஓ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "O-" },
+    ];
+    return spokenTamil.find((pattern) => pattern.regex.test(normalized))?.value;
+  }
+
+  function extractVoiceUnits(text: string) {
+    const numeric = text.match(/(?:தேவை(?:யான)?|வேண்டும்|required|need(?:ed|s)?)\s*(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)?\s*(\d{1,2})/i)
+      || text.match(/(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)\s*(\d{1,2})/i)
+      || text.match(/(\d{1,2})\s*(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)/i);
+    if (numeric) return Number(numeric[1]);
+    const tamilNumbers: Record<string, number> = {
+      "ஒன்று": 1, "ஒன்றே": 1, "ஒரு": 1,
+      "இரண்டு": 2, "ரெண்டு": 2, "இரண்டே": 2,
+      "மூன்று": 3, "மூன்றே": 3,
+      "நான்கு": 4, "நான்கே": 4,
+      "ஐந்து": 5, "ஐந்தே": 5,
+      "ஆறு": 6, "ஆறே": 6,
+      "ஏழு": 7, "ஏழே": 7,
+      "எட்டு": 8, "எட்டே": 8,
+      "ஒன்பது": 9, "ஒன்பதே": 9,
+      "பத்து": 10, "பத்தே": 10,
+    };
+    return Object.entries(tamilNumbers).find(([word]) => text.includes(word))?.[1];
+  }
+
+  function extractVoiceComponentType(text: string) {
+    if (/platelet|பிளேட்லெட்/i.test(text)) return "platelets";
+    if (/plasma|பிளாஸ்மா/i.test(text)) return "plasma";
+    if (/whole\s*blood|blood|பிளட்|ரத்தம்|இரத்தம்/i.test(text)) return "whole_blood";
+    return undefined;
+  }
+
   const missingRequiredFields = [
     !form.patientFirstName ? (lang === "ta" ? "நோயாளியின் பெயர்" : "Patient name") : null,
     !form.patientAge ? (lang === "ta" ? "நோயாளியின் வயது" : "Patient age") : null,
@@ -74,11 +139,18 @@ export function NewRequest() {
 
     const map: any = { ...parsed };
     if (map.unitsRequired) map.unitsRequired = Number(map.unitsRequired);
+    if (!map.patientName) map.patientName = extractVoicePatientName(text);
+    if (!map.patientAge) map.patientAge = extractVoiceAge(text);
+    if (!map.patientGender) map.patientGender = extractVoiceGender(text);
+    if (!map.bloodGroup) map.bloodGroup = extractVoiceBloodGroup(text);
+    if (!map.componentType) map.componentType = extractVoiceComponentType(text);
+    if (!map.unitsRequired) map.unitsRequired = extractVoiceUnits(text);
 
     // Map parsed fields to form fields
     const updates: any = {};
     if (map.patientName) updates.patientFirstName = map.patientName;
     if (map.patientAge) updates.patientAge = Number(map.patientAge);
+    if (map.patientGender) updates.patientGender = map.patientGender;
     if (map.bloodGroup) updates.bloodGroup = map.bloodGroup;
     if (map.componentType) updates.componentType = map.componentType;
     if (map.unitsRequired) updates.unitsRequired = map.unitsRequired;

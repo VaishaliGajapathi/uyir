@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { query, queryOne, exec } from "../db.js";
 import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 
@@ -12,6 +13,32 @@ usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 });
 
 usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
+  const schema = z.object({
+    name: z.string().min(2).optional(),
+    language: z.enum(["ta", "en"]).optional(),
+    district: z.string().min(2).optional(),
+    taluk: z.string().optional(),
+    bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
+    gender: z.enum(["male", "female"]).optional(),
+    age: z.number().int().min(18).max(100).optional(),
+    isPlateletDonor: z.boolean().optional(),
+    shareLocation: z.boolean().optional(),
+    notificationsEnabled: z.boolean().optional(),
+    voiceEnabled: z.boolean().optional(),
+    locationEnabled: z.boolean().optional(),
+    pincode: z.string().optional(),
+    weight: z.number().positive().optional(),
+    height: z.number().positive().optional(),
+    hemoglobinLevel: z.number().positive().optional(),
+    sleepHours: z.number().int().min(0).max(24).optional(),
+    drinkingHabits: z.string().optional(),
+    smokingHabits: z.string().optional(),
+    lastDonationDate: z.string().optional(),
+    dob: z.string().optional(),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  
   const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","weight","height","hemoglobinLevel","sleepHours","drinkingHabits","smokingHabits"];
   const sets: string[] = [];
   const vals: any[] = [];
@@ -31,10 +58,17 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 });
 
 usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res: any) => {
-  const { lat, lng, district, taluk, pincode } = req.body;
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    return res.status(400).json({ error: "lat/lng required" });
-  }
+  const schema = z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    district: z.string().optional(),
+    taluk: z.string().optional(),
+    pincode: z.string().optional(),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  
+  const { lat, lng, district, taluk, pincode } = parse.data;
   const user = await queryOne<any>(
     'UPDATE "User" SET "lat"=$1, "lng"=$2, "shareLocation"=true, "locationEnabled"=true, "district"=COALESCE($3,"district"), "taluk"=COALESCE($4,"taluk"), "pincode"=COALESCE($5,"pincode") WHERE "id"=$6 RETURNING *',
     [lat, lng, district?.trim() || null, taluk?.trim() || null, pincode?.trim() || null, req.userId]
@@ -43,14 +77,26 @@ usersRouter.post("/me/location", requireAuth, async (req: AuthedRequest, res: an
 });
 
 usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: any) => {
-  await exec('UPDATE "User" SET "fcmToken" = $1 WHERE "id" = $2', [req.body.token, req.userId]);
+  const schema = z.object({ token: z.string().min(10) });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  await exec('UPDATE "User" SET "fcmToken" = $1 WHERE "id" = $2', [parse.data.token, req.userId]);
   res.json({ ok: true });
 });
 
 usersRouter.post("/me/push-subscription", requireAuth, async (req: AuthedRequest, res: any) => {
-  const { subscription } = req.body;
-  if (!subscription) return res.status(400).json({ error: "subscription object required" });
-  await exec('UPDATE "User" SET "pushSubscription" = $1 WHERE "id" = $2', [JSON.stringify(subscription), req.userId]);
+  const schema = z.object({
+    subscription: z.object({
+      endpoint: z.string().url(),
+      keys: z.object({
+        p256dh: z.string(),
+        auth: z.string(),
+      }),
+    }),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  await exec('UPDATE "User" SET "pushSubscription" = $1 WHERE "id" = $2', [JSON.stringify(parse.data.subscription), req.userId]);
   res.json({ ok: true });
 });
 
@@ -67,10 +113,15 @@ usersRouter.get("/me/documents", requireAuth, async (req: AuthedRequest, res: an
 });
 
 usersRouter.post("/me/documents", requireAuth, async (req: AuthedRequest, res: any) => {
-  const { documentType, fileUrl, documentNumber } = req.body;
-  if (!documentType || !fileUrl) return res.status(400).json({ error: "documentType and fileUrl required" });
-  const validTypes = ["aadhar","driving_license","passport"];
-  if (!validTypes.includes(documentType)) return res.status(400).json({ error: "Invalid document type" });
+  const schema = z.object({
+    documentType: z.enum(["aadhar", "driving_license", "passport"]),
+    fileUrl: z.string().url(),
+    documentNumber: z.string().optional(),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  
+  const { documentType, fileUrl, documentNumber } = parse.data;
   const doc = await queryOne<any>(
     'INSERT INTO "DonorDocument" ("id","donorId","documentType","fileUrl","documentNumber","uploadedAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,NOW()) RETURNING *',
     [req.userId, documentType, fileUrl, documentNumber || null]

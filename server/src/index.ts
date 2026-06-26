@@ -1,9 +1,12 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { logger, logRequest } from "./lib/logger.js";
+import * as Sentry from "@sentry/node";
 
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
@@ -17,8 +20,8 @@ import { ngoRouter } from "./routes/ngo.js";
 import { exec } from "./db.js";
 import { TN_DISTRICT_NAMES } from "./lib/districts.js";
 
-process.on("uncaughtException", (err) => console.error("[FATAL] uncaughtException:", err));
-process.on("unhandledRejection", (reason) => console.error("[FATAL] unhandledRejection:", reason));
+process.on("uncaughtException", (err) => logger.fatal({ err }, "uncaughtException"));
+process.on("unhandledRejection", (reason) => logger.fatal({ reason }, "unhandledRejection"));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,8 +29,45 @@ const isProd = process.env.NODE_ENV === "production";
 
 const app = express();
 
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    tracesSampleRate: isProd ? 0.1 : 1.0,
+  });
+  logger.info("Sentry initialized");
+}
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.msg91.com", "https://fcm.googleapis.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
 async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoName" TEXT');
+  await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
+  await exec(`
+    CREATE TABLE IF NOT EXISTS "AuditLog" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "action" TEXT NOT NULL,
+      "entityType" TEXT NOT NULL,
+      "entityId" TEXT,
+      "details" TEXT,
+      "ipAddress" TEXT,
+      "userAgent" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+    )
+  `);
 }
 
 const allowedOrigins = [
@@ -61,6 +101,7 @@ app.use(cors({
 // Explicitly handle OPTIONS preflight for all routes
 app.options("*", cors());
 app.use(express.json({ limit: "30mb" }));
+app.use(logRequest);
 
 app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
 app.get("/api/districts", (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
@@ -101,7 +142,7 @@ if (isProd) {
   ];
   const staticDir = possiblePaths.find((p) => {
     const exists = fs.existsSync(path.join(p, "index.html"));
-    if (exists) console.log(`[static] Found frontend at: ${p}`);
+    if (exists) logger.info({ path: p }, "Found frontend build");
     return exists;
   });
   if (staticDir) {
@@ -110,7 +151,7 @@ if (isProd) {
       res.sendFile(path.join(staticDir, "index.html"));
     });
   } else {
-    console.error("[static] No frontend build found. Checked:", possiblePaths);
+    logger.error({ possiblePaths }, "No frontend build found");
     app.get("*", (_req: Request, res: Response) => {
       res.status(503).json({ error: "Frontend not built. Please rebuild and deploy." });
     });
@@ -120,7 +161,7 @@ if (isProd) {
 }
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("[error]", err);
+  logger.error({ err }, "Unhandled error");
   res.status(500).json({ error: err?.message || "Internal error" });
 });
 

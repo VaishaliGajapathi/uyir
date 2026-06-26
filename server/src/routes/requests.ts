@@ -4,6 +4,8 @@ import { query, queryOne, exec } from "../db.js";
 import { requireAuth, optionalAuth, AuthedRequest } from "../middleware/auth.js";
 import { verifyRequest, verifyDocument } from "../services/verification.js";
 import { haversineKm, TN_DISTRICTS } from "../lib/districts.js";
+import { runAlertCycle, escalateRadius } from "../services/alerts.js";
+import { logAudit, AuditActions } from "../lib/audit.js";
 
 export const requestsRouter = Router();
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -41,6 +43,15 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
     'INSERT INTO "BloodRequest" ("id","patientName","bloodGroup","componentType","unitsRequired","hospitalName","district","taluk","contactPerson","contactNumber","doctorReference","emergencyLevel","lat","lng","createdById","status","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()) RETURNING *',
     [d.patientName, d.bloodGroup, d.componentType, d.unitsRequired, d.hospitalName, d.district, d.taluk || null, d.contactPerson, d.contactNumber, d.doctorReference || null, d.emergencyLevel, d.lat || null, d.lng || null, req.userId!, "pending_verification"]
   );
+  await logAudit({
+    userId: req.userId!,
+    action: AuditActions.REQUEST_CREATE,
+    entityType: "BloodRequest",
+    entityId: request.id,
+    details: JSON.stringify({ bloodGroup: d.bloodGroup, unitsRequired: d.unitsRequired, emergencyLevel: d.emergencyLevel }),
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
   res.status(201).json(request);
 });
 
@@ -114,6 +125,7 @@ requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, re
   if (!base64 || !mimeType) return res.status(400).json({ error: "base64 + mimeType required" });
   const request = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   if (!request) return res.status(404).json({ error: "Request not found" });
+  if (!canManageRequest(request, req)) return res.status(403).json({ error: "Not allowed to upload documents for this request" });
   const ai = await verifyDocument(base64, mimeType, documentType || "requirement_slip", request.patientName);
   const doc = await queryOne<any>(
     'INSERT INTO "RequestDocument" ("id","requestId","fileUrl","documentType","aiVerified","aiScore","aiNotes","uploadedAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,NOW()) RETURNING *',
@@ -177,7 +189,17 @@ requestsRouter.post("/:id/alert", requireAuth, async (req: AuthedRequest, res: a
   if (request.status === "verified") {
     await exec('UPDATE "BloodRequest" SET "status" = $1 WHERE "id" = $2', ["alert_sent", request.id]);
   }
-  res.json({ ok: true, message: "Alert cycle triggered" });
+  const result = await runAlertCycle(request.id);
+  await logAudit({
+    userId: req.userId!,
+    action: AuditActions.REQUEST_ALERT,
+    entityType: "BloodRequest",
+    entityId: request.id,
+    details: JSON.stringify({ alertedCount: result.alerted, radiusKm: result.radiusKm }),
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+  res.json({ ok: true, message: "Alert cycle triggered", ...result });
 });
 
 requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res: any) => {
@@ -187,7 +209,17 @@ requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res
   if (!["verified", "alert_sent", "donor_accepted"].includes(String(request.status || ""))) {
     return res.status(400).json({ error: "Request must be AI/admin verified before escalation" });
   }
-  res.json({ radiusKm: 50, message: "Escalated to next radius tier" });
+  const newRadius = await escalateRadius(request.id);
+  await logAudit({
+    userId: req.userId!,
+    action: AuditActions.REQUEST_ESCALATE,
+    entityType: "BloodRequest",
+    entityId: request.id,
+    details: JSON.stringify({ newRadiusKm: newRadius }),
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+  res.json({ radiusKm: newRadius, message: "Escalated to next radius tier" });
 });
 
 requestsRouter.post("/:id/check-escalation", requireAuth, async (req: AuthedRequest, res: any) => {

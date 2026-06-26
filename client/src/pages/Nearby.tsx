@@ -7,6 +7,18 @@ import { Button, Card, Spinner, Sheet, Badge } from "../components/ui";
 import { emergencyMeta } from "../lib/utils";
 import { DonationCertificate } from "../components/DonationCertificate";
 
+type RadarItem = {
+  id: string;
+  request: any;
+  status: string;
+  matchScore: number | null;
+  distanceKm: number | null;
+  etaMinutes: number | null;
+  responseId?: string;
+  completedAt?: string;
+  source: "alert" | "request";
+};
+
 function getMissingDonorFields(user: any, lang: "ta" | "en") {
   const fields: string[] = [];
   if (!user?.name || user.name.trim() === "" || user.name === "UYIR User") {
@@ -27,7 +39,7 @@ function getMissingDonorFields(user: any, lang: "ta" | "en") {
 export function Nearby() {
   const { user, refreshUser } = useApp();
   const nav = useNavigate();
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<RadarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [certificateOpen, setCertificateOpen] = useState(false);
@@ -36,8 +48,8 @@ export function Nearby() {
   async function load() {
     setLoading(true);
     try {
-      const alerts = await api.myAlerts();
-      const normalized = alerts.map((a: any) => ({
+      const [alerts, requests] = await Promise.all([api.myAlerts(), api.listRequests()]);
+      const normalizedAlerts: RadarItem[] = alerts.map((a: any): RadarItem => ({
         id: a.id,
         request: a.request,
         status: a.status,
@@ -45,9 +57,54 @@ export function Nearby() {
         distanceKm: a.distanceKm ?? null,
         etaMinutes: a.etaMinutes ?? null,
         responseId: a.id,
-      })).filter((a: any) => a.request); // Filter out alerts with missing request data
+        completedAt: a.completedAt,
+        source: "alert",
+      })).filter((a: RadarItem) => a.request);
 
-      setItems(normalized);
+      const alertedRequestIds = new Set(normalizedAlerts.map((a) => a.request?.id).filter(Boolean));
+      const normalizedRequests: RadarItem[] = requests
+        .filter((r: any) => r?.id && !alertedRequestIds.has(r.id))
+        .filter((r: any) => !["completed", "closed", "life_saved"].includes(String(r.status || "")))
+        .map((r: any): RadarItem => ({
+          id: `request-${r.id}`,
+          request: r,
+          status: r.status,
+          matchScore: null,
+          distanceKm: null,
+          etaMinutes: null,
+          source: "request",
+        }));
+
+      const emergencyRank: Record<string, number> = { red: 0, orange: 1, yellow: 2 };
+      const combined = [...normalizedAlerts, ...normalizedRequests].sort((a, b) => {
+        const aBloodMatch = a.request?.bloodGroup === user?.bloodGroup ? 1 : 0;
+        const bBloodMatch = b.request?.bloodGroup === user?.bloodGroup ? 1 : 0;
+        if (aBloodMatch !== bBloodMatch) return bBloodMatch - aBloodMatch;
+
+        const aSameTaluk = user?.taluk && a.request?.taluk && a.request.taluk === user.taluk ? 1 : 0;
+        const bSameTaluk = user?.taluk && b.request?.taluk && b.request.taluk === user.taluk ? 1 : 0;
+        if (aSameTaluk !== bSameTaluk) return bSameTaluk - aSameTaluk;
+
+        const aSameDistrict = user?.district && a.request?.district === user.district ? 1 : 0;
+        const bSameDistrict = user?.district && b.request?.district === user.district ? 1 : 0;
+        if (aSameDistrict !== bSameDistrict) return bSameDistrict - aSameDistrict;
+
+        const aIsAlert = a.source === "alert" ? 1 : 0;
+        const bIsAlert = b.source === "alert" ? 1 : 0;
+        if (aIsAlert !== bIsAlert) return bIsAlert - aIsAlert;
+
+        const aDistance = a.distanceKm ?? Number.MAX_SAFE_INTEGER;
+        const bDistance = b.distanceKm ?? Number.MAX_SAFE_INTEGER;
+        if (aDistance !== bDistance) return aDistance - bDistance;
+
+        const aEmergency = emergencyRank[a.request?.emergencyLevel] ?? 99;
+        const bEmergency = emergencyRank[b.request?.emergencyLevel] ?? 99;
+        if (aEmergency !== bEmergency) return aEmergency - bEmergency;
+
+        return new Date(b.request?.createdAt || 0).getTime() - new Date(a.request?.createdAt || 0).getTime();
+      });
+
+      setItems(combined);
     } finally {
       setLoading(false);
     }
@@ -91,8 +148,8 @@ export function Nearby() {
     setCertificateOpen(true);
   }
 
-  const active = items.filter((a) => !["declined", "completed"].includes(a.status));
-  const done = items.filter((a) => a.status === "completed");
+  const active = items.filter((a) => a.source === "request" ? !["completed", "closed", "life_saved"].includes(a.request?.status || a.status) : !["declined", "completed"].includes(a.status));
+  const done = items.filter((a) => a.source === "alert" && a.status === "completed");
 
   return (
     <div className="px-4 py-4">
@@ -101,7 +158,7 @@ export function Nearby() {
           <Radar className="h-6 w-6 text-uyir-600" />
           <h1 className="text-xl font-extrabold text-slate-800">Blood Radar</h1>
         </div>
-        <span className="text-xs text-slate-400">{active.length} live</span>
+        <span className="text-xs text-slate-400">{active.length} nearby</span>
       </header>
 
       {!user?.shareLocation && (
@@ -118,14 +175,19 @@ export function Nearby() {
       {loading ? <Spinner /> : active.length === 0 ? (
         <div className="rounded-2xl bg-white py-16 text-center">
           <Radar className="mx-auto mb-3 h-10 w-10 animate-pulse text-slate-300" />
-          <p className="font-medium text-slate-500">No live requests for you right now</p>
-          <p className="text-sm text-slate-400">We'll alert you when {user?.bloodGroup || "your blood type"} is needed nearby.</p>
+          <p className="font-medium text-slate-500">No nearby requests for you right now</p>
+          <p className="text-sm text-slate-400">We&apos;ll show {user?.bloodGroup || "your blood group"} first, then all blood groups in your area and district.</p>
         </div>
       ) : (
         <div className="space-y-3">
+          <Card className="bg-slate-50 p-3 text-xs text-slate-500">
+            Showing <span className="font-bold text-slate-700">{user?.bloodGroup || "your blood group"}</span> requests first, followed by all blood groups in your area and district.
+          </Card>
           {active.map((a) => {
             const r = a.request;
             const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
+            const isBloodMatch = r?.bloodGroup === user?.bloodGroup;
+            const isSameTaluk = Boolean(user?.taluk && r?.taluk && user.taluk === r.taluk);
             return (
               <Card key={a.id} className={`overflow-hidden ring-2 ${em.ring} ring-opacity-40`}>
                 <div className={`flex items-center justify-between px-4 py-1.5 text-xs font-bold ${em.color}`}>
@@ -136,6 +198,11 @@ export function Nearby() {
                   <div className="flex items-center gap-3">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-uyir-50 text-xl font-extrabold text-uyir-700">{r?.bloodGroup || "?"}</div>
                     <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap gap-2">
+                        <Badge className={isBloodMatch ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>{isBloodMatch ? "Your blood group" : "Other blood group"}</Badge>
+                        <Badge className={isSameTaluk ? "bg-blue-100 text-blue-700" : "bg-violet-100 text-violet-700"}>{isSameTaluk ? `${r?.taluk || "Your area"}` : `${r?.district || "Your district"}`}</Badge>
+                        {a.source === "alert" && <Badge className="bg-red-100 text-red-700">Live alert</Badge>}
+                      </div>
                       <p className="font-bold text-slate-800">{r?.unitsRequired || 0} unit(s) · {r?.componentType?.replace("_", " ").replace("whole blood", "blood") || "blood"}</p>
                       <p className="flex items-center gap-1 truncate text-sm text-slate-500"><MapPin className="h-3.5 w-3.5" /> {r?.hospitalName || "Unknown"}, {r?.district || "Unknown"}</p>
                       <div className="mt-0.5 flex gap-3 text-[11px] text-slate-400">
@@ -160,6 +227,12 @@ export function Nearby() {
                       <Button className="w-full" loading={busy === a.id} onClick={() => act(a.id, async () => { const res = await api.completeResponse(a.responseId); if (res.newBadge) alert(`Donation complete! New badge: ${res.newBadge}`); })}>
                         <Droplet className="h-4 w-4" /> Mark donation complete
                       </Button>
+                    </div>
+                  )}
+                  {a.source === "request" && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={() => nav(`/request/${r.id}`)}>View request</Button>
+                      <Button loading={busy === a.id} onClick={() => act(a.id, () => api.acceptRequestAsDonor(r.id))}><Check className="h-4 w-4" /> I can donate</Button>
                     </div>
                   )}
                 </div>

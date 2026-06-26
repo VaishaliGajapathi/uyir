@@ -3,7 +3,11 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { bus, AlertEvent } from "../services/alerts.js";
 
 export const streamRouter = Router();
-const SECRET = process.env.JWT_SECRET || "change-this-secret";
+const secret = process.env.JWT_SECRET;
+if (!secret) {
+  throw new Error("JWT_SECRET is required");
+}
+const SECRET: string = secret;
 
 // Server-Sent Events stream for real-time donor alerts.
 // Token passed as query param because EventSource cannot set headers.

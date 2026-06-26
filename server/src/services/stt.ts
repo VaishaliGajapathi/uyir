@@ -63,12 +63,66 @@ export interface ParsedRequest {
    return total || undefined;
  }
 
+ const TAMIL_NUMBER_WORDS: Record<string, number> = {
+   "பூஜ்யம்": 0,
+   "ஒன்று": 1,
+   "ஒன்றே": 1,
+   "ஒரு": 1,
+   "இரண்டு": 2,
+   "ரெண்டு": 2,
+   "இரண்டே": 2,
+   "மூன்று": 3,
+   "மூன்றே": 3,
+   "நான்கு": 4,
+   "நான்கே": 4,
+   "ஐந்து": 5,
+   "ஐந்தே": 5,
+   "ஆறு": 6,
+   "ஆறே": 6,
+   "ஏழு": 7,
+   "ஏழே": 7,
+   "எட்டு": 8,
+   "எட்டே": 8,
+   "ஒன்பது": 9,
+   "ஒன்பதே": 9,
+   "பத்து": 10,
+ };
+
+ function parseTamilWordNumber(value: string): number | undefined {
+   const normalized = String(value || "").trim();
+   for (const [word, amount] of Object.entries(TAMIL_NUMBER_WORDS)) {
+     if (normalized.includes(word)) return amount;
+   }
+   return undefined;
+ }
+
+ function extractPatientName(text: string): string | undefined {
+   const match = text.match(/(?:நோயாளியின்\s*பெயர்|பேஷன்(?:ட்)?\s*நேம்|patient\s*name|பெயர்|name)\s*(?:is|:|வந்து)?\s*([\u0B80-\u0BFFa-zA-Z]+(?:\s+[\u0B80-\u0BFFa-zA-Z]+){0,3})/i);
+   if (!match) return undefined;
+   const cleaned = match[1].replace(/(?:\b(?:age|years?|old|blood|group|unit|units|required|need(?:ed|s)?)\b|வயது|ஏஜ்|இயர்ஸ்|ஓல்ட்|யூனிட்|தேவை).*$/i, "").trim();
+   return cleaned || undefined;
+ }
+
  function normalizeBloodGroup(value?: string): string | undefined {
    const text = String(value || "").trim();
    const direct = text.match(/\b(AB|A|B|O)\s*([+-])\b/i);
    if (direct) return `${direct[1].toUpperCase()}${direct[2]}`;
    const spoken = text.match(/\b(AB|A|B|O)\s*(positive|negative|plus|minus)\b/i);
    if (spoken) return `${spoken[1].toUpperCase()}${/negative|minus/i.test(spoken[2]) ? "-" : "+"}`;
+   const normalized = text.replace(/blood\s*group|பிளட்\s*குரூப்|இரத்த\s*வகை|ரத்த\s*வகை/gi, " ").replace(/\s+/g, " ").trim();
+   const spokenTamil = [
+     { regex: /(?:\bab\b|a\s*b|ஏ\s*பி|ஏபி|எபி)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "AB+" },
+     { regex: /(?:\bab\b|a\s*b|ஏ\s*பி|ஏபி|எபி)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "AB-" },
+     { regex: /(?:\ba\b|ஏ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "A+" },
+     { regex: /(?:\ba\b|ஏ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "A-" },
+     { regex: /(?:\bb\b|பி|பீ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "B+" },
+     { regex: /(?:\bb\b|பி|பீ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "B-" },
+     { regex: /(?:\bo\b|ஓ)\s*(?:positive|plus|\+|பாசிடிவ்|ப்ளஸ்|பிளஸ்)/i, value: "O+" },
+     { regex: /(?:\bo\b|ஓ)\s*(?:negative|minus|-|நெகட்டிவ்|மைனஸ்)/i, value: "O-" },
+   ];
+   for (const pattern of spokenTamil) {
+     if (pattern.regex.test(normalized)) return pattern.value;
+   }
    return undefined;
  }
 
@@ -135,6 +189,8 @@ function extractDistrict(text: string): string | undefined {
 function extractPatientAge(text: string): number | undefined {
   const numeric = text.match(/\bage\s*(?:is\s*)?(\d{1,3})\b/i) || text.match(/\b(\d{1,3})\s*(?:years?\s*old|years?|age)\b/i);
   if (numeric) return Number(numeric[1]);
+  const mixedNumeric = text.match(/\b(\d{1,3})\s*(?:இயர்ஸ்\s*ஓல்ட்|இயர்ஸ்|வருஷம்|வயசு|வயது)\b/i) || text.match(/(?:வயது|ஏஜ்|வயசு)\s*(?:வந்து\s*)?(\d{1,3})/i);
+  if (mixedNumeric) return Number(mixedNumeric[1]);
   
   // Tamil age patterns: "வயது 33", "ஏஜ் 33", "நோயாளியின் வயது 33"
   const tamilAge = text.match(/(?:வயது|ஏஜ்|வயதுக்கு)\s*(\d{1,3})/i) || text.match(/(?:நோயாளியின்\s*வயது|பேஷன்ட்\s*ஏஜ்)\s*(\d{1,3})/i);
@@ -143,6 +199,21 @@ function extractPatientAge(text: string): number | undefined {
   const words = text.match(/\b((?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and)(?:\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|and))*)\s+(?:age|years?\s*old|years?)\b/i);
   return words ? parseWordNumber(words[1]) : undefined;
  }
+
+function extractUnitsRequired(text: string): number | undefined {
+  const numeric = text.match(/(?:தேவை(?:யான)?|வேண்டும்|required|need(?:ed|s)?)\s*(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)?\s*(\d{1,2})/i)
+    || text.match(/(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)\s*(\d{1,2})/i)
+    || text.match(/(\d{1,2})\s*(?:யூனிட்(?:கள்)?|யூனிட்ஸ்?|units?|unit)/i);
+  if (numeric) return Number(numeric[1]);
+  return parseTamilWordNumber(text);
+}
+
+function extractComponentType(text: string): string | undefined {
+  if (/platelet|பிளேட்லெட்/i.test(text)) return "platelets";
+  if (/plasma|பிளாஸ்மா/i.test(text)) return "plasma";
+  if (/whole\s*blood|blood|பிளட்|ரத்தம்|இரத்தம்/i.test(text)) return "whole_blood";
+  return undefined;
+}
 
  function cleanHospitalName(value?: string): string | undefined {
    let text = String(value || "").replace(/["(),]/g, " ").replace(/\s+/g, " ").trim();
@@ -153,11 +224,16 @@ function extractPatientAge(text: string): number | undefined {
  }
 
  function sanitizeParsedRequest(parsed: ParsedRequest, text: string): ParsedRequest {
+   const parsedAge = parsed.patientAge != null ? Number(parsed.patientAge) : undefined;
+   const parsedUnits = parsed.unitsRequired != null ? Number(parsed.unitsRequired) : undefined;
    return {
      ...parsed,
-     patientAge: parsed.patientAge || extractPatientAge(text),
+     patientName: parsed.patientName || extractPatientName(text),
+     patientAge: Number.isFinite(parsedAge) ? parsedAge : extractPatientAge(text),
      patientGender: parsed.patientGender || extractPatientGender(text),
      bloodGroup: normalizeBloodGroup(parsed.bloodGroup || text) || parsed.bloodGroup,
+     componentType: parsed.componentType || extractComponentType(text),
+     unitsRequired: Number.isFinite(parsedUnits) ? parsedUnits : extractUnitsRequired(text),
      hospitalName: cleanHospitalName(parsed.hospitalName) || cleanHospitalName(text.match(/([^.\n,]*\b(?:medical college hospital|medical college|hospital|clinic|nursing home|medical center|medical centre|health centre|health center|health city)\b)/i)?.[1]),
      district: parsed.district || extractDistrict(text),
      emergencyLevel: parsed.emergencyLevel || extractEmergencyLevel(text),

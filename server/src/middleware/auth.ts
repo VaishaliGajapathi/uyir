@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const SECRET = process.env.JWT_SECRET || "change-this-secret";
+const secret = process.env.JWT_SECRET;
+if (!secret) {
+  throw new Error("JWT_SECRET is required");
+}
+const SECRET: string = secret;
 
 export interface AuthedRequest extends Request {
   userId?: string;

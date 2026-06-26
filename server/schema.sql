@@ -245,8 +245,26 @@ CREATE TABLE "HealthReminder" (
     CONSTRAINT "HealthReminder_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "AuditLog" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT,
+    "details" TEXT,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_mobile_key" ON "User"("mobile");
+
+-- CreateIndex for donor matching optimization
+CREATE INDEX idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DonorResponse_requestId_donorId_key" ON "DonorResponse"("requestId", "donorId");
@@ -295,4 +313,7 @@ ALTER TABLE "DonationRating" ADD CONSTRAINT "DonationRating_requesterId_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "HealthReminder" ADD CONSTRAINT "HealthReminder_donorId_fkey" FOREIGN KEY ("donorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

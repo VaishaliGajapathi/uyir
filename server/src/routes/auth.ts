@@ -3,10 +3,28 @@ import { z } from "zod";
 import { queryOne, exec } from "../db.js";
 import { signToken } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
+import { logAudit, AuditActions } from "../lib/audit.js";
 
 import { verifyAccessToken } from "../lib/msg91.js";
 
 export const authRouter = Router();
+
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many OTP requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many login attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
   return (req: any, res: any, next: any) => {
@@ -29,7 +47,7 @@ async function verifyOtpForMobile(mobile: string, accessToken?: string): Promise
   return true;
 }
 
-authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
+authRouter.post("/otp/request", otpLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15), name: z.string().optional() });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
@@ -48,7 +66,7 @@ authRouter.post("/otp/request", asyncHandler(async (req: any, res: any) => {
   res.json({ ok: true, exists: false, user: null });
 }));
 
-authRouter.post("/login", asyncHandler(async (req: any, res: any) => {
+authRouter.post("/login", loginLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
@@ -63,10 +81,18 @@ authRouter.post("/login", asyncHandler(async (req: any, res: any) => {
   if (!passwordMatch) return res.status(401).json({ error: "Invalid password. Use 'Forgot password' to reset." });
 
   const token = signToken(user.id, user.role);
+  await logAudit({
+    userId: user.id,
+    action: AuditActions.USER_LOGIN,
+    entityType: "User",
+    entityId: user.id,
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
   res.json({ token, user });
 }));
 
-authRouter.post("/forgot-password", asyncHandler(async (req: any, res: any) => {
+authRouter.post("/forgot-password", otpLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10).max(15) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid mobile" });
@@ -80,7 +106,7 @@ authRouter.post("/forgot-password", asyncHandler(async (req: any, res: any) => {
   res.json({ ok: true, message: "Proceed with OTP verification" });
 }));
 
-authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
+authRouter.post("/reset-password", otpLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({ mobile: z.string().min(10), accessToken: z.string(), password: z.string().min(4) });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input" });
@@ -95,10 +121,18 @@ authRouter.post("/reset-password", asyncHandler(async (req: any, res: any) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
+  await logAudit({
+    userId: user.id,
+    action: AuditActions.PASSWORD_RESET,
+    entityType: "User",
+    entityId: user.id,
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
   res.json({ ok: true, message: "Password reset successfully" });
 }));
 
-authRouter.post("/otp/verify", asyncHandler(async (req: any, res: any) => {
+authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), accessToken: z.string(),
     name: z.string().optional(), role: z.enum(["donor","requester"]).optional(),

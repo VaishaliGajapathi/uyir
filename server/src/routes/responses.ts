@@ -108,6 +108,7 @@ responsesRouter.post("/:id/start-donation", requireAuth, async (req: AuthedReque
 responsesRouter.post("/:id/complete", requireAuth, async (req: AuthedRequest, res: any) => {
   const resp = await queryOne<any>('SELECT * FROM "DonorResponse" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   if (!resp) return res.status(404).json({ error: "Not found" });
+  if (resp.donorId !== req.userId) return res.status(403).json({ error: "Not your response" });
   await exec('UPDATE "DonorResponse" SET "status"=$1, "completedAt"=NOW() WHERE "id"=$2', ["completed", resp.id]);
   await exec('UPDATE "User" SET "donationCount" = "donationCount" + 1, "reputationScore" = "reputationScore" + 50, "lastDonationDate" = NOW() WHERE "id" = $1', [resp.donorId]);
   const donor = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [resp.donorId]);
