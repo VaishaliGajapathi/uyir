@@ -20,26 +20,18 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     taluk: z.string().optional(),
     bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
     gender: z.enum(["male", "female"]).optional(),
-    age: z.union([z.number().int().min(18).max(100), z.null()]).optional(),
     isPlateletDonor: z.boolean().optional(),
     shareLocation: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
     voiceEnabled: z.boolean().optional(),
     locationEnabled: z.boolean().optional(),
     pincode: z.string().optional(),
-    weight: z.union([z.number().positive(), z.null()]).optional(),
-    height: z.union([z.number().positive(), z.null()]).optional(),
-    hemoglobinLevel: z.union([z.number().positive(), z.null()]).optional(),
-    sleepHours: z.union([z.number().int().min(0).max(24), z.null()]).optional(),
-    drinkingHabits: z.string().optional(),
-    smokingHabits: z.string().optional(),
     lastDonationDate: z.union([z.string(), z.null()]).optional(),
-    dob: z.union([z.string(), z.null()]).optional(),
   }).passthrough();
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   
-  const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","weight","height","hemoglobinLevel","sleepHours","drinkingHabits","smokingHabits"];
+  const allowed = ["name","language","district","taluk","bloodGroup","gender","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode"];
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {
@@ -47,9 +39,6 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   }
   if ("lastDonationDate" in req.body && req.body.lastDonationDate) {
     sets.push(`"lastDonationDate" = $${sets.length + 1}`); vals.push(new Date(req.body.lastDonationDate));
-  }
-  if ("dob" in req.body && req.body.dob) {
-    sets.push(`"dob" = $${sets.length + 1}`); vals.push(new Date(req.body.dob));
   }
   if (sets.length === 0) return res.status(400).json({ error: "No fields to update" });
   vals.push(req.userId);
