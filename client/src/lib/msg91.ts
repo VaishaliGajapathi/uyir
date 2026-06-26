@@ -18,6 +18,8 @@ declare global {
 
 let initPromise: Promise<void> | null = null;
 let currentReqId: string | null = null;
+let lastOtpSentAt = 0;
+const OTP_COOLDOWN_MS = 60000; // 60 second cooldown between OTP sends
 
 function initWidget(): Promise<void> {
   if (initPromise) return initPromise;
@@ -80,6 +82,11 @@ void initWidget();
 
 // Send OTP using MSG91 custom UI
 export async function sendWidgetOtp(mobile: string): Promise<string> {
+  const now = Date.now();
+  if (now - lastOtpSentAt < OTP_COOLDOWN_MS) {
+    const waitSec = Math.ceil((OTP_COOLDOWN_MS - (now - lastOtpSentAt)) / 1000);
+    throw new Error(`Please wait ${waitSec}s before requesting another OTP`);
+  }
   await initWidget();
   return new Promise<string>((resolve, reject) => {
     if (typeof window.sendOtp !== "function") {
@@ -88,6 +95,7 @@ export async function sendWidgetOtp(mobile: string): Promise<string> {
     window.sendOtp(
       formatIdentifier(mobile),
       (data: any) => {
+        lastOtpSentAt = Date.now();
         // Store reqId for verify/retry
         currentReqId = typeof data === "string" ? data : data?.reqId || data?.requestId;
         resolve(currentReqId || "sent");
@@ -130,6 +138,11 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
 
 // Retry OTP using MSG91 custom UI
 export async function retryWidgetOtp(): Promise<void> {
+  const now = Date.now();
+  if (now - lastOtpSentAt < OTP_COOLDOWN_MS) {
+    const waitSec = Math.ceil((OTP_COOLDOWN_MS - (now - lastOtpSentAt)) / 1000);
+    throw new Error(`Please wait ${waitSec}s before resending OTP`);
+  }
   await initWidget();
   return new Promise<void>((resolve, reject) => {
     if (typeof window.retryOtp !== "function") {
@@ -137,7 +150,7 @@ export async function retryWidgetOtp(): Promise<void> {
     }
     window.retryOtp(
       "11", // SMS channel code
-      () => resolve(),
+      () => { lastOtpSentAt = Date.now(); resolve(); },
       (error: any) => reject(new Error(error?.message || "Failed to resend OTP")),
       currentReqId || undefined
     );
