@@ -28,6 +28,7 @@ const __dirname = path.dirname(__filename);
 const isProd = process.env.NODE_ENV === "production";
 
 const app = express();
+app.set("trust proxy", 1);
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -43,9 +44,9 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://verify.msg91.com", "https://verify.phone91.com", "https://control.msg91.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.msg91.com", "https://fcm.googleapis.com"],
+      connectSrc: ["'self'", "https://api.msg91.com", "https://control.msg91.com", "https://verify.msg91.com", "https://fcm.googleapis.com", "https://fcm.googleapis.com/"],
     },
   },
   crossOriginEmbedderPolicy: false,

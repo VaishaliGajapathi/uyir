@@ -5,10 +5,20 @@ const isProd = process.env.NODE_ENV === "production";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes("neon.tech") ? { rejectUnauthorized: false } : false,
-  max: isProd ? 20 : 10,
-  min: isProd ? 5 : 2,
-  idleTimeoutMillis: 30000,
+  max: isProd ? 10 : 5,
+  min: 0,
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 10000,
+});
+
+pool.on("error", (err) => {
+  console.error("[db] Pool error (idle client):", err.message);
+});
+
+pool.on("connect", (client) => {
+  client.on("error", (err) => {
+    console.error("[db] Client error:", err.message);
+  });
 });
 
 export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> {
