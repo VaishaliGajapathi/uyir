@@ -29,12 +29,14 @@ export function Home() {
   const { user, lang } = useApp();
   const nav = useNavigate();
   const [nearby, setNearby] = useState<BloodRequest[]>([]);
+  const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
   const [available, setAvailable] = useState(user?.notificationsEnabled ?? true);
 
   useEffect(() => {
     const params: Record<string, string> = {};
     if (user?.district) params.district = user.district;
     api.listRequests(params).then((r) => setNearby(r.slice(0, 4))).catch(() => {});
+    api.myRequests().then((r) => setMyRequests(r.slice(0, 5))).catch(() => {});
   }, [user?.district]);
 
   async function toggleAvailability() {
@@ -125,6 +127,47 @@ export function Home() {
           <span className="text-xs text-white/80">{lang === "ta" ? "யாருக்கு தேவை என்று பார்" : "See who needs you"}</span>
         </button>
       </div>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-bold text-slate-800">{lang === "ta" ? "எனது கோரிக்கைகள்" : "My Requests"}</h2>
+          <button onClick={() => nav("/requests?mine=true")} className="flex items-center text-sm font-medium text-uyir-600">
+            {lang === "ta" ? "அனைத்தும்" : "All"} <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {myRequests.length === 0 && <p className="rounded-xl bg-white py-8 text-center text-sm text-slate-400">{lang === "ta" ? "நீங்கள் எந்த கோரிக்கையும் உருவாக்கவில்லை" : "You haven't created any requests yet."}</p>}
+          {myRequests.map((r) => {
+            const em = emergencyMeta[r.emergencyLevel] || emergencyMeta.orange;
+            const statusLabels: Record<string, { en: string; ta: string }> = {
+              pending_verification: { en: "Pending", ta: "நிலுவை" },
+              verified: { en: "Verified", ta: "சரிபார்க்கப்பட்டது" },
+              alert_sent: { en: "Alert Sent", ta: "அறிவிப்பு அனுப்பப்பட்டது" },
+              donor_accepted: { en: "Donor Found", ta: "தானவாளர் கிடைத்தார்" },
+              completed: { en: "Completed", ta: "முடிந்தது" },
+              life_saved: { en: "Life Saved", ta: "உயிர் காக்கப்பட்டது" },
+              rejected: { en: "Rejected", ta: "நிராகரிக்கப்பட்டது" },
+            };
+            const st = statusLabels[r.status] || { en: r.status, ta: r.status };
+            return (
+              <Card key={r.id} className="flex items-center gap-3 p-3">
+                <button className="flex w-full items-center gap-3 text-left" onClick={() => nav(`/request/${r.id}`)}>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-uyir-50 text-lg font-extrabold text-uyir-700">{r.bloodGroup}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-800">{r.hospitalName}</p>
+                    <p className="truncate text-xs text-slate-500">{r.unitsRequired} unit(s) · {r.componentType.replace("_", " ")} · {r.district}</p>
+                    <p className="text-[11px] text-slate-400">{timeAgo(r.createdAt)}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${em.color}`}>{em.label}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">{lang === "ta" ? st.ta : st.en}</span>
+                  </div>
+                </button>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
 
       <section>
         <div className="mb-2 flex items-center justify-between">

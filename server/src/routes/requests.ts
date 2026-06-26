@@ -57,20 +57,24 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
 
 requestsRouter.get("/", optionalAuth, async (req: AuthedRequest, res: any) => {
   const viewer = req.userId ? await queryOne<any>('SELECT "id","role","district","taluk","lat","lng" FROM "User" WHERE "id" = $1 LIMIT 1', [req.userId]) : null;
-  const { district, bloodGroup, status, componentType } = req.query as Record<string, string>;
+  const { district, bloodGroup, status, componentType, mine } = req.query as Record<string, string>;
   const conditions: string[] = [];
   const params: any[] = [];
-  if (district) { conditions.push(`"district" = $${params.length + 1}`); params.push(district); }
-  else if (viewer?.role === "donor" && viewer.district) { conditions.push(`"district" = $${params.length + 1}`); params.push(viewer.district); }
-  if (bloodGroup) { conditions.push(`"bloodGroup" = $${params.length + 1}`); params.push(bloodGroup); }
-  if (componentType) { conditions.push(`"componentType" = $${params.length + 1}`); params.push(componentType); }
-  if (status) { conditions.push(`"status" = $${params.length + 1}`); params.push(status); }
-  if (!isPrivilegedViewer(viewer?.role)) {
-    if (viewer?.id) {
-      conditions.push(`("status" IN ('verified','alert_sent','donor_accepted','completed','life_saved') OR "createdById" = $${params.length + 1})`);
-      params.push(viewer.id);
-    } else {
-      conditions.push(`"status" IN ('verified','alert_sent','donor_accepted','completed','life_saved')`);
+  if (mine === "true" && viewer?.id) {
+    conditions.push(`"createdById" = $${params.length + 1}`); params.push(viewer.id);
+  } else {
+    if (district) { conditions.push(`"district" = $${params.length + 1}`); params.push(district); }
+    else if (viewer?.role === "donor" && viewer.district) { conditions.push(`"district" = $${params.length + 1}`); params.push(viewer.district); }
+    if (bloodGroup) { conditions.push(`"bloodGroup" = $${params.length + 1}`); params.push(bloodGroup); }
+    if (componentType) { conditions.push(`"componentType" = $${params.length + 1}`); params.push(componentType); }
+    if (status) { conditions.push(`"status" = $${params.length + 1}`); params.push(status); }
+    if (!isPrivilegedViewer(viewer?.role)) {
+      if (viewer?.id) {
+        conditions.push(`("status" IN ('verified','alert_sent','donor_accepted','completed','life_saved') OR "createdById" = $${params.length + 1})`);
+        params.push(viewer.id);
+      } else {
+        conditions.push(`"status" IN ('verified','alert_sent','donor_accepted','completed','life_saved')`);
+      }
     }
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

@@ -121,6 +121,7 @@ export const api = {
   deleteDocument: (id: string) => req("/users/me/documents/" + id, { method: "DELETE" }),
   // requests
   listRequests: (params: Record<string, string> = {}) => req<BloodRequest[]>(`/requests?${new URLSearchParams(params)}`),
+  myRequests: () => req<BloodRequest[]>(`/requests?mine=true`),
   getRequest: (id: string) => req<BloodRequest>(`/requests/${id}`),
   createRequest: (data: any) => req<BloodRequest>("/requests", { method: "POST", body: JSON.stringify(data) }),
   uploadDocument: (id: string, base64: string, mimeType: string, documentType: string) =>
