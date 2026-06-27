@@ -43,10 +43,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "https://verify.msg91.com", "https://verify.phone91.com", "https://control.msg91.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://verify.msg91.com", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://verify.msg91.com", "https://verify.phone91.com", "https://control.msg91.com", "https://api.msg91.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.msg91.com", "https://control.msg91.com", "https://verify.msg91.com", "https://fcm.googleapis.com", "https://fcm.googleapis.com/"],
+      fontSrc: ["'self'", "https:", "data:"],
+      connectSrc: ["'self'", "https://api.msg91.com", "https://control.msg91.com", "https://verify.msg91.com", "https://fcm.googleapis.com", "wss://verify.msg91.com"],
+      frameSrc: ["'self'", "https://verify.msg91.com", "https://verify.phone91.com"],
     },
   },
   crossOriginEmbedderPolicy: false,
