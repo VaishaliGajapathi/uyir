@@ -7,17 +7,32 @@ services:
     buildCommand: npm install && npm run build && cd ../client && npm install && npm run build && rm -rf ../server/public && mkdir -p ../server/public && cp -r dist/* ../server/public/
     startCommand: npm start
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: uyir-db
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      - key: OPENAI_API_KEY
+      # OTP verification (required for signup/login OTP)
+      - key: MSG91_AUTH_KEY
         sync: false
+      # Speech-to-text + AI parsing (required for voice requests)
+      - key: FAL_KEY
+        sync: false
+      # AI request parsing & document verification (Gemini preferred)
       - key: GEMINI_API_KEY
         sync: false
-      - key: REPLICATE_API_TOKEN
+      - key: OPENAI_API_KEY
+        sync: false
+      # Web push notifications (optional; push disabled if unset)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      # Firebase Cloud Messaging for mobile push (optional)
+      - key: FIREBASE_SERVICE_ACCOUNT_BASE64
         sync: false
 
 databases:
