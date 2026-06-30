@@ -93,8 +93,36 @@ export function extractJson<T = any>(text: string): T | null {
   }
 }
 
-// Generic text-completion that prefers Gemini, falls back to OpenAI.
+// Text LLM models available via fal.ai OpenRouter (single FAL_KEY).
+const FAL_TEXT_MODELS = Array.from(new Set([
+  process.env.FAL_TEXT_MODEL,
+  "google/gemini-2.5-flash",
+  "openai/gpt-4o-mini",
+  "meta-llama/llama-3.3-70b-instruct",
+].filter(Boolean) as string[]));
+
+// Generic text-completion that prefers fal.ai OpenRouter, then Gemini, then OpenAI.
 export async function completeJSON(prompt: string): Promise<any | null> {
+  if (falOpenRouter && hasFalOpenRouter) {
+    for (const modelName of FAL_TEXT_MODELS) {
+      try {
+        const res = await falOpenRouter.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: "system", content: "Only return valid JSON. Do not wrap in markdown." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        });
+        const out = extractJson(res.choices[0]?.message?.content || "");
+        if (out) return out;
+        console.warn(`[ai] fal.ai text model ${modelName} returned non-JSON output`);
+      } catch (e) {
+        console.warn(`[ai] fal.ai text model ${modelName} failed, trying next:`, (e as Error).message);
+      }
+    }
+  }
   if (gemini) {
     let lastGeminiError = "";
     for (const modelName of GEMINI_TEXT_MODELS) {
