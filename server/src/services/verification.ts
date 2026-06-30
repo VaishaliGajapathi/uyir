@@ -1,4 +1,4 @@
-import { gemini, openai, falOpenRouter, MODELS, completeJSON, extractJson, hasGemini, hasFalOpenRouter, hasOpenAI, GEMINI_VISION_MODELS } from "../lib/ai.js";
+import { falOpenRouter, completeJSON, extractJson, hasFalOpenRouter, FAL_VISION_MODELS } from "../lib/ai.js";
 
 import { hasFal, callFalAI } from "../lib/ai.js";
 
@@ -270,16 +270,7 @@ Return ONLY valid JSON with this exact shape:
  "hospitalRegistrationFound":true/false,
  "gstNumberFound":true/false}`;
 
-  // Try fal.ai OpenRouter first (supports Gemini, GPT-4o, Claude, etc via one key)
-  const FAL_VISION_MODELS = [
-    "google/gemini-2.5-flash",
-    "openai/gpt-4o",
-    "anthropic/claude-3.5-sonnet",
-    "xai/grok-2-vision",
-    "meta-llama/llama-3.2-90b-vision-instruct",
-    "google/gemini-2.0-flash",
-  ];
-
+  // Vision verification via fal.ai OpenRouter (Gemini, GPT-4o, Claude via one key)
   if (falOpenRouter && hasFalOpenRouter) {
     for (const modelName of FAL_VISION_MODELS) {
       try {
@@ -316,64 +307,7 @@ Return ONLY valid JSON with this exact shape:
     console.warn("[verification] fal.ai OpenRouter not configured for vision");
   }
 
-  // Fallback to Gemini directly
-  if (gemini && hasGemini) {
-    for (const modelName of GEMINI_VISION_MODELS) {
-      try {
-        console.log("[verification] Attempting Gemini vision with model:", modelName);
-        const model = gemini.getGenerativeModel({ model: modelName });
-        const res = await model.generateContent([
-          { inlineData: { data: base64, mimeType } },
-          { text: prompt },
-        ]);
-        const text = res.response.text();
-        console.log("[verification] Gemini vision response:", text.substring(0, 200));
-        const out = extractJson<DocumentVerificationResult>(text);
-        if (out) {
-          const normalized = normalizeDocumentResult(out);
-          console.log("[verification] Gemini vision success:", normalized);
-          return normalized;
-        }
-        console.warn(`[verification] Gemini vision model ${modelName} could not parse JSON from response`);
-      } catch (e) {
-        console.error(`[verification] Gemini vision model ${modelName} failed:`, (e as Error).message);
-      }
-    }
-  }
-
-  if (openai && hasOpenAI) {
-    try {
-      console.log("[verification] Attempting OpenAI vision with model:", MODELS.vision);
-      const dataUri = `data:${mimeType};base64,${base64}`;
-      const res = await openai.chat.completions.create({
-        model: MODELS.vision,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: dataUri } },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-      });
-      const text = res.choices[0]?.message?.content || "";
-      console.log("[verification] OpenAI vision response:", text.substring(0, 200));
-      const out = extractJson<DocumentVerificationResult>(text);
-      if (out) {
-        const normalized = normalizeDocumentResult(out);
-        console.log("[verification] OpenAI vision success:", normalized);
-        return normalized;
-      }
-      console.warn("[verification] OpenAI vision could not parse JSON from response");
-    } catch (e) {
-      console.error("[verification] OpenAI vision failed:", (e as Error).message);
-    }
-  }
-
-  // If we reach here, all vision providers either failed or are not configured.
+  // If we reach here, fal.ai failed or is not configured.
   // This does NOT mean the document is fake – only that automatic AI checking could not run.
   return {
     score: 0,
@@ -423,7 +357,7 @@ export async function generateHealthTips(user: any): Promise<HealthTipsResult> {
   if (bmi && (bmi < 18.5 || bmi >= 30)) score -= 5; // Slight penalty for extreme BMI
   score = Math.max(0, Math.min(100, score));
 
-  if (!gemini) {
+  if (!hasFalOpenRouter) {
     const predictions = bmi 
       ? [`BMI: ${bmi.toFixed(1)} (${bmiCategory})`, "Good health status"]
       : ["Good health status"];
@@ -463,52 +397,9 @@ Provide:
 
 Return ONLY JSON: {"tips":["tip1","tip2"],"predictions":["pred1","pred2"],"postDonationTips":["tip1","tip2","tip3"]}`;
 
-    let out: { tips: string[]; predictions: string[]; postDonationTips: string[] } | null = null;
-
-    // Try fal.ai first
-    if (hasFal) {
-      try {
-        const falResult = await callFalAI(MODELS.falText, {
-          prompt,
-          max_tokens: 1024,
-          temperature: 0.3,
-        });
-        out = extractJson<{ tips: string[]; predictions: string[]; postDonationTips: string[] }>(
-          falResult?.output || falResult?.text || falResult?.content || JSON.stringify(falResult)
-        );
-        if (out) console.log("[health] fal.ai generated tips successfully");
-      } catch (e) {
-        console.warn("[health] fal.ai failed:", (e as Error).message);
-      }
-    }
-
-    // Fallback to Gemini
-    if (!out && gemini) {
-      try {
-        const model = gemini.getGenerativeModel({ model: MODELS.gemini });
-        const res = await model.generateContent([{ text: prompt }]);
-        out = extractJson<{ tips: string[]; predictions: string[]; postDonationTips: string[] }>(res.response.text());
-        if (out) console.log("[health] Gemini generated tips successfully");
-      } catch (e) {
-        console.warn("[health] Gemini failed:", (e as Error).message);
-      }
-    }
-
-    // Fallback to OpenAI
-    if (!out && openai) {
-      try {
-        const res = await openai.chat.completions.create({
-          model: MODELS.text,
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-          temperature: 0.3,
-        });
-        out = extractJson(res.choices[0]?.message?.content || "");
-        if (out) console.log("[health] OpenAI generated tips successfully");
-      } catch (e) {
-        console.warn("[health] OpenAI failed:", (e as Error).message);
-      }
-    }
+    // Generate health tips via fal.ai OpenRouter
+    const out = await completeJSON(prompt) as { tips: string[]; predictions: string[]; postDonationTips: string[] } | null;
+    if (out) console.log("[health] fal.ai generated tips successfully");
 
     const predictions = out?.predictions || (bmi ? [`BMI: ${bmi.toFixed(1)} (${bmiCategory})`, "Good health status"] : ["Good health status"]);
 

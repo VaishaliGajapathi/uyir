@@ -4,14 +4,14 @@ import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 import { transcribeAudio, parseRequestFromText, parseProfileFromText } from "../services/stt.js";
 import { analyzeMessage } from "../services/fraud.js";
 import { generateHealthTips } from "../services/verification.js";
-import { hasOpenAI, hasGemini, hasFal } from "../lib/ai.js";
+import { hasFal } from "../lib/ai.js";
 import { queryOne } from "../db.js";
 
 export const aiRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 aiRouter.get("/status", (_req: Request, res: any) => {
-  res.json({ openai: hasOpenAI, gemini: hasGemini, fal: hasFal });
+  res.json({ fal: hasFal });
 });
 
 aiRouter.post("/transcribe", requireAuth, upload.single("audio"), async (req: any, res: any) => {
