@@ -7,6 +7,7 @@ import { Spinner } from "./components/ui";
 import type { User } from "./lib/api";
 
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Home = lazy(() => import("./pages/Home"));
 const Requests = lazy(() => import("./pages/Requests"));
 const NewRequest = lazy(() => import("./pages/NewRequest"));
@@ -29,14 +30,14 @@ const Ratings = lazy(() => import("./pages/Ratings"));
 function dashboardPathForRole(user: User | null) {
   if (!user) return "/";
   if (user.role === "hospital_approver") return "/hospital-dashboard";
-  if (user.role === "admin" || user.role === "verifier") return "/admin";
+  if (user.role === "admin" || user.role === "verifier" || user.role === "super_admin") return "/admin";
   if (user.role === "ngo_admin") return "/ngoadmin";
   return "/home";
 }
 
 function AppShell({ children }: { children: ReactNode }) {
   const { user } = useApp();
-  const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier" && user?.role !== "ngo_admin";
+  const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier" && user?.role !== "ngo_admin" && user?.role !== "super_admin";
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {showEndUserShell && <BottomNav />}
@@ -60,6 +61,7 @@ function Inner() {
     <Suspense fallback={<div className="h-screen bg-slate-50" />}>
       <Routes>
         <Route path="/" element={user ? <Navigate to={defaultDashboard} replace /> : <Onboarding />} />
+        <Route path="/adminlogin" element={<AdminLogin />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/hospital-login" element={<HospitalLogin />} />
         <Route path="/hospital-register" element={<HospitalRegister />} />
@@ -78,7 +80,7 @@ function Inner() {
         <Route path="/ngoadmin" element={protectedElement(<NgoAdmin />)} />
         <Route path="/hospital-dashboard" element={protectedElement(<HospitalDashboard />)} />
         <Route path="/ratings" element={protectedElement(<Ratings />)} />
-        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital_approver" || user.role === "ngo_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
+        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital_approver" || user.role === "ngo_admin" || user.role === "super_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
