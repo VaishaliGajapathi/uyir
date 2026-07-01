@@ -80,6 +80,17 @@ usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: a
   res.json({ ok: true });
 });
 
+usersRouter.post("/me/availability", requireAuth, async (req: AuthedRequest, res: any) => {
+  const schema = z.object({ isAvailable: z.boolean() });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  const user = await queryOne<any>(
+    'UPDATE "User" SET "isAvailable" = $1 WHERE "id" = $2 RETURNING *',
+    [parse.data.isAvailable, req.userId]
+  );
+  res.json({ ok: true, isAvailable: user!.isAvailable });
+});
+
 usersRouter.post("/me/push-subscription", requireAuth, async (req: AuthedRequest, res: any) => {
   const schema = z.object({
     subscription: z.object({
