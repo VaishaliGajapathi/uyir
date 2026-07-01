@@ -8,7 +8,7 @@ import type { Lang } from "../lib/constants";
 
 function dashboardPathForRole(role?: string) {
   if (role === "hospital") return "/hospital-dashboard";
-  if (role === "admin" || role === "verifier" || role === "super_admin") return "/admin";
+  if (role === "administrator" || role === "volunteer" || role === "super_admin") return "/admin";
   if (role === "ngo") return "/ngoadmin";
   if (role === "blood_bank") return "/blood-bank-dashboard";
   return "/home";

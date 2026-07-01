@@ -212,8 +212,8 @@ authRouter.post("/hospital/register", asyncHandler(async (req: any, res: any) =>
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","password","role","district","hospitalName","hospitalRegistrationId","hospitalId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
-    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), hashedPassword, "hospital", district, hospitalName, hospitalRegistrationId, hospital.id]
+    'INSERT INTO "User" ("id","name","mobile","password","plainPassword","role","district","hospitalName","hospitalRegistrationId","hospitalId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) RETURNING *',
+    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), hashedPassword, password, "hospital", district, hospitalName, hospitalRegistrationId, hospital.id]
   );
 
   const token = signToken(user.id, user.role);

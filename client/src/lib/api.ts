@@ -38,7 +38,7 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export interface User {
-  id: string; name: string; mobile: string; role: "donor" | "admin" | "verifier" | "ngo" | "blood_bank" | "hospital" | "super_admin"; language: string;
+  id: string; name: string; mobile: string; role: "donor" | "administrator" | "volunteer" | "ngo" | "blood_bank" | "hospital" | "super_admin"; language: string;
   email?: string;
   designation?: string;
   ngoName?: string;
@@ -176,8 +176,15 @@ export const api = {
   adminBanUser: (id: string) => req(`/admin/ban-user/${id}`, { method: "POST" }),
   adminGetAdmins: () => req<any[]>("/admin/admins"),
   adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
-  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string; district?: string; ngoName?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
+  adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string; district?: string; ngoName?: string; ngoId?: string; designation?: string; ngoAddress?: string; ngoRegistrationNumber?: string; ngoPhone?: string; ngoEmail?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   adminUpdateAdmin: (id: string, data: { name?: string; email?: string; designation?: string; district?: string }) => req<User>(`/admin/admins/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  adminResetPassword: (id: string, password: string) => req(`/admin/admins/${id}/reset-password`, { method: "POST", body: JSON.stringify({ password }) }),
+  adminViewPassword: (id: string) => req<{ password: string }>(`/admin/admins/${id}/password`),
+  adminFreezeUser: (id: string) => req(`/admin/admins/${id}/freeze`, { method: "POST" }),
+  adminDeactivateUser: (id: string) => req(`/admin/admins/${id}/deactivate`, { method: "POST" }),
+  adminDeleteUser: (id: string) => req(`/admin/admins/${id}`, { method: "DELETE" }),
+  changePassword: (currentPassword: string, newPassword: string) => req("/admin/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
+  adminGetNgos: () => req<any[]>("/admin/ngos"),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
   adminApproveNgo: (id: string) => req(`/admin/ngos/${id}/approve`, { method: "POST" }),

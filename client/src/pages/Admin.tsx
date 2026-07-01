@@ -23,10 +23,15 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
   const [profileForm, setProfileForm] = useState({ name: "", email: "", designation: "", district: "" });
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [ngoOrganizations, setNgoOrganizations] = useState<any[]>([]);
+  const [viewedPassword, setViewedPassword] = useState<string | null>(null);
+  const [viewingPasswordFor, setViewingPasswordFor] = useState<string | null>(null);
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
@@ -85,7 +90,7 @@ export function Admin() {
   }
 
   useEffect(() => {
-    if (user?.role !== "admin" && user?.role !== "verifier") return;
+    if (user?.role !== "administrator" && user?.role !== "volunteer" && user?.role !== "super_admin") return;
     loadAll();
   }, [user]);
 
@@ -114,6 +119,11 @@ export function Admin() {
       setAdmins(a);
       // Filter NGO admins from admins list
       setNgos(a.filter((u: any) => u.role === "ngo"));
+      // Load NGO organizations for parent-child selection
+      try {
+        const ngoOrgs = await api.adminGetNgos();
+        setNgoOrganizations(ngoOrgs);
+      } catch {}
     } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   }
 
@@ -221,7 +231,7 @@ export function Admin() {
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
+      setAdminForm({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -250,7 +260,7 @@ export function Admin() {
     }
   }
 
-  if (user?.role !== "admin" && user?.role !== "verifier") {
+  if (user?.role !== "administrator" && user?.role !== "volunteer" && user?.role !== "super_admin") {
     return <div className="p-10 text-center text-slate-400">Access denied. Admin only.</div>;
   }
 
@@ -756,7 +766,9 @@ export function Admin() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-bold text-slate-800">Admin Users ({admins.length})</h3>
-            <Button size="sm" onClick={() => setShowAdminForm(true)}>+ Add Admin</Button>
+            {user?.role === "super_admin" && (
+              <Button size="sm" onClick={() => setShowAdminForm(true)}>+ Add Admin</Button>
+            )}
           </div>
           {showAdminForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
@@ -792,10 +804,11 @@ export function Admin() {
                 <select
                   className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   value={adminForm.role}
-                  onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
+                  onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value, ngoId: "", ngoName: "" })}
                 >
-                  <option value="admin">Admin</option>
-                  <option value="verifier">Verifier</option>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="administrator">Administrator</option>
+                  <option value="volunteer">Volunteer</option>
                   <option value="ngo">NGO</option>
                   <option value="blood_bank">Blood Bank</option>
                   <option value="hospital">Hospital</option>
@@ -809,41 +822,71 @@ export function Admin() {
                 />
                 {adminForm.role === "ngo" && (
                   <>
-                    <input
-                      type="text"
-                      placeholder="NGO Name"
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                      value={adminForm.ngoName}
-                      onChange={(e) => setAdminForm({ ...adminForm, ngoName: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      placeholder="NGO Address"
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                      value={adminForm.ngoAddress}
-                      onChange={(e) => setAdminForm({ ...adminForm, ngoAddress: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      placeholder="NGO Registration Number"
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                      value={adminForm.ngoRegistrationNumber}
-                      onChange={(e) => setAdminForm({ ...adminForm, ngoRegistrationNumber: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      placeholder="NGO Phone"
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                      value={adminForm.ngoPhone}
-                      onChange={(e) => setAdminForm({ ...adminForm, ngoPhone: e.target.value })}
-                    />
-                    <input
-                      type="email"
-                      placeholder="NGO Email"
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-                      value={adminForm.ngoEmail}
-                      onChange={(e) => setAdminForm({ ...adminForm, ngoEmail: e.target.value })}
-                    />
+                    <div className="col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-slate-600">Select existing NGO or create new</label>
+                      <select
+                        className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                        value={adminForm.ngoId}
+                        onChange={(e) => {
+                          if (e.target.value === "__new__") {
+                            setAdminForm({ ...adminForm, ngoId: "", ngoName: "" });
+                          } else {
+                            const ngo = ngoOrganizations.find((n: any) => n.id === e.target.value);
+                            setAdminForm({ ...adminForm, ngoId: e.target.value, ngoName: ngo?.name || "", district: ngo?.district || adminForm.district });
+                          }
+                        }}
+                      >
+                        <option value="">-- Select existing NGO --</option>
+                        <option value="__new__">+ Create new NGO</option>
+                        {ngoOrganizations.map((n: any) => (
+                          <option key={n.id} value={n.id}>{n.name} ({n.district})</option>
+                        ))}
+                      </select>
+                    </div>
+                    {!adminForm.ngoId && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="NGO Name"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                          value={adminForm.ngoName}
+                          onChange={(e) => setAdminForm({ ...adminForm, ngoName: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="NGO Address"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                          value={adminForm.ngoAddress}
+                          onChange={(e) => setAdminForm({ ...adminForm, ngoAddress: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="NGO Registration Number"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                          value={adminForm.ngoRegistrationNumber}
+                          onChange={(e) => setAdminForm({ ...adminForm, ngoRegistrationNumber: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="NGO Phone"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                          value={adminForm.ngoPhone}
+                          onChange={(e) => setAdminForm({ ...adminForm, ngoPhone: e.target.value })}
+                        />
+                        <input
+                          type="email"
+                          placeholder="NGO Email"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                          value={adminForm.ngoEmail}
+                          onChange={(e) => setAdminForm({ ...adminForm, ngoEmail: e.target.value })}
+                        />
+                      </>
+                    )}
+                    {adminForm.ngoId && (
+                      <div className="col-span-2 text-xs text-slate-500 bg-emerald-50 rounded p-2">
+                        Linking to existing NGO: <strong>{ngoOrganizations.find((n: any) => n.id === adminForm.ngoId)?.name}</strong>
+                      </div>
+                    )}
                     <SearchableSelect
                       options={TN_DISTRICTS}
                       value={adminForm.district}
@@ -869,21 +912,63 @@ export function Admin() {
                   {(a.role as string) === "ngo" && (
                     <p className="text-xs text-slate-400">{a.ngoName} · {a.district}</p>
                   )}
+                  {a.banned && <span className="text-xs text-rose-600 font-medium"> · Frozen</span>}
+                  {!a.verified && a.role !== "ngo" && <span className="text-xs text-amber-600 font-medium"> · Deactivated</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={a.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}>{a.role}</Badge>
-                  {user?.role === "super_admin" && (
-                    <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={() => {
-                      setProfileForm({ name: a.name, email: a.email || "", designation: a.designation || "", district: a.district || "" });
-                      setEditingAdminId(a.id);
-                      setShowProfileEdit(true);
-                      setTab("profile");
-                    }}>Edit</Button>
+                  <Badge className={a.role === "super_admin" ? "bg-rose-100 text-rose-700" : a.role === "administrator" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}>{a.role}</Badge>
+                  {user?.role === "super_admin" && a.role !== "super_admin" && (
+                    <>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={() => {
+                        setProfileForm({ name: a.name, email: a.email || "", designation: a.designation || "", district: a.district || "" });
+                        setEditingAdminId(a.id);
+                        setShowProfileEdit(true);
+                        setTab("profile");
+                      }}>Edit</Button>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" loading={busy === `pw-${a.id}`} onClick={async () => {
+                        setBusy(`pw-${a.id}`);
+                        try {
+                          const res = await api.adminViewPassword(a.id);
+                          setViewedPassword(res.password);
+                          setViewingPasswordFor(a.name);
+                        } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                      }}>View PW</Button>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" loading={busy === `reset-${a.id}`} onClick={async () => {
+                        const pw = prompt(`Reset password for ${a.name}:`);
+                        if (!pw) return;
+                        setBusy(`reset-${a.id}`);
+                        try {
+                          await api.adminResetPassword(a.id, pw);
+                          alert("Password reset successfully");
+                        } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                      }}>Reset PW</Button>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" loading={busy === `freeze-${a.id}`} onClick={async () => {
+                        if (!confirm(`Freeze ${a.name}? They will be banned from login.`)) return;
+                        setBusy(`freeze-${a.id}`);
+                        try { await api.adminFreezeUser(a.id); await loadAll(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                      }}>{a.banned ? "Unfreeze" : "Freeze"}</Button>
+                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" loading={busy === `deact-${a.id}`} onClick={async () => {
+                        if (!confirm(`${a.verified ? "Deactivate" : "Activate"} ${a.name}?`)) return;
+                        setBusy(`deact-${a.id}`);
+                        try { await api.adminDeactivateUser(a.id); await loadAll(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                      }}>{a.verified ? "Deactivate" : "Activate"}</Button>
+                    </>
                   )}
                 </div>
               </div>
             ))}
           </div>
+          {viewedPassword && (
+            <div className="mt-3 rounded-lg bg-slate-800 p-3 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Password for {viewingPasswordFor}:</p>
+                  <p className="text-sm font-mono font-bold">{viewedPassword}</p>
+                </div>
+                <button onClick={() => { setViewedPassword(null); setViewingPasswordFor(null); }} className="text-slate-400 hover:text-white">✕</button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -891,13 +976,71 @@ export function Admin() {
         <Card className="p-4">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold text-slate-800">{editingAdminId ? "Edit Admin Profile" : "My Profile"}</h3>
-            {!showProfileEdit && (
-              <Button size="sm" onClick={() => {
-                setProfileForm({ name: user?.name || "", email: user?.email || "", designation: user?.designation || "", district: user?.district || "" });
-                setShowProfileEdit(true);
-              }}>Edit Profile</Button>
-            )}
+            <div className="flex gap-2">
+              {!editingAdminId && (
+                <Button size="sm" variant="outline" onClick={() => setShowPasswordChange(!showPasswordChange)}>Change Password</Button>
+              )}
+              {!showProfileEdit && (
+                <Button size="sm" onClick={() => {
+                  setProfileForm({ name: user?.name || "", email: user?.email || "", designation: user?.designation || "", district: user?.district || "" });
+                  setShowProfileEdit(true);
+                }}>Edit Profile</Button>
+              )}
+            </div>
           </div>
+          
+          {showPasswordChange && !editingAdminId && (
+            <div className="mb-4 rounded-lg bg-slate-50 p-4">
+              <div className="mb-3 grid grid-cols-3 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Current Password</label>
+                  <input
+                    type="password"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">New Password</label>
+                  <input
+                    type="password"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Confirm Password</label>
+                  <input
+                    type="password"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" loading={busy === "changePassword"} onClick={async () => {
+                  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                    alert("New passwords do not match");
+                    return;
+                  }
+                  setBusy("changePassword");
+                  try {
+                    await api.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+                    alert("Password changed successfully");
+                    setShowPasswordChange(false);
+                    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                  } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                }}>Update Password</Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setShowPasswordChange(false);
+                  setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                }}>Cancel</Button>
+              </div>
+            </div>
+          )}
           
           {showProfileEdit ? (
             <div className="rounded-lg bg-slate-50 p-4">

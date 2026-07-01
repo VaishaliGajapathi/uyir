@@ -38,7 +38,7 @@ export function requireAdminOrHospitalApprover(req: AuthedRequest, res: Response
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
   try {
     const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
-    if (decoded.role !== "admin" && decoded.role !== "verifier" && decoded.role !== "hospital") {
+    if (decoded.role !== "administrator" && decoded.role !== "super_admin" && decoded.role !== "volunteer" && decoded.role !== "hospital") {
       return res.status(403).json({ error: "Forbidden: Admin or hospital approver required" });
     }
     req.userId = decoded.userId;
@@ -49,13 +49,13 @@ export function requireAdminOrHospitalApprover(req: AuthedRequest, res: Response
   }
 }
 
-export function requireAdminOrVerifier(req: AuthedRequest, res: Response, next: NextFunction) {
+export function requireAdminOrVolunteer(req: AuthedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
   try {
     const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
-    if (decoded.role !== "admin" && decoded.role !== "verifier") {
-      return res.status(403).json({ error: "Forbidden: Admin or verifier required" });
+    if (decoded.role !== "administrator" && decoded.role !== "super_admin" && decoded.role !== "volunteer") {
+      return res.status(403).json({ error: "Forbidden: Administrator or volunteer required" });
     }
     req.userId = decoded.userId;
     req.role = decoded.role;
@@ -86,8 +86,8 @@ export function requireAdminOrNgo(req: AuthedRequest, res: Response, next: NextF
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
   try {
     const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
-    if (decoded.role !== "admin" && decoded.role !== "verifier" && decoded.role !== "ngo") {
-      return res.status(403).json({ error: "Forbidden: Admin, verifier, or NGO admin required" });
+    if (decoded.role !== "administrator" && decoded.role !== "super_admin" && decoded.role !== "volunteer" && decoded.role !== "ngo" && decoded.role !== "blood_bank") {
+      return res.status(403).json({ error: "Forbidden: Admin, volunteer, NGO, or blood bank admin required" });
     }
     req.userId = decoded.userId;
     req.role = decoded.role;

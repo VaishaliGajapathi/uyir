@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { query, queryOne, exec } from "../db.js";
-import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo, requireSuperAdmin, AuthedRequest } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrVolunteer, requireAdminOrNgo, requireSuperAdmin, AuthedRequest } from "../middleware/auth.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
-const ADMIN_ROLES = ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"] as const;
+const ADMIN_ROLES = ["administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"] as const;
 
 function asyncHandler(fn: (req: AuthedRequest, res: Response, next: NextFunction) => Promise<any>) {
   return (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -42,55 +42,55 @@ adminRouter.get("/stats", requireAdminOrNgo, asyncHandler(async (_req: AuthedReq
 }));
 
 // Donors list
-adminRouter.get("/donors", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+adminRouter.get("/donors", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const donors = await query<any>('SELECT * FROM "User" WHERE "role" = $1 ORDER BY "createdAt" DESC', ["donor"]);
   res.json(donors);
 }));
 
 // All requests
-adminRouter.get("/requests", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+adminRouter.get("/requests", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const requests = await query<any>('SELECT * FROM "BloodRequest" ORDER BY "createdAt" DESC', []);
   res.json(requests);
 }));
 
 // Pending verification requests
-adminRouter.get("/pending-verification", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+adminRouter.get("/pending-verification", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const requests = await query<any>('SELECT * FROM "BloodRequest" WHERE "status" = $1 ORDER BY "createdAt" DESC', ["pending_verification"]);
   res.json(requests);
 }));
 
 // Hospitals list
-adminRouter.get("/hospitals", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+adminRouter.get("/hospitals", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const hospitals = await query<any>('SELECT * FROM "Hospital" ORDER BY "createdAt" DESC', []);
   res.json(hospitals);
 }));
 
 // Verify a hospital
-adminRouter.post("/hospitals/:id/verify", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+adminRouter.post("/hospitals/:id/verify", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "Hospital" SET "verified" = true, "verifiedById" = $1, "verifiedAt" = NOW() WHERE "id" = $2', [req.userId, req.params.id]);
   res.json({ ok: true });
 }));
 
 // Reject a hospital
-adminRouter.post("/hospitals/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+adminRouter.post("/hospitals/:id/reject", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
 // Fraud reports
-adminRouter.get("/fraud-reports", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+adminRouter.get("/fraud-reports", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const reports = await query<any>('SELECT * FROM "FraudReport" ORDER BY "createdAt" DESC', []);
   res.json(reports);
 }));
 
 // Action a fraud report
-adminRouter.post("/reports/:id/action", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+adminRouter.post("/reports/:id/action", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["actioned", req.params.id]);
   res.json({ ok: true });
 }));
 
 // Dismiss a fraud report
-adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+adminRouter.post("/reports/:id/dismiss", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "FraudReport" SET "status" = $1 WHERE "id" = $2', ["dismissed", req.params.id]);
   res.json({ ok: true });
 }));
@@ -105,8 +105,8 @@ adminRouter.post("/verify-request/:id", requireAdminOrNgo, asyncHandler(async (r
 }));
 
 // Admin users list
-adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
-  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3,$4,$5,$6) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
+adminRouter.get("/admins", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3,$4,$5,$6) ORDER BY "createdAt" DESC', ["administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"]);
   
   // Add activity statistics for NGO admins
   for (const admin of admins) {
@@ -124,22 +124,42 @@ adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Aut
   res.json(admins);
 }));
 
-// Create admin user
-adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, mobile, email, role, password, district, ngoName, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail } = req.body;
+// Create admin user (SUPER ADMIN ONLY)
+adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, mobile, email, role, password, district, ngoName, ngoId, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
-  if (role === "ngo" && (!district || !ngoName)) {
-    return res.status(400).json({ error: "district and ngoName are required for NGO admins" });
+  if (role === "ngo" && (!district || !ngoName) && !ngoId) {
+    return res.status(400).json({ error: "district and ngoName (or ngoId) are required for NGO admins" });
   }
   const bcrypt = await import("bcryptjs");
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
   const sanitizedMobile = mobile.replace(/\D/g, "").slice(-10);
   const existingUser = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [sanitizedMobile]);
   if (existingUser) return res.status(400).json({ error: "User with this mobile already exists" });
+
+  // If NGO role and ngoId provided, link to existing NGO
+  let finalNgoId = ngoId || null;
+  let finalNgoName = ngoName || null;
+  let finalNgoStatus = null;
+  if (role === "ngo" && ngoId) {
+    const ngo = await queryOne<any>('SELECT * FROM "Ngo" WHERE "id" = $1 LIMIT 1', [ngoId]);
+    if (!ngo) return res.status(400).json({ error: "NGO not found" });
+    finalNgoName = ngo.name;
+    finalNgoStatus = ngo.status;
+  } else if (role === "ngo" && ngoName && !ngoId) {
+    // Create new NGO record
+    const newNgo = await queryOne<any>(
+      'INSERT INTO "Ngo" ("name","address","registrationNumber","phone","email","district","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *',
+      [ngoName, ngoAddress || null, ngoRegistrationNumber || null, ngoPhone || null, ngoEmail || null, district || null, "pending"]
+    );
+    finalNgoId = newNgo.id;
+    finalNgoStatus = "pending";
+  }
+
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","email","password","role","language","verified","district","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()) RETURNING *',
-    [name, sanitizedMobile, email || null, hashedPassword, role, "ta", role === "ngo" ? district : null, role === "ngo" ? ngoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? "pending" : null]
+    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW()) RETURNING *',
+    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", role === "ngo" ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null]
   );
   res.status(201).json(user);
 }));
@@ -160,21 +180,24 @@ adminRouter.post("/requests/:id/reject", requireAdminOrNgo, asyncHandler(async (
 }));
 
 // Approve NGO
-adminRouter.post("/ngos/:id/approve", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  await exec('UPDATE "User" SET "ngoStatus" = $1 WHERE "id" = $2', ["approved", req.params.id]);
-  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+adminRouter.post("/ngos/:id/approve", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  // Approve NGO organization and all its users
+  await exec('UPDATE "Ngo" SET "status" = $1 WHERE "id" = $2', ["approved", req.params.id]);
+  await exec('UPDATE "User" SET "ngoStatus" = $1 WHERE "ngoId" = $2', ["approved", req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "Ngo" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
 }));
 
 // Reject NGO
-adminRouter.post("/ngos/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  await exec('UPDATE "User" SET "ngoStatus" = $1 WHERE "id" = $2', ["rejected", req.params.id]);
-  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+adminRouter.post("/ngos/:id/reject", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  await exec('UPDATE "Ngo" SET "status" = $1 WHERE "id" = $2', ["rejected", req.params.id]);
+  await exec('UPDATE "User" SET "ngoStatus" = $1 WHERE "ngoId" = $2', ["rejected", req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "Ngo" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
 }));
 
 // Ban a user
-adminRouter.post("/ban-user/:id", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+adminRouter.post("/ban-user/:id", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "User" SET "reputationScore" = -1000, "banned" = true WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
@@ -242,7 +265,7 @@ adminRouter.post("/hospitals/:id/freeze", requireSuperAdmin, asyncHandler(async 
 
 // SUPER ADMIN ONLY: Delete an admin user
 adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('DELETE FROM "User" WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true, deletedId: req.params.id });
@@ -251,7 +274,7 @@ adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Au
 // SUPER ADMIN ONLY: Update admin user profile
 adminRouter.patch("/admins/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const { name, email, designation, district } = req.body;
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   
   const updates: string[] = [];
@@ -273,7 +296,7 @@ adminRouter.patch("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Aut
 
 // SUPER ADMIN ONLY: Deactivate an admin user
 adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('UPDATE "User" SET "verified" = false WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
@@ -282,9 +305,48 @@ adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async
 
 // SUPER ADMIN ONLY: Freeze an admin user
 adminRouter.post("/admins/:id/freeze", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('UPDATE "User" SET "banned" = true WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Reset any user's password
+adminRouter.post("/admins/:id/reset-password", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: "Password is required" });
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!admin) return res.status(404).json({ error: "User not found" });
+  const bcrypt = await import("bcryptjs");
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await exec('UPDATE "User" SET "password" = $1, "plainPassword" = $2 WHERE "id" = $3', [hashedPassword, password, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// SUPER ADMIN ONLY: View any user's password
+adminRouter.get("/admins/:id/password", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const admin = await queryOne<any>('SELECT "plainPassword" FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!admin) return res.status(404).json({ error: "User not found" });
+  res.json({ password: admin.plainPassword || "Password not available (created before this feature)" });
+}));
+
+// Any authenticated user: change own password
+adminRouter.post("/change-password", requireAuth, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: "Current password and new password are required" });
+  const user = await queryOne<any>('SELECT "password" FROM "User" WHERE "id" = $1 LIMIT 1', [req.userId]);
+  if (!user || !user.password) return res.status(400).json({ error: "No password set" });
+  const bcrypt = await import("bcryptjs");
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await exec('UPDATE "User" SET "password" = $1, "plainPassword" = $2 WHERE "id" = $3', [hashedPassword, newPassword, req.userId]);
+  res.json({ ok: true });
+}));
+
+// Get all NGOs (for parent-child selection)
+adminRouter.get("/ngos", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const ngos = await query<any>('SELECT * FROM "Ngo" ORDER BY "createdAt" DESC');
+  res.json(ngos);
 }));
