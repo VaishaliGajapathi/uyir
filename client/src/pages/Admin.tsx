@@ -6,7 +6,7 @@ import { Card, Button, Badge, Spinner } from "../components/ui";
 import { timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS } from "../lib/constants";
 
-type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "admins";
+type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins";
 
 export function Admin() {
   const { user } = useApp();
@@ -17,6 +17,7 @@ export function Admin() {
   const [pending, setPending] = useState<any[]>([]);
   const [fraudReports, setFraudReports] = useState<any[]>([]);
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [ngos, setNgos] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +104,8 @@ export function Admin() {
       setFraudReports(f);
       setHospitals(h);
       setAdmins(a);
+      // Filter NGO admins from admins list
+      setNgos(a.filter((u: any) => u.role === "ngo_admin"));
     } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   }
 
@@ -238,6 +241,7 @@ export function Admin() {
             { id: "verification", label: "Verification", icon: CheckCircle2 },
             { id: "fraud", label: "Fraud Reports", icon: AlertTriangle },
             { id: "hospitals", label: "Hospitals", icon: Building2 },
+            { id: "ngos", label: "NGOs", icon: Building2 },
             { id: "admins", label: "Admin Users", icon: ShieldCheck },
           ] as const).map((item) => {
             const Icon = item.icon;
@@ -627,6 +631,37 @@ export function Admin() {
                       <XCircle className="h-3 w-3" /> Revoke
                     </Button>
                   )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {tab === "ngos" && (
+        <Card className="p-4">
+          <h3 className="mb-2 font-bold text-slate-800">NGO Admins ({ngos.length})</h3>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {ngos.length === 0 && <p className="text-sm text-slate-400">No NGO admins found.</p>}
+            {ngos.map((n) => (
+              <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{n.name}</p>
+                    <p className="text-xs text-slate-400">{n.mobile} · {n.district || "No district"}</p>
+                    {n.ngoName && <p className="text-xs text-slate-500">NGO: {n.ngoName}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-violet-100 text-violet-700">NGO Admin</Badge>
+                    <Badge className={n.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>
+                      {n.verified ? "Verified" : "Unverified"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="outline" loading={busy === n.id} onClick={() => banUser(n.id)}>
+                    <Ban className="h-3 w-3" /> Ban
+                  </Button>
                 </div>
               </div>
             ))}
