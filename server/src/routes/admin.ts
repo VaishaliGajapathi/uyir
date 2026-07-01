@@ -350,3 +350,188 @@ adminRouter.get("/ngos", requireAdminOrVolunteer, asyncHandler(async (_req: Auth
   const ngos = await query<any>('SELECT * FROM "Ngo" ORDER BY "createdAt" DESC');
   res.json(ngos);
 }));
+
+// ============ CRM ENDPOINTS ============
+
+// Activity timeline (recent audit logs)
+adminRouter.get("/activity", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+  const logs = await query<any>(
+    `SELECT a.*, u."name" as "userName", u."role" as "userRole"
+     FROM "AuditLog" a
+     LEFT JOIN "User" u ON a."userId" = u."id"
+     ORDER BY a."createdAt" DESC
+     LIMIT $1`,
+    [limit]
+  );
+  res.json(logs);
+}));
+
+// User activity timeline (for a specific user)
+adminRouter.get("/users/:id/activity", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+  const logs = await query<any>(
+    `SELECT a.*, u."name" as "userName", u."role" as "userRole"
+     FROM "AuditLog" a
+     LEFT JOIN "User" u ON a."userId" = u."id"
+     WHERE a."userId" = $1
+     ORDER BY a."createdAt" DESC
+     LIMIT $2`,
+    [req.params.id, limit]
+  );
+  res.json(logs);
+}));
+
+// Donor search with filters and sorting
+adminRouter.get("/donors/search", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { q, bloodGroup, district, sortBy, sortOrder, minDonations, maxDonations } = req.query;
+  let sql = `SELECT * FROM "User" WHERE "role" = 'donor'`;
+  const params: any[] = [];
+  let idx = 1;
+
+  if (q) {
+    sql += ` AND ("name" ILIKE $${idx} OR "mobile" ILIKE $${idx})`;
+    params.push(`%${q}%`);
+    idx++;
+  }
+  if (bloodGroup) {
+    sql += ` AND "bloodGroup" = $${idx}`;
+    params.push(bloodGroup);
+    idx++;
+  }
+  if (district) {
+    sql += ` AND "district" = $${idx}`;
+    params.push(district);
+    idx++;
+  }
+  if (minDonations) {
+    sql += ` AND "donationCount" >= $${idx}`;
+    params.push(parseInt(minDonations as string));
+    idx++;
+  }
+  if (maxDonations) {
+    sql += ` AND "donationCount" <= $${idx}`;
+    params.push(parseInt(maxDonations as string));
+    idx++;
+  }
+
+  const validSortFields = ["createdAt", "name", "donationCount", "reputationScore", "lastDonationDate"];
+  const sortField = validSortFields.includes(sortBy as string) ? `"${sortBy}"` : '"createdAt"';
+  const sortDir = sortOrder === "asc" ? "ASC" : "DESC";
+  sql += ` ORDER BY ${sortField} ${sortDir}`;
+
+  const donors = await query<any>(sql, params);
+  res.json(donors);
+}));
+
+// Blood inventory (aggregate by blood group)
+adminRouter.get("/blood-inventory", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const byGroup = await query<any>(
+    `SELECT "bloodGroup", COUNT(*)::int as "donorCount",
+            COUNT(*) FILTER (WHERE "lastDonationDate" IS NULL OR "lastDonationDate" < NOW() - INTERVAL '90 days')::int as "eligibleDonors",
+            COUNT(*) FILTER (WHERE "isPlateletDonor" = true)::int as "plateletDonors"
+     FROM "User" WHERE "role" = 'donor' AND "verified" = true AND "banned" = false
+     GROUP BY "bloodGroup" ORDER BY "bloodGroup"`
+  );
+  const byDistrict = await query<any>(
+    `SELECT "district", COUNT(*)::int as "donorCount",
+            COUNT(*) FILTER (WHERE "lastDonationDate" IS NULL OR "lastDonationDate" < NOW() - INTERVAL '90 days')::int as "eligibleDonors"
+     FROM "User" WHERE "role" = 'donor' AND "verified" = true AND "banned" = false
+     GROUP BY "district" ORDER BY "donorCount" DESC`
+  );
+  const totalDonors = byGroup.reduce((sum: number, g: any) => sum + g.donorCount, 0);
+  const totalEligible = byGroup.reduce((sum: number, g: any) => sum + g.eligibleDonors, 0);
+  res.json({ byGroup, byDistrict, totalDonors, totalEligible });
+}));
+
+// Request lifecycle / pipeline
+adminRouter.get("/requests/pipeline", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const byStatus = await query<any>(
+    `SELECT "status", COUNT(*)::int as cnt,
+            COUNT(*) FILTER (WHERE "emergencyLevel" = 'red')::int as "redCount",
+            COUNT(*) FILTER (WHERE "emergencyLevel" = 'orange')::int as "orangeCount",
+            COUNT(*) FILTER (WHERE "emergencyLevel" = 'green')::int as "greenCount"
+     FROM "BloodRequest"
+     GROUP BY "status" ORDER BY "status"`
+  );
+  const byBloodGroup = await query<any>(
+    `SELECT "bloodGroup", COUNT(*)::int as cnt
+     FROM "BloodRequest"
+     GROUP BY "bloodGroup" ORDER BY "bloodGroup"`
+  );
+  const byDistrict = await query<any>(
+    `SELECT "district", COUNT(*)::int as cnt
+     FROM "BloodRequest"
+     GROUP BY "district" ORDER BY cnt DESC`
+  );
+  const fulfillmentRate = await queryOne<any>(
+    `SELECT
+       COUNT(*)::int as "total",
+       COUNT(*) FILTER (WHERE "status" = 'completed')::int as "completed",
+       COUNT(*) FILTER (WHERE "status" = 'closed')::int as "closed",
+       COUNT(*) FILTER (WHERE "status" = 'rejected')::int as "rejected"
+     FROM "BloodRequest"`
+  );
+  res.json({ byStatus, byBloodGroup, byDistrict, fulfillmentRate });
+}));
+
+// Donor history (donation responses for a specific donor)
+adminRouter.get("/donors/:id/history", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const history = await query<any>(
+    `SELECT dr.*, br."patientName", br."bloodGroup", br."hospitalName", br."district", br."emergencyLevel"
+     FROM "DonorResponse" dr
+     JOIN "BloodRequest" br ON dr."requestId" = br."id"
+     WHERE dr."donorId" = $1
+     ORDER BY dr."createdAt" DESC`,
+    [req.params.id]
+  );
+  res.json(history);
+}));
+
+// Role hierarchy
+adminRouter.get("/role-hierarchy", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const byRole = await query<any>(
+    `SELECT "role", COUNT(*)::int as cnt,
+            COUNT(*) FILTER (WHERE "verified" = true)::int as "activeCount",
+            COUNT(*) FILTER (WHERE "banned" = true)::int as "bannedCount"
+     FROM "User"
+     WHERE "role" IN ('super_admin','administrator','volunteer','ngo','blood_bank','hospital','donor')
+     GROUP BY "role" ORDER BY cnt DESC`
+  );
+  const ngoUsers = await query<any>(
+    `SELECT n."name" as "ngoName", n."district", n."status", COUNT(u."id")::int as "userCount"
+     FROM "Ngo" n
+     LEFT JOIN "User" u ON u."ngoId" = n."id"
+     GROUP BY n."id", n."name", n."district", n."status"
+     ORDER BY n."name"`
+  );
+  res.json({ byRole, ngoUsers });
+}));
+
+// Analytics dashboard
+adminRouter.get("/analytics", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const requestsOverTime = await query<any>(
+    `SELECT DATE("createdAt") as date, COUNT(*)::int as cnt
+     FROM "BloodRequest"
+     WHERE "createdAt" > NOW() - INTERVAL '30 days'
+     GROUP BY DATE("createdAt") ORDER BY date`
+  );
+  const donationsOverTime = await query<any>(
+    `SELECT DATE("createdAt") as date, COUNT(*)::int as cnt
+     FROM "DonorResponse"
+     WHERE "createdAt" > NOW() - INTERVAL '30 days' AND "status" = 'completed'
+     GROUP BY DATE("createdAt") ORDER BY date`
+  );
+  const topDonors = await query<any>(
+    `SELECT "name", "mobile", "bloodGroup", "district", "donationCount", "livesSavedCount", "reputationScore"
+     FROM "User" WHERE "role" = 'donor'
+     ORDER BY "donationCount" DESC LIMIT 10`
+  );
+  const districtHeatmap = await query<any>(
+    `SELECT "district", COUNT(*)::int as "requests",
+            COUNT(*) FILTER (WHERE "status" NOT IN ('closed','rejected','completed'))::int as "active"
+     FROM "BloodRequest"
+     GROUP BY "district" ORDER BY "requests" DESC`
+  );
+  res.json({ requestsOverTime, donationsOverTime, topDonors, districtHeatmap });
+}));

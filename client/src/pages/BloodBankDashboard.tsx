@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, Building2, ShieldCheck, CheckCircle2, XCircle, MapPin, LogOut } from "lucide-react";
+import { Users, Droplet, Building2, ShieldCheck, CheckCircle2, XCircle, MapPin, LogOut, Heart, Layers, BarChart3, Activity, Download } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner } from "../components/ui";
 import { timeAgo } from "../lib/utils";
 import { useNavigate } from "react-router-dom";
 
-type Tab = "overview" | "requests" | "hospitals";
+type Tab = "overview" | "requests" | "hospitals" | "inventory" | "pipeline" | "analytics";
 
 export function BloodBankDashboard() {
   const { user, lang, logout } = useApp();
@@ -17,6 +17,9 @@ export function BloodBankDashboard() {
   const [hospitals, setHospitals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [bloodInventory, setBloodInventory] = useState<any>(null);
+  const [pipeline, setPipeline] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
 
   const statusCounts = useMemo(() => {
     return requests.reduce((acc: Record<string, number>, request: any) => {
@@ -53,6 +56,17 @@ export function BloodBankDashboard() {
       setStats(s);
       setRequests(r);
       setHospitals(h);
+      // Load CRM data
+      try {
+        const [inv, pipe, ana] = await Promise.all([
+          api.adminBloodInventory(),
+          api.adminRequestPipeline(),
+          api.adminAnalytics(),
+        ]);
+        setBloodInventory(inv);
+        setPipeline(pipe);
+        setAnalytics(ana);
+      } catch {}
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -155,7 +169,7 @@ export function BloodBankDashboard() {
       </div>
 
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        {(["overview", "requests", "hospitals"] as Tab[]).map((t) => (
+        {(["overview", "requests", "hospitals", "inventory", "pipeline", "analytics"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -165,7 +179,10 @@ export function BloodBankDashboard() {
           >
             {t === "overview" ? (lang === "ta" ? "மேலோட்டம்" : "Overview")
               : t === "requests" ? (lang === "ta" ? "கோரிக்கைகள்" : "Requests")
-              : (lang === "ta" ? "மருத்துவமனைகள்" : "Hospitals")}
+              : t === "hospitals" ? (lang === "ta" ? "மருத்துவமனைகள்" : "Hospitals")
+              : t === "inventory" ? (lang === "ta" ? "இரத்த இருப்பு" : "Blood Inventory")
+              : t === "pipeline" ? (lang === "ta" ? "கோரிக்கை குழாய்" : "Request Pipeline")
+              : (lang === "ta" ? "பகுப்பாய்வு" : "Analytics")}
           </button>
         ))}
       </div>
@@ -320,6 +337,182 @@ export function BloodBankDashboard() {
             ))}
           </div>
         </Card>
+      )}
+
+      {/* ============ BLOOD INVENTORY ============ */}
+      {tab === "inventory" && bloodInventory && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
+            <StatCard icon={CheckCircle2} label="Eligible (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
+          </div>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
+            <div className="grid grid-cols-4 gap-3">
+              {bloodInventory.byGroup.map((g: any) => (
+                <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
+                  <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p className="text-slate-600">Donors: <span className="font-bold">{g.donorCount}</span></p>
+                    <p className="text-emerald-600">Eligible: <span className="font-bold">{g.eligibleDonors}</span></p>
+                    <p className="text-violet-600">Platelet: <span className="font-bold">{g.plateletDonors}</span></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Donors by District</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {bloodInventory.byDistrict.map((d: any) => (
+                <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700">{d.district}</span>
+                  <div className="flex gap-2">
+                    <Badge className="bg-blue-100 text-blue-700">{d.donorCount} donors</Badge>
+                    <Badge className="bg-emerald-100 text-emerald-700">{d.eligibleDonors} eligible</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ============ REQUEST PIPELINE ============ */}
+      {tab === "pipeline" && pipeline && (
+        <div className="space-y-3">
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Fulfillment Pipeline</h3>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="rounded-lg bg-slate-50 p-3 text-center">
+                <p className="text-xs text-slate-500">Total</p>
+                <p className="text-2xl font-extrabold text-slate-800">{pipeline.fulfillmentRate?.total || 0}</p>
+              </div>
+              <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                <p className="text-xs text-emerald-600">Completed</p>
+                <p className="text-2xl font-extrabold text-emerald-700">{pipeline.fulfillmentRate?.completed || 0}</p>
+              </div>
+              <div className="rounded-lg bg-slate-100 p-3 text-center">
+                <p className="text-xs text-slate-500">Closed</p>
+                <p className="text-2xl font-extrabold text-slate-600">{pipeline.fulfillmentRate?.closed || 0}</p>
+              </div>
+              <div className="rounded-lg bg-rose-50 p-3 text-center">
+                <p className="text-xs text-rose-600">Rejected</p>
+                <p className="text-2xl font-extrabold text-rose-700">{pipeline.fulfillmentRate?.rejected || 0}</p>
+              </div>
+            </div>
+            {pipeline.fulfillmentRate?.total > 0 && (
+              <div className="mt-3">
+                <div className="flex h-6 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500" style={{ width: `${(pipeline.fulfillmentRate.completed / pipeline.fulfillmentRate.total) * 100}%` }} />
+                  <div className="bg-slate-400" style={{ width: `${(pipeline.fulfillmentRate.closed / pipeline.fulfillmentRate.total) * 100}%` }} />
+                  <div className="bg-rose-400" style={{ width: `${(pipeline.fulfillmentRate.rejected / pipeline.fulfillmentRate.total) * 100}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Fulfillment rate: {((pipeline.fulfillmentRate.completed / pipeline.fulfillmentRate.total) * 100).toFixed(1)}%</p>
+              </div>
+            )}
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Status Breakdown</h3>
+            <div className="space-y-2">
+              {pipeline.byStatus.map((s: any) => (
+                <div key={s.status} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700 capitalize">{s.status.replace(/_/g, " ")}</span>
+                  <div className="flex gap-2">
+                    <Badge className="bg-slate-200 text-slate-700">{s.cnt} total</Badge>
+                    {s.redCount > 0 && <Badge className="bg-rose-100 text-rose-700">{s.redCount} red</Badge>}
+                    {s.orangeCount > 0 && <Badge className="bg-amber-100 text-amber-700">{s.orangeCount} orange</Badge>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">By Blood Group</h3>
+              <div className="space-y-2">
+                {pipeline.byBloodGroup.map((b: any) => (
+                  <div key={b.bloodGroup} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-bold text-red-600">{b.bloodGroup}</span>
+                    <Badge className="bg-red-100 text-red-700">{b.cnt}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">By District</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {pipeline.byDistrict.map((d: any) => (
+                  <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700">{d.district}</span>
+                    <Badge className="bg-blue-100 text-blue-700">{d.cnt}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ANALYTICS ============ */}
+      {tab === "analytics" && analytics && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">Requests (30 Days)</h3>
+              <div className="flex items-end gap-1 h-32">
+                {analytics.requestsOverTime.map((d: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.date}: ${d.cnt}`}>
+                    <div className="w-full bg-red-400 rounded-t" style={{ height: `${(d.cnt / Math.max(...analytics.requestsOverTime.map((x: any) => x.cnt), 1)) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Total: {analytics.requestsOverTime.reduce((s: number, d: any) => s + d.cnt, 0)}</p>
+            </Card>
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">Donations (30 Days)</h3>
+              <div className="flex items-end gap-1 h-32">
+                {analytics.donationsOverTime.map((d: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.date}: ${d.cnt}`}>
+                    <div className="w-full bg-emerald-400 rounded-t" style={{ height: `${(d.cnt / Math.max(...analytics.donationsOverTime.map((x: any) => x.cnt), 1)) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Total: {analytics.donationsOverTime.reduce((s: number, d: any) => s + d.cnt, 0)}</p>
+            </Card>
+          </div>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Top 10 Donors</h3>
+            <div className="space-y-2">
+              {analytics.topDonors.map((d: any, i: number) => (
+                <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-uyir-100 text-xs font-bold text-uyir-700">{i + 1}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{d.name}</p>
+                      <p className="text-xs text-slate-400">{d.bloodGroup} · {d.district}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge className="bg-red-100 text-red-700">{d.donationCount} donations</Badge>
+                    <Badge className="bg-violet-100 text-violet-700">{d.livesSavedCount || 0} lives</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">District Heatmap</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {analytics.districtHeatmap.map((d: any) => (
+                <div key={d.district} className="rounded-lg p-3" style={{ backgroundColor: `rgba(239, 68, 68, ${Math.min(d.requests / 20, 0.9)})` }}>
+                  <p className="text-sm font-bold text-white">{d.district}</p>
+                  <p className="text-xs text-white/80">{d.requests} requests · {d.active} active</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui";
 import { timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
 
-type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins" | "profile";
+type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
 
 export function Admin() {
   const { user, lang } = useApp();
@@ -37,7 +37,18 @@ export function Admin() {
   const [donorSearch, setDonorSearch] = useState("");
   const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
   const [donorPage, setDonorPage] = useState(1);
+  const [donorSortBy, setDonorSortBy] = useState("createdAt");
+  const [donorSortOrder, setDonorSortOrder] = useState<"asc" | "desc">("desc");
+  const [donorHistory, setDonorHistory] = useState<any[]>([]);
+  const [showDonorHistory, setShowDonorHistory] = useState<string | null>(null);
   const [requestStatusFilter, setRequestStatusFilter] = useState<string | null>(null);
+  const [activity, setActivity] = useState<any[]>([]);
+  const [bloodInventory, setBloodInventory] = useState<any>(null);
+  const [pipeline, setPipeline] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [roleHierarchy, setRoleHierarchy] = useState<any>(null);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const DONORS_PER_PAGE = 20;
   const statusCounts = useMemo(() => requests.reduce((acc: Record<string, number>, request: any) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
@@ -123,6 +134,21 @@ export function Admin() {
       try {
         const ngoOrgs = await api.adminGetNgos();
         setNgoOrganizations(ngoOrgs);
+      } catch {}
+      // Load CRM data
+      try {
+        const [act, inv, pipe, ana, hier] = await Promise.all([
+          api.adminActivity(30),
+          api.adminBloodInventory(),
+          api.adminRequestPipeline(),
+          api.adminAnalytics(),
+          api.adminRoleHierarchy(),
+        ]);
+        setActivity(act);
+        setBloodInventory(inv);
+        setPipeline(pipe);
+        setAnalytics(ana);
+        setRoleHierarchy(hier);
       } catch {}
     } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   }
@@ -236,6 +262,70 @@ export function Admin() {
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
+  function exportRequestsCSV() {
+    const headers = ["Patient", "Blood Group", "Units", "Hospital", "District", "Status", "Emergency", "Created"];
+    const rows = requests.map((r) => [
+      r.patientName, r.bloodGroup, r.unitsRequired, r.hospitalName, r.district, r.status, r.emergencyLevel, new Date(r.createdAt).toLocaleString(),
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `uyir-requests-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportHospitalsCSV() {
+    const headers = ["Name", "District", "Address", "Phone", "Verified", "Created"];
+    const rows = hospitals.map((h) => [
+      h.name, h.district, h.address || "", h.phone || "", h.verified ? "Yes" : "No", new Date(h.createdAt).toLocaleString(),
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `uyir-hospitals-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadDonorHistory(id: string) {
+    setBusy(`history-${id}`);
+    try {
+      const h = await api.adminDonorHistory(id);
+      setDonorHistory(h);
+      setShowDonorHistory(id);
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  function toggleDonorSort(field: string) {
+    if (donorSortBy === field) {
+      setDonorSortOrder(donorSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setDonorSortBy(field);
+      setDonorSortOrder("desc");
+    }
+  }
+
+  const sortedDonors = useMemo(() => {
+    const sorted = [...filteredDonors];
+    const field = donorSortBy as any;
+    sorted.sort((a, b) => {
+      let aVal = a[field];
+      let bVal = b[field];
+      if (field === "name") { aVal = aVal?.toLowerCase() || ""; bVal = bVal?.toLowerCase() || ""; }
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+      if (aVal < bVal) return donorSortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return donorSortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [filteredDonors, donorSortBy, donorSortOrder]);
+
   async function approveNgo(id: string) {
     setBusy(`approve-${id}`);
     try {
@@ -269,39 +359,117 @@ export function Admin() {
   return (
     <div className="flex h-screen bg-slate-50">
       {/* Left Sidebar */}
-      <aside className="w-56 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
+      <aside className="w-60 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
         <div className="p-4 border-b border-slate-100">
           <img src="/uyir-logo.png" alt="UYIR" className="h-10 w-auto object-contain mb-2" />
           <h2 className="text-lg font-bold text-slate-800">Hi, {user?.name?.split(" ")[0] || "Admin"}</h2>
-          <p className="text-xs text-slate-500">Admin Dashboard</p>
+          <p className="text-xs text-slate-500 capitalize">{user?.role?.replace(/_/g, " ")} Dashboard</p>
         </div>
+
+        {/* Quick Search */}
+        <div className="p-3 border-b border-slate-100">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Quick search..."
+              className="w-full rounded-md border border-slate-200 pl-8 pr-2 py-1.5 text-sm"
+              value={globalSearch}
+              onChange={(e) => {
+                setGlobalSearch(e.target.value);
+                setDonorSearch(e.target.value);
+                if (e.target.value && tab !== "donors") setTab("donors");
+              }}
+            />
+          </div>
+        </div>
+
         <nav className="p-2 space-y-1">
+          {/* Dashboard Section */}
+          <p className="px-3 py-1 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Dashboard</p>
           {([
             { id: "overview", label: "Overview", icon: Users },
+            { id: "analytics", label: "Analytics", icon: BarChart3 },
+            { id: "activity", label: "Activity Feed", icon: Activity },
+          ] as const).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                <Icon className="h-4 w-4" /> {item.label}
+              </button>
+            );
+          })}
+
+          {/* Operations Section */}
+          <p className="px-3 py-1 mt-2 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Operations</p>
+          {([
             { id: "donors", label: "Donors", icon: Droplet },
             { id: "requests", label: "Requests", icon: ShieldCheck },
             { id: "verification", label: "Verification", icon: CheckCircle2 },
             { id: "fraud", label: "Fraud Reports", icon: AlertTriangle },
             { id: "hospitals", label: "Hospitals", icon: Building2 },
             { id: "ngos", label: "NGOs", icon: Building2 },
-            { id: "admins", label: "Admin Users", icon: ShieldCheck },
+          ] as const).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                <Icon className="h-4 w-4" /> {item.label}
+              </button>
+            );
+          })}
+
+          {/* Blood Bank CRM Section */}
+          <p className="px-3 py-1 mt-2 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Blood Bank CRM</p>
+          {([
+            { id: "inventory", label: "Blood Inventory", icon: Heart },
+            { id: "pipeline", label: "Request Pipeline", icon: Layers },
+          ] as const).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                <Icon className="h-4 w-4" /> {item.label}
+              </button>
+            );
+          })}
+
+          {/* Admin Section */}
+          <p className="px-3 py-1 mt-2 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Administration</p>
+          {([
+            { id: "admins", label: "User Management", icon: ShieldCheck },
+            { id: "hierarchy", label: "Role Hierarchy", icon: Network },
             { id: "profile", label: "My Profile", icon: User },
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
-              <button
-                key={item.id}
-                onClick={() => setTab(item.id as Tab)}
-                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-                  tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
+              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                <Icon className="h-4 w-4" /> {item.label}
               </button>
             );
           })}
         </nav>
+
+        {/* Recent Activity Mini Feed */}
+        {activity.length > 0 && (
+          <div className="p-3 border-t border-slate-100">
+            <p className="mb-2 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Recent Activity</p>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {activity.slice(0, 5).map((a: any) => (
+                <div key={a.id} className="flex items-start gap-1.5 text-xs">
+                  <Activity className="h-3 w-3 mt-0.5 text-slate-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-slate-600 truncate">{a.userName || "System"}: {a.action}</p>
+                    <p className="text-slate-400 text-[10px]">{timeAgo(a.createdAt)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 border-t border-slate-100 mt-auto">
           <Button size="sm" variant="outline" className="w-full" onClick={loadAll}>Refresh</Button>
         </div>
@@ -410,7 +578,7 @@ export function Admin() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-600 sticky top-0">
                 <tr>
-                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Name</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => toggleDonorSort("name")}>Name {donorSortBy === "name" && (donorSortOrder === "asc" ? "↑" : "↓")}</th>
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Mobile</th>
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Blood</th>
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">District</th>
@@ -421,14 +589,14 @@ export function Admin() {
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Verified</th>
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Available</th>
                   <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Platelet</th>
-                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Donations</th>
-                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Rep</th>
-                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold">Last Donation</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => toggleDonorSort("donationCount")}>Donations {donorSortBy === "donationCount" && (donorSortOrder === "asc" ? "↑" : "↓")}</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => toggleDonorSort("reputationScore")}>Rep {donorSortBy === "reputationScore" && (donorSortOrder === "asc" ? "↑" : "↓")}</th>
+                  <th className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2 font-semibold cursor-pointer hover:bg-slate-200" onClick={() => toggleDonorSort("lastDonationDate")}>Last Donation {donorSortBy === "lastDonationDate" && (donorSortOrder === "asc" ? "↑" : "↓")}</th>
                   <th className="whitespace-nowrap border-b border-slate-200 px-3 py-2 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedDonors.map((d) => (
+                {sortedDonors.slice((donorPage - 1) * DONORS_PER_PAGE, donorPage * DONORS_PER_PAGE).map((d) => (
                   <>
                   <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedDonorId(expandedDonorId === d.id ? null : d.id)}>
                     <td className="whitespace-nowrap border-r border-slate-100 px-3 py-2 font-medium text-slate-800">
@@ -467,9 +635,14 @@ export function Admin() {
                       {d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2">
-                      <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={(e) => { e.stopPropagation(); banUser(d.id); }}>
-                        <Ban className="h-3 w-3" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={(e) => { e.stopPropagation(); banUser(d.id); }}>
+                          <Ban className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" loading={busy === `history-${d.id}`} onClick={(e) => { e.stopPropagation(); loadDonorHistory(d.id); }}>
+                          <Activity className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                   {expandedDonorId === d.id && (
@@ -503,7 +676,7 @@ export function Admin() {
                   )}
                   </>
                 ))}
-                {paginatedDonors.length === 0 && (
+                {sortedDonors.length === 0 && (
                   <tr><td colSpan={15} className="px-3 py-8 text-center text-slate-400">No donors on this page.</td></tr>
                 )}
               </tbody>
@@ -526,9 +699,14 @@ export function Admin() {
       {tab === "requests" && (
         <Card className="p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800">
-              All Requests {requestStatusFilter ? `(filtered: ${filteredRequests.length})` : `(${requests.length})`}
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-slate-800">
+                All Requests {requestStatusFilter ? `(filtered: ${filteredRequests.length})` : `(${requests.length})`}
+              </h3>
+              <Button size="sm" variant="outline" onClick={exportRequestsCSV}>
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+            </div>
             {requestStatusFilter && (
               <Button size="sm" variant="outline" onClick={() => setRequestStatusFilter(null)}>
                 Clear Filter
@@ -667,7 +845,12 @@ export function Admin() {
 
       {tab === "hospitals" && (
         <Card className="p-4">
-          <h3 className="mb-2 font-bold text-slate-800">Hospitals ({hospitals.length})</h3>
+          <div className="mb-2 flex items-center gap-3">
+            <h3 className="font-bold text-slate-800">Hospitals ({hospitals.length})</h3>
+            <Button size="sm" variant="outline" onClick={exportHospitalsCSV}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+          </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {hospitals.map((h) => (
               <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
@@ -1151,6 +1334,286 @@ export function Admin() {
           )}
         </Card>
       )}
+
+      {/* ============ ACTIVITY FEED ============ */}
+      {tab === "activity" && (
+        <Card className="p-4">
+          <h3 className="mb-3 font-bold text-slate-800">Activity Timeline ({activity.length})</h3>
+          <div className="space-y-2 max-h-[32rem] overflow-y-auto">
+            {activity.length === 0 && <p className="text-sm text-slate-400">No recent activity</p>}
+            {activity.map((a: any) => (
+              <div key={a.id} className="flex items-start gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-uyir-100">
+                    <Activity className="h-3.5 w-3.5 text-uyir-600" />
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">{a.userName || "System"}</span>
+                    <span className="text-slate-500"> · {a.action}</span>
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {a.entityType && `${a.entityType}`}
+                    {a.details && ` · ${a.details}`}
+                    {` · ${timeAgo(a.createdAt)}`}
+                  </p>
+                </div>
+                <Badge className="bg-slate-200 text-slate-600 text-[10px]">{a.userRole || "system"}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ============ BLOOD INVENTORY ============ */}
+      {tab === "inventory" && bloodInventory && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
+            <StatCard icon={CheckCircle2} label="Eligible Donors (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
+          </div>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
+            <div className="grid grid-cols-4 gap-3">
+              {bloodInventory.byGroup.map((g: any) => (
+                <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
+                  <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p className="text-slate-600">Donors: <span className="font-bold">{g.donorCount}</span></p>
+                    <p className="text-emerald-600">Eligible: <span className="font-bold">{g.eligibleDonors}</span></p>
+                    <p className="text-violet-600">Platelet: <span className="font-bold">{g.plateletDonors}</span></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Donors by District</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {bloodInventory.byDistrict.map((d: any) => (
+                <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700">{d.district}</span>
+                  <div className="flex gap-2">
+                    <Badge className="bg-blue-100 text-blue-700">{d.donorCount} donors</Badge>
+                    <Badge className="bg-emerald-100 text-emerald-700">{d.eligibleDonors} eligible</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ============ REQUEST PIPELINE ============ */}
+      {tab === "pipeline" && pipeline && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Request Fulfillment Pipeline</h3>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="rounded-lg bg-slate-50 p-3 text-center">
+                <p className="text-xs text-slate-500">Total</p>
+                <p className="text-2xl font-extrabold text-slate-800">{pipeline.fulfillmentRate?.total || 0}</p>
+              </div>
+              <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                <p className="text-xs text-emerald-600">Completed</p>
+                <p className="text-2xl font-extrabold text-emerald-700">{pipeline.fulfillmentRate?.completed || 0}</p>
+              </div>
+              <div className="rounded-lg bg-slate-100 p-3 text-center">
+                <p className="text-xs text-slate-500">Closed</p>
+                <p className="text-2xl font-extrabold text-slate-600">{pipeline.fulfillmentRate?.closed || 0}</p>
+              </div>
+              <div className="rounded-lg bg-rose-50 p-3 text-center">
+                <p className="text-xs text-rose-600">Rejected</p>
+                <p className="text-2xl font-extrabold text-rose-700">{pipeline.fulfillmentRate?.rejected || 0}</p>
+              </div>
+            </div>
+            {pipeline.fulfillmentRate?.total > 0 && (
+              <div className="mt-3">
+                <div className="flex h-6 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500" style={{ width: `${(pipeline.fulfillmentRate.completed / pipeline.fulfillmentRate.total) * 100}%` }} />
+                  <div className="bg-slate-400" style={{ width: `${(pipeline.fulfillmentRate.closed / pipeline.fulfillmentRate.total) * 100}%` }} />
+                  <div className="bg-rose-400" style={{ width: `${(pipeline.fulfillmentRate.rejected / pipeline.fulfillmentRate.total) * 100}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Fulfillment rate: {((pipeline.fulfillmentRate.completed / pipeline.fulfillmentRate.total) * 100).toFixed(1)}%
+                </p>
+              </div>
+            )}
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Status Breakdown</h3>
+            <div className="space-y-2">
+              {pipeline.byStatus.map((s: any) => (
+                <div key={s.status} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700 capitalize">{s.status.replace(/_/g, " ")}</span>
+                  <div className="flex gap-2">
+                    <Badge className="bg-slate-200 text-slate-700">{s.cnt} total</Badge>
+                    {s.redCount > 0 && <Badge className="bg-rose-100 text-rose-700">{s.redCount} red</Badge>}
+                    {s.orangeCount > 0 && <Badge className="bg-amber-100 text-amber-700">{s.orangeCount} orange</Badge>}
+                    {s.greenCount > 0 && <Badge className="bg-emerald-100 text-emerald-700">{s.greenCount} green</Badge>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">By Blood Group</h3>
+              <div className="space-y-2">
+                {pipeline.byBloodGroup.map((b: any) => (
+                  <div key={b.bloodGroup} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-bold text-red-600">{b.bloodGroup}</span>
+                    <Badge className="bg-red-100 text-red-700">{b.cnt}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">By District</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {pipeline.byDistrict.map((d: any) => (
+                  <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700">{d.district}</span>
+                    <Badge className="bg-blue-100 text-blue-700">{d.cnt}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ANALYTICS ============ */}
+      {tab === "analytics" && analytics && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">Requests (Last 30 Days)</h3>
+              <div className="flex items-end gap-1 h-32">
+                {analytics.requestsOverTime.map((d: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.date}: ${d.cnt}`}>
+                    <div className="w-full bg-red-400 rounded-t" style={{ height: `${(d.cnt / Math.max(...analytics.requestsOverTime.map((x: any) => x.cnt), 1)) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{analytics.requestsOverTime.length} days · Total: {analytics.requestsOverTime.reduce((s: number, d: any) => s + d.cnt, 0)}</p>
+            </Card>
+            <Card className="p-4">
+              <h3 className="mb-3 font-bold text-slate-800">Completed Donations (Last 30 Days)</h3>
+              <div className="flex items-end gap-1 h-32">
+                {analytics.donationsOverTime.map((d: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.date}: ${d.cnt}`}>
+                    <div className="w-full bg-emerald-400 rounded-t" style={{ height: `${(d.cnt / Math.max(...analytics.donationsOverTime.map((x: any) => x.cnt), 1)) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{analytics.donationsOverTime.length} days · Total: {analytics.donationsOverTime.reduce((s: number, d: any) => s + d.cnt, 0)}</p>
+            </Card>
+          </div>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Top 10 Donors</h3>
+            <div className="space-y-2">
+              {analytics.topDonors.map((d: any, i: number) => (
+                <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-uyir-100 text-xs font-bold text-uyir-700">{i + 1}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{d.name}</p>
+                      <p className="text-xs text-slate-400">{d.bloodGroup} · {d.district}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge className="bg-red-100 text-red-700">{d.donationCount} donations</Badge>
+                    <Badge className="bg-violet-100 text-violet-700">{d.livesSavedCount || 0} lives</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">District Heatmap</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {analytics.districtHeatmap.map((d: any) => (
+                <div key={d.district} className="rounded-lg p-3" style={{ backgroundColor: `rgba(239, 68, 68, ${Math.min(d.requests / 20, 0.9)})` }}>
+                  <p className="text-sm font-bold text-white">{d.district}</p>
+                  <p className="text-xs text-white/80">{d.requests} requests · {d.active} active</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ============ ROLE HIERARCHY ============ */}
+      {tab === "hierarchy" && roleHierarchy && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">Role Distribution</h3>
+            <div className="space-y-2">
+              {roleHierarchy.byRole.map((r: any) => (
+                <div key={r.role} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="capitalize text-sm font-semibold text-slate-700">{r.role.replace(/_/g, " ")}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge className="bg-blue-100 text-blue-700">{r.cnt} total</Badge>
+                    <Badge className="bg-emerald-100 text-emerald-700">{r.activeCount} active</Badge>
+                    {r.bannedCount > 0 && <Badge className="bg-rose-100 text-rose-700">{r.bannedCount} banned</Badge>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="mb-3 font-bold text-slate-800">NGO Parent-Child Hierarchy</h3>
+            <div className="space-y-2">
+              {roleHierarchy.ngoUsers.length === 0 && <p className="text-sm text-slate-400">No NGOs registered</p>}
+              {roleHierarchy.ngoUsers.map((n: any, i: number) => (
+                <div key={i} className="rounded-lg bg-slate-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{n.ngoName}</p>
+                      <p className="text-xs text-slate-400">{n.district || "No district"}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-blue-100 text-blue-700">{n.userCount} users</Badge>
+                      <Badge className={n.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>{n.status}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ============ DONOR HISTORY MODAL ============ */}
+      {showDonorHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDonorHistory(null)}>
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">Donation History</h3>
+              <button onClick={() => setShowDonorHistory(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="space-y-2">
+              {donorHistory.length === 0 && <p className="text-sm text-slate-400">No donation history</p>}
+              {donorHistory.map((h: any) => (
+                <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{h.patientName} · {h.bloodGroup}</p>
+                      <p className="text-xs text-slate-400">{h.hospitalName} · {h.district} · {timeAgo(h.createdAt)}</p>
+                    </div>
+                    <Badge className={h.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}>{h.status}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       </main>
     </div>
   );
