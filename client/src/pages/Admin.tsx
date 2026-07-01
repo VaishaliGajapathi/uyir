@@ -377,7 +377,7 @@ export function Admin() {
               className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-uyir-400"
             >
               <option value="">All Districts</option>
-              {uniqueDistricts.map((d) => (
+              {districts.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
