@@ -112,7 +112,7 @@ adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Req
 
 // Create admin user
 adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
-  const { name, mobile, role, password, district, ngoName } = req.body;
+  const { name, mobile, email, role, password, district, ngoName } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
   if (role === "ngo_admin" && (!district || !ngoName)) {
@@ -124,8 +124,8 @@ adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Req
   const existingUser = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [sanitizedMobile]);
   if (existingUser) return res.status(400).json({ error: "User with this mobile already exists" });
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","password","role","language","verified","district","ngoName","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,true,$6,$7,NOW()) RETURNING *',
-    [name, sanitizedMobile, hashedPassword, role, "ta", role === "ngo_admin" ? district : null, role === "ngo_admin" ? ngoName : null]
+    'INSERT INTO "User" ("id","name","mobile","email","password","role","language","verified","district","ngoName","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,true,$7,$8,NOW()) RETURNING *',
+    [name, sanitizedMobile, email || null, hashedPassword, role, "ta", role === "ngo_admin" ? district : null, role === "ngo_admin" ? ngoName : null]
   );
   res.status(201).json(user);
 }));
