@@ -23,7 +23,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "" });
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
@@ -213,7 +213,7 @@ export function Admin() {
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "" });
+      setAdminForm({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -698,6 +698,13 @@ export function Admin() {
                   className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   value={adminForm.email}
                   onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Designation (e.g., UYIR Admin, Hospital Admin)"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={adminForm.designation}
+                  onChange={(e) => setAdminForm({ ...adminForm, designation: e.target.value })}
                 />
                 <select
                   className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
