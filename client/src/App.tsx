@@ -17,6 +17,7 @@ const Impact = lazy(() => import("./pages/Impact"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NgoAdmin = lazy(() => import("./pages/NgoAdmin"));
+const BloodBankDashboard = lazy(() => import("./pages/BloodBankDashboard"));
 const Terms = lazy(() => import("./pages/Terms"));
 const HospitalLogin = lazy(() => import("./pages/HospitalLogin"));
 const HospitalRegister = lazy(() => import("./pages/HospitalRegister"));
@@ -32,7 +33,7 @@ function dashboardPathForRole(user: User | null) {
   if (user.role === "hospital") return "/hospital-dashboard";
   if (user.role === "admin" || user.role === "verifier" || user.role === "super_admin") return "/admin";
   if (user.role === "ngo") return "/ngoadmin";
-  if (user.role === "blood_bank") return "/admin";
+  if (user.role === "blood_bank") return "/blood-bank-dashboard";
   return "/home";
 }
 
@@ -79,6 +80,7 @@ function Inner() {
         <Route path="/profile" element={protectedElement(<Profile />)} />
         <Route path="/admin" element={protectedElement(<Admin />)} />
         <Route path="/ngoadmin" element={protectedElement(<NgoAdmin />)} />
+        <Route path="/blood-bank-dashboard" element={protectedElement(<BloodBankDashboard />)} />
         <Route path="/hospital-dashboard" element={protectedElement(<HospitalDashboard />)} />
         <Route path="/ratings" element={protectedElement(<Ratings />)} />
         <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital" || user.role === "ngo" || user.role === "blood_bank" || user.role === "super_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />

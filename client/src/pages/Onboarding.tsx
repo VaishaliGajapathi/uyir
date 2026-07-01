@@ -11,7 +11,7 @@ function dashboardPathForRole(role?: string) {
   if (role === "hospital") return "/hospital-dashboard";
   if (role === "admin" || role === "verifier") return "/admin";
   if (role === "ngo") return "/ngoadmin";
-  if (role === "blood_bank") return "/admin";
+  if (role === "blood_bank") return "/blood-bank-dashboard";
   return "/home";
 }
 
