@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Card, Button, Badge, Spinner } from "../components/ui";
+import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui";
 import { timeAgo } from "../lib/utils";
-import { BLOOD_GROUPS } from "../lib/constants";
+import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
 
 type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins" | "profile";
 
@@ -844,16 +844,13 @@ export function Admin() {
                       value={adminForm.ngoEmail}
                       onChange={(e) => setAdminForm({ ...adminForm, ngoEmail: e.target.value })}
                     />
-                    <select
-                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                    <SearchableSelect
+                      options={TN_DISTRICTS}
                       value={adminForm.district}
-                      onChange={(e) => setAdminForm({ ...adminForm, district: e.target.value })}
-                    >
-                      <option value="">Select district</option>
-                      {districts.map((district) => (
-                        <option key={district} value={district}>{district}</option>
-                      ))}
-                    </select>
+                      onChange={(v) => setAdminForm({ ...adminForm, district: v })}
+                      placeholder="Select district"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                    />
                   </>
                 )}
               </div>
@@ -934,16 +931,13 @@ export function Admin() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">District</label>
-                  <select
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  <SearchableSelect
+                    options={TN_DISTRICTS}
                     value={profileForm.district}
-                    onChange={(e) => setProfileForm({ ...profileForm, district: e.target.value })}
-                  >
-                    <option value="">Select district</option>
-                    {districts.map((district) => (
-                      <option key={district} value={district}>{district}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setProfileForm({ ...profileForm, district: v })}
+                    placeholder="Select district"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm h-9"
+                  />
                 </div>
               </div>
               <div className="flex gap-2">

@@ -1,5 +1,28 @@
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+export const TN_DISTRICTS = [
+  "Chennai",
+  "Coimbatore",
+  "Madurai",
+  "Salem",
+  "Tiruppur",
+  "Erode",
+  "Trichy",
+  "Namakkal",
+  "Dharmapuri",
+  "Karur",
+  "Dindigul",
+  "Tirunelveli",
+  "Vellore",
+  "Ranipet",
+  "Thanjavur",
+  "Kancheepuram",
+  "Krishnagiri",
+  "Theni",
+  "Virudhunagar",
+  "Nilgiris",
+];
+
 export const COMPONENT_TYPES = [
   { value: "whole_blood", label: "Blood", labelTa: "இரத்தம்" },
   { value: "platelets", label: "Platelets", labelTa: "தட்டுச்சல்" },

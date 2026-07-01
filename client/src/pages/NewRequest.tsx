@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload, ShieldCheck, FileCheck2, Radio, CheckCircle2, Share2, MapPin, Camera } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Button, Input, Select, Card, Badge } from "../components/ui";
+import { Button, Input, Select, Card, Badge, SearchableSelect } from "../components/ui";
 import { VoiceButton } from "../components/VoiceButton";
 import { HospitalAutocomplete } from "../components/HospitalAutocomplete";
-import { BLOOD_GROUPS, COMPONENT_TYPES, EMERGENCY_LEVELS } from "../lib/constants";
+import { BLOOD_GROUPS, COMPONENT_TYPES, EMERGENCY_LEVELS, TN_DISTRICTS } from "../lib/constants";
 import { requestUrl, nativeShare, shareWhatsApp, shareFacebook } from "../lib/share";
 
 type Phase = "form" | "documents" | "verifying" | "result";
@@ -475,10 +475,13 @@ export function NewRequest() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Select label={lang === "ta" ? "மாவட்டம் *" : "District *"} value={form.district} onChange={(e) => set("district", e.target.value)}>
-              <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-              {districts.map((d) => <option key={d}>{d}</option>)}
-            </Select>
+            <SearchableSelect
+              label={lang === "ta" ? "மாவட்டம் *" : "District *"}
+              options={TN_DISTRICTS}
+              value={form.district}
+              onChange={(v) => set("district", v)}
+              placeholder={lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}
+            />
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">{lang === "ta" ? "மருத்துவமனை *" : "Hospital *"}</label>
               <HospitalAutocomplete

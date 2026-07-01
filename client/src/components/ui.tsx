@@ -1,6 +1,7 @@
 import { cn } from "../lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, X, Search } from "lucide-react";
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export function Button({
   className, variant = "primary", size = "md", loading, children, ...props
@@ -79,5 +80,117 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
         {children}
       </div>
     </div>
+  );
+}
+
+export function SearchableSelect({
+  label,
+  options,
+  value,
+  onChange,
+  placeholder = "Search...",
+  className,
+}: {
+  label?: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filteredOptions = options.filter((option) =>
+    option.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const displayValue = value || placeholder;
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSelect(option: string) {
+    onChange(option);
+    setIsOpen(false);
+    setSearchTerm("");
+  }
+
+  function handleClear() {
+    onChange("");
+    setSearchTerm("");
+  }
+
+  return (
+    <label className="block">
+      {label && <span className="mb-1 block text-sm font-medium text-slate-600">{label}</span>}
+      <div className="relative" ref={containerRef}>
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-[15px] outline-none transition focus:border-uyir-500 focus:ring-2 focus:ring-uyir-100",
+            !value && "text-slate-400",
+            className
+          )}
+        >
+          <span className="truncate">{displayValue}</span>
+          <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        {isOpen && (
+          <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="border-b border-slate-100 p-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={placeholder}
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-uyir-500 focus:ring-1 focus:ring-uyir-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="p-3 text-sm text-slate-400">No results found</div>
+              ) : (
+                filteredOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => handleSelect(option)}
+                    className={cn(
+                      "w-full px-4 py-2 text-left text-sm transition hover:bg-slate-50",
+                      value === option && "bg-uyir-50 font-medium text-uyir-700"
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </label>
   );
 }

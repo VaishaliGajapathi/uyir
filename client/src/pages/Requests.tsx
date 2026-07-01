@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, X } from "lucide-react";
 import { api, type BloodRequest } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Card, Button, Spinner } from "../components/ui";
+import { Card, Button, Spinner, SearchableSelect } from "../components/ui";
 import { emergencyMeta, statusMeta, timeAgo } from "../lib/utils";
-import { BLOOD_GROUPS } from "../lib/constants";
+import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
 
 export function Requests() {
   const nav = useNavigate();
   const { user } = useApp();
   const [list, setList] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [districts, setDistricts] = useState<string[]>([]);
+  const [showDistrictFilter, setShowDistrictFilter] = useState(false);
   const [filters, setFilters] = useState<{ district?: string; bloodGroup?: string; componentType?: string }>({});
 
   async function load() {
@@ -22,7 +22,6 @@ export function Requests() {
     try { setList(await api.listRequests(params)); } finally { setLoading(false); }
   }
 
-  useEffect(() => { api.districts().then(setDistricts).catch(() => {}); }, []);
   useEffect(() => { load(); }, [filters]);
 
   return (
@@ -41,11 +40,32 @@ export function Requests() {
           <option value="">Any group</option>
           {BLOOD_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs"
-          value={filters.district || ""} onChange={(e) => setFilters((f) => ({ ...f, district: e.target.value || undefined }))}>
-          <option value="">All districts</option>
-          {districts.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        {showDistrictFilter ? (
+          <div className="relative min-w-[200px]">
+            <SearchableSelect
+              options={TN_DISTRICTS}
+              value={filters.district || ""}
+              onChange={(v) => setFilters((f) => ({ ...f, district: v || undefined }))}
+              placeholder="All districts"
+              className="h-8 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => setShowDistrictFilter(false)}
+              className="absolute -right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowDistrictFilter(true)}
+            className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs hover:bg-slate-50"
+          >
+            {filters.district || "All districts"}
+          </button>
+        )}
       </div>
 
       {loading ? <Spinner /> : list.length === 0 ? (

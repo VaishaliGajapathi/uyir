@@ -22,6 +22,7 @@ export const TN_DISTRICTS: Record<string, DistrictInfo> = {
   Dindigul: { name: "Dindigul", lat: 10.3624, lng: 77.9695, neighbours: ["Madurai", "Karur", "Tiruppur", "Theni", "Trichy"] },
   Tirunelveli: { name: "Tirunelveli", lat: 8.7139, lng: 77.7567, neighbours: ["Thoothukudi", "Tenkasi", "Virudhunagar"] },
   Vellore: { name: "Vellore", lat: 12.9165, lng: 79.1325, neighbours: ["Tiruvannamalai", "Ranipet", "Krishnagiri"] },
+  Ranipet: { name: "Ranipet", lat: 12.9442, lng: 79.3355, neighbours: ["Vellore", "Kancheepuram", "Tiruvannamalai"] },
   Thanjavur: { name: "Thanjavur", lat: 10.787, lng: 79.1378, neighbours: ["Trichy", "Pudukkottai", "Thiruvarur", "Nagapattinam", "Ariyalur"] },
   Kanchipuram: { name: "Kancheepuram", lat: 12.8342, lng: 79.7036, neighbours: ["Chennai", "Chengalpattu", "Ranipet", "Tiruvannamalai", "Vellore"] },
   Krishnagiri: { name: "Krishnagiri", lat: 12.5186, lng: 78.2137, neighbours: ["Dharmapuri", "Vellore"] },
