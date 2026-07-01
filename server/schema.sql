@@ -114,11 +114,54 @@ CREATE TABLE "BloodRequest" (
     "escalatedAt" TIMESTAMP(3),
     "createdById" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
     "closedAt" TIMESTAMP(3),
     "verifiedBy" TEXT,
     "verifiedByType" TEXT,
 
     CONSTRAINT "BloodRequest_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BloodBank" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "district" TEXT NOT NULL,
+    "address" TEXT,
+    "phone" TEXT,
+    "lat" DOUBLE PRECISION,
+    "lng" DOUBLE PRECISION,
+    "availableBloodGroups" TEXT,
+    "verified" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "BloodBank_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VerificationHistory" (
+    "id" TEXT NOT NULL,
+    "requestId" TEXT NOT NULL,
+    "verifierId" TEXT,
+    "decision" TEXT NOT NULL,
+    "score" INTEGER,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VerificationHistory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "DisasterBroadcast" (
+    "id" TEXT NOT NULL,
+    "district" TEXT,
+    "message" TEXT NOT NULL,
+    "priority" TEXT NOT NULL DEFAULT 'high',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "DisasterBroadcast_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable

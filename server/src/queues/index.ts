@@ -42,9 +42,14 @@ export type AiJob =
   | { type: "request-verification"; requestId: string }
   | { type: "fraud-check"; text: string };
 
+export type OperationalJob =
+  | { type: "expire-request"; requestId: string }
+  | { type: "expire-stale-requests" };
+
 export const notificationQueue = createQueue<NotificationJob>("notifications");
 export const documentVerificationQueue = createQueue<DocumentVerificationJob>("document-verification");
 export const aiQueue = createQueue<AiJob>("ai-tasks");
+export const operationalQueue = createQueue<OperationalJob>("operational-tasks");
 
 export async function addNotificationJob(data: NotificationJob) {
   if (!notificationQueue) return false;
@@ -62,5 +67,12 @@ export async function addAiJob(data: AiJob) {
   if (!aiQueue) return false;
   const key = data.type === "request-verification" ? data.requestId : Buffer.from(data.text).toString("base64url").slice(0, 64);
   await aiQueue.add(data.type, data, { jobId: `${data.type}:${key}` });
+  return true;
+}
+
+export async function addOperationalJob(data: OperationalJob, options: { delay?: number; repeat?: { pattern: string } } = {}) {
+  if (!operationalQueue) return false;
+  const key = data.type === "expire-request" ? data.requestId : data.type;
+  await operationalQueue.add(data.type, data, { jobId: `${data.type}:${key}`, ...options });
   return true;
 }

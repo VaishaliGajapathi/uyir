@@ -4,7 +4,7 @@ import { exec, query, queryOne } from "../db.js";
 import { runAlertCycle, escalateRadius } from "../services/alerts.js";
 import { verifyDocument, verifyRequest } from "../services/verification.js";
 import { analyzeMessage } from "../services/fraud.js";
-import { bullConnection, connection, queueEnabled, NotificationJob, DocumentVerificationJob, AiJob } from "./index.js";
+import { bullConnection, connection, operationalQueue, queueEnabled, NotificationJob, DocumentVerificationJob, AiJob, OperationalJob } from "./index.js";
 
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
 
@@ -67,9 +67,31 @@ const aiWorker = new Worker<AiJob>(
   { connection: bullConnection, concurrency: Number(process.env.AI_WORKER_CONCURRENCY || 2) }
 );
 
-for (const worker of [notificationWorker, documentWorker, aiWorker]) {
+const operationalWorker = new Worker<OperationalJob>(
+  "operational-tasks",
+  async (job) => {
+    if (job.data.type === "expire-request") {
+      await exec(
+        'UPDATE "BloodRequest" SET "status" = $1, "closedAt" = NOW() WHERE "id" = $2 AND "status" IN ($3,$4,$5)',
+        ["expired", job.data.requestId, "pending_verification", "verified", "alert_sent"]
+      );
+      return { expiredRequestId: job.data.requestId };
+    }
+
+    const result = await exec(
+      'UPDATE "BloodRequest" SET "status" = $1, "closedAt" = NOW() WHERE "expiresAt" IS NOT NULL AND "expiresAt" <= NOW() AND "status" IN ($2,$3,$4)',
+      ["expired", "pending_verification", "verified", "alert_sent"]
+    );
+    return { expired: result.rowCount || 0 };
+  },
+  { connection: bullConnection, concurrency: 1 }
+);
+
+for (const worker of [notificationWorker, documentWorker, aiWorker, operationalWorker]) {
   worker.on("completed", (job) => console.log(`[worker] ${job.queueName}:${job.id} completed`));
   worker.on("failed", (job, err) => console.error(`[worker] ${job?.queueName}:${job?.id} failed`, err));
 }
+
+await operationalQueue?.add("expire-stale-requests", { type: "expire-stale-requests" }, { jobId: "expire-stale-requests:repeat", repeat: { pattern: "*/15 * * * *" } });
 
 console.log("[worker] BullMQ workers started");

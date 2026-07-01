@@ -6,7 +6,7 @@ import { verifyRequest, verifyDocument } from "../services/verification.js";
 import { haversineKm, TN_DISTRICTS } from "../lib/districts.js";
 import { runAlertCycle, escalateRadius } from "../services/alerts.js";
 import { logAudit, AuditActions } from "../lib/audit.js";
-import { addAiJob, addDocumentVerificationJob, addNotificationJob } from "../queues/index.js";
+import { addAiJob, addDocumentVerificationJob, addNotificationJob, addOperationalJob } from "../queues/index.js";
 
 export const requestsRouter = Router();
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -41,9 +41,10 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const d = parse.data;
   const request = await queryOne<any>(
-    'INSERT INTO "BloodRequest" ("id","patientName","bloodGroup","componentType","unitsRequired","hospitalName","district","taluk","contactPerson","contactNumber","doctorReference","emergencyLevel","lat","lng","createdById","status","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()) RETURNING *',
+    'INSERT INTO "BloodRequest" ("id","patientName","bloodGroup","componentType","unitsRequired","hospitalName","district","taluk","contactPerson","contactNumber","doctorReference","emergencyLevel","lat","lng","createdById","status","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW() + INTERVAL \'24 hours\',NOW()) RETURNING *',
     [d.patientName, d.bloodGroup, d.componentType, d.unitsRequired, d.hospitalName, d.district, d.taluk || null, d.contactPerson, d.contactNumber, d.doctorReference || null, d.emergencyLevel, d.lat || null, d.lng || null, req.userId!, "pending_verification"]
   );
+  await addOperationalJob({ type: "expire-request", requestId: request.id }, { delay: 24 * 60 * 60 * 1000 });
   await logAudit({
     userId: req.userId!,
     action: AuditActions.REQUEST_CREATE,
