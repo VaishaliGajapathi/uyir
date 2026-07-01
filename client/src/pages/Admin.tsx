@@ -32,12 +32,17 @@ export function Admin() {
   const [donorSearch, setDonorSearch] = useState("");
   const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
   const [donorPage, setDonorPage] = useState(1);
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string | null>(null);
   const DONORS_PER_PAGE = 20;
   const statusCounts = useMemo(() => requests.reduce((acc: Record<string, number>, request: any) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
     return acc;
   }, {}), [requests]);
   const requestStatusEntries = useMemo(() => Object.entries(statusCounts) as Array<[string, number]>, [statusCounts]);
+  const filteredRequests = useMemo(() => {
+    if (!requestStatusFilter) return requests;
+    return requests.filter((r) => r.status === requestStatusFilter);
+  }, [requests, requestStatusFilter]);
 
   const uniqueDistricts = useMemo(() => {
     const set = new Set<string>();
@@ -510,16 +515,33 @@ export function Admin() {
 
       {tab === "requests" && (
         <Card className="p-4">
-          <h3 className="mb-2 font-bold text-slate-800">All Requests ({requests.length})</h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800">
+              All Requests {requestStatusFilter ? `(filtered: ${filteredRequests.length})` : `(${requests.length})`}
+            </h3>
+            {requestStatusFilter && (
+              <Button size="sm" variant="outline" onClick={() => setRequestStatusFilter(null)}>
+                Clear Filter
+              </Button>
+            )}
+          </div>
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
             {requestStatusEntries.map(([status, count]) => (
-              <span key={status} className={`rounded-full px-3 py-1 font-semibold ${statusClass(status)}`}>
+              <button
+                key={status}
+                onClick={() => setRequestStatusFilter(requestStatusFilter === status ? null : status)}
+                className={`rounded-full px-3 py-1 font-semibold cursor-pointer transition-colors ${
+                  requestStatusFilter === status
+                    ? "ring-2 ring-uyir-600 ring-offset-2"
+                    : "hover:opacity-80"
+                } ${statusClass(status)}`}
+              >
                 {status.replace(/_/g, " ")}: {count}
-              </span>
+              </button>
             ))}
           </div>
           <div className="space-y-3 max-h-[32rem] overflow-y-auto">
-            {requests.map((r) => (
+            {filteredRequests.map((r) => (
               <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                   <div>
