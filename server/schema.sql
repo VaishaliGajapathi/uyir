@@ -96,6 +96,7 @@ CREATE TABLE "BloodRequest" (
     "unitsRequired" INTEGER NOT NULL DEFAULT 1,
     "hospitalId" TEXT,
     "hospitalName" TEXT NOT NULL,
+    "hospitalType" TEXT,
     "district" TEXT NOT NULL,
     "taluk" TEXT,
     "lat" DOUBLE PRECISION,

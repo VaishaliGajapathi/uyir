@@ -7,6 +7,7 @@ import { haversineKm, TN_DISTRICTS } from "../lib/districts.js";
 import { runAlertCycle, escalateRadius } from "../services/alerts.js";
 import { logAudit, AuditActions } from "../lib/audit.js";
 import { addAiJob, addDocumentVerificationJob, addNotificationJob, addOperationalJob } from "../queues/index.js";
+import { calculatePriorityScore, getPriorityLabel } from "../services/priority.js";
 
 export const requestsRouter = Router();
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -22,6 +23,7 @@ function canManageRequest(request: any, req: AuthedRequest) {
 
 const createSchema = z.object({
   patientName: z.string().min(2),
+  patientAge: z.number().int().min(0).max(120).optional(),
   bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]),
   componentType: z.enum(["whole_blood", "platelets", "plasma"]).default("whole_blood"),
   unitsRequired: z.number().int().min(1).max(20),
@@ -32,6 +34,7 @@ const createSchema = z.object({
   contactNumber: z.string().min(10),
   doctorReference: z.string().optional(),
   emergencyLevel: z.enum(["green", "orange", "red"]).default("orange"),
+  hospitalType: z.enum(["government", "private", "trust"]).optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
 });
@@ -40,9 +43,21 @@ requestsRouter.post("/", requireAuth, async (req: AuthedRequest, res: any) => {
   const parse = createSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const d = parse.data;
+  const priorityScore = calculatePriorityScore({
+    unitsRequired: d.unitsRequired,
+    bloodGroup: d.bloodGroup,
+    componentType: d.componentType,
+    patientAge: d.patientAge,
+    emergencyLevel: d.emergencyLevel,
+    hospitalType: d.hospitalType,
+    isChild: !!(d.patientAge && d.patientAge < 12),
+    isPlatelet: d.componentType === "platelets",
+  });
+  const priorityLabel = getPriorityLabel(priorityScore);
+
   const request = await queryOne<any>(
-    'INSERT INTO "BloodRequest" ("id","patientName","bloodGroup","componentType","unitsRequired","hospitalName","district","taluk","contactPerson","contactNumber","doctorReference","emergencyLevel","lat","lng","createdById","status","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW() + INTERVAL \'24 hours\',NOW()) RETURNING *',
-    [d.patientName, d.bloodGroup, d.componentType, d.unitsRequired, d.hospitalName, d.district, d.taluk || null, d.contactPerson, d.contactNumber, d.doctorReference || null, d.emergencyLevel, d.lat || null, d.lng || null, req.userId!, "pending_verification"]
+    'INSERT INTO "BloodRequest" ("id","patientName","patientAge","bloodGroup","componentType","unitsRequired","hospitalName","district","taluk","contactPerson","contactNumber","doctorReference","emergencyLevel","hospitalType","lat","lng","createdById","status","expiresAt","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW() + INTERVAL \'24 hours\',NOW()) RETURNING *',
+    [d.patientName, d.patientAge || null, d.bloodGroup, d.componentType, d.unitsRequired, d.hospitalName, d.district, d.taluk || null, d.contactPerson, d.contactNumber, d.doctorReference || null, d.emergencyLevel, d.hospitalType || null, d.lat || null, d.lng || null, req.userId!, "pending_verification"]
   );
   await addOperationalJob({ type: "expire-request", requestId: request.id }, { delay: 24 * 60 * 60 * 1000 });
   await logAudit({

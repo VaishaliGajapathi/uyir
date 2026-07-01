@@ -57,6 +57,7 @@ app.use(helmet({
 async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoName" TEXT');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)');
+  await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "hospitalType" TEXT');
   await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
   await exec('CREATE INDEX IF NOT EXISTS idx_blood_request_expiry ON "BloodRequest" ("expiresAt", "status") WHERE "expiresAt" IS NOT NULL');
   await exec(`
