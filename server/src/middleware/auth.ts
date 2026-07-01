@@ -110,3 +110,19 @@ export function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunct
   }
   next();
 }
+
+export function requireSuperAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const decoded = jwt.verify(header.slice(7), SECRET) as { userId: string; role: string };
+    if (decoded.role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden: Super admin required" });
+    }
+    req.userId = decoded.userId;
+    req.role = decoded.role;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}

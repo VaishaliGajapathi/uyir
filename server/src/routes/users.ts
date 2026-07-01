@@ -13,6 +13,7 @@ usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 });
 
 usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
+  console.log("[users/me PATCH] Request body keys:", Object.keys(req.body));
   const schema = z.object({
     name: z.string().min(2).optional(),
     language: z.enum(["ta", "en"]).optional(),
@@ -27,11 +28,16 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     locationEnabled: z.boolean().optional(),
     pincode: z.string().optional(),
     lastDonationDate: z.union([z.string(), z.null()]).optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
   }).passthrough();
   const parse = schema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
-  
-  const allowed = ["name","language","district","taluk","bloodGroup","gender","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode"];
+  if (!parse.success) {
+    console.log("[users/me PATCH] Validation error:", parse.error.flatten());
+    return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+  }
+
+  const allowed = ["name","language","district","taluk","bloodGroup","gender","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","lat","lng"];
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {
@@ -42,6 +48,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   }
   if (sets.length === 0) return res.status(400).json({ error: "No fields to update" });
   vals.push(req.userId);
+  console.log("[users/me PATCH] Update query:", sets.join(", "), "Values:", vals);
   const user = await queryOne<any>(`UPDATE "User" SET ${sets.join(", ")} WHERE "id" = $${vals.length} RETURNING *`, vals);
   res.json(user);
 });

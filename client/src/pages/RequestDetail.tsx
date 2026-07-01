@@ -7,6 +7,7 @@ import { Button, Card, Spinner, Sheet, Badge } from "../components/ui";
 import { emergencyMeta, statusMeta, timeAgo } from "../lib/utils";
 import { MapView } from "../components/MapView";
 import { DonationCertificate } from "../components/DonationCertificate";
+import { requestUrl, nativeShare, shareWhatsApp, shareFacebook, shareInstagram } from "../lib/share";
 
 export function RequestDetail() {
   const { id } = useParams();
@@ -155,53 +156,33 @@ export function RequestDetail() {
     } catch (e: any) { alert(e.message); } finally { setBusy(false); }
   }
 
-  function shareToWhatsApp() {
-    if (!r) return;
-    const signupLink = window.location.origin;
-    const timestamp = new Date().toLocaleString('en-IN', { 
+  function buildShareMessage(includeComponent = false) {
+    if (!r) return "";
+    const timestamp = new Date().toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    const componentLine = includeComponent ? `\nComponent: ${r.componentType.replace("_", " ")}\nUnits: ${r.unitsRequired}` : "";
+    return `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}${componentLine}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Open UYIR: ${requestUrl(r.id, "accept")}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
   }
 
-  function shareToInstagram() {
+  async function shareToWhatsApp() {
     if (!r) return;
-    const signupLink = window.location.origin;
-    const timestamp = new Date().toLocaleString('en-IN', { 
-      timeZone: 'Asia/Kolkata',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
-    // Instagram doesn't have direct URL sharing, so we copy to clipboard and open Instagram
-    navigator.clipboard.writeText(message);
-    window.open("https://www.instagram.com/", "_blank");
+    const message = buildShareMessage(true);
+    if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(r.id, "accept") })) return;
+    shareWhatsApp(message);
   }
 
-  function shareToFacebook() {
+  async function shareToInstagram() {
     if (!r) return;
-    const signupLink = window.location.origin;
-    const timestamp = new Date().toLocaleString('en-IN', { 
-      timeZone: 'Asia/Kolkata',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    const message = `🚨 UYIR Verified Emergency — ${timestamp} IST\n\nPatient: ${r.patientName}\nBlood Group: ${r.bloodGroup}\nHospital: ${r.hospitalName}, ${r.district}\nContact: ${r.contactNumber}\n\n✅ Verified by UYIR AI + Hospital\n📱 Download UYIR App: ${signupLink}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
-    const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    await shareInstagram(buildShareMessage());
+  }
+
+  async function shareToFacebook() {
+    if (!r) return;
+    const message = buildShareMessage();
+    if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(r.id, "accept") })) return;
+    shareFacebook(requestUrl(r.id, "accept"), message);
   }
 
   return (
@@ -277,29 +258,10 @@ export function RequestDetail() {
             <button
               className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canShareRequest}
-              onClick={() => {
-                const shareLink = `${window.location.origin}/request/${r.id}?action=accept`;
-                const signupLink = window.location.origin;
-                const timestamp = new Date().toLocaleString('en-IN', { 
-                  timeZone: 'Asia/Kolkata',
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                });
-                const message = `🚨 UYIR Verified Emergency — ${timestamp} IST
-
-Patient: ${r.patientName}
-Blood Group: ${r.bloodGroup}
-Hospital: ${r.hospitalName}, ${r.district}
-Contact: ${r.contactNumber}
-
-✅ Verified by UYIR AI + Hospital
-📱 Download UYIR App: ${signupLink}
-
-Request link: ${shareLink}`;
-                navigator.clipboard.writeText(message);
+              onClick={async () => {
+                const message = buildShareMessage();
+                if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(r.id, "accept") })) return;
+                try { await navigator.clipboard.writeText(message); } catch { /* noop */ }
                 alert("Message copied! Share with donors to help them navigate to the app and login.");
               }}
             >

@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { query, queryOne, exec } from "../db.js";
-import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo, requireSuperAdmin } from "../middleware/auth.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
-const ADMIN_ROLES = ["admin", "verifier", "ngo_admin"] as const;
+const ADMIN_ROLES = ["admin", "verifier", "ngo_admin", "super_admin"] as const;
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -106,7 +106,7 @@ adminRouter.post("/verify-request/:id", requireAdminOrVerifier, asyncHandler(asy
 
 // Admin users list
 adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: Request, res: Response) => {
-  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo_admin"]);
+  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3,$4) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo_admin", "super_admin"]);
   res.json(admins);
 }));
 
@@ -158,4 +158,82 @@ adminRouter.get("/dashboard", requireAdminOrNgo, asyncHandler(async (_req: Reque
   const requests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
   const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
   res.json({ totalUsers: users?.cnt || 0, totalRequests: requests?.cnt || 0, completedDonations: completed?.cnt || 0 });
+}));
+
+// SUPER ADMIN ONLY: Delete a user
+adminRouter.delete("/users/:id", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const user = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  await exec('DELETE FROM "User" WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true, deletedId: req.params.id });
+}));
+
+// SUPER ADMIN ONLY: Deactivate a user
+adminRouter.post("/users/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const user = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  await exec('UPDATE "User" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Freeze a user (set banned = true)
+adminRouter.post("/users/:id/freeze", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const user = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  await exec('UPDATE "User" SET "banned" = true WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Delete a hospital
+adminRouter.delete("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!hospital) return res.status(404).json({ error: "Hospital not found" });
+  await exec('DELETE FROM "Hospital" WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true, deletedId: req.params.id });
+}));
+
+// SUPER ADMIN ONLY: Deactivate a hospital
+adminRouter.post("/hospitals/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!hospital) return res.status(404).json({ error: "Hospital not found" });
+  await exec('UPDATE "Hospital" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Freeze a hospital
+adminRouter.post("/hospitals/:id/freeze", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!hospital) return res.status(404).json({ error: "Hospital not found" });
+  await exec('UPDATE "Hospital" SET "verified" = false, "active" = false WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Delete an admin user
+adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  if (!admin) return res.status(404).json({ error: "Admin user not found" });
+  await exec('DELETE FROM "User" WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true, deletedId: req.params.id });
+}));
+
+// SUPER ADMIN ONLY: Deactivate an admin user
+adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  if (!admin) return res.status(404).json({ error: "Admin user not found" });
+  await exec('UPDATE "User" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
+// SUPER ADMIN ONLY: Freeze an admin user
+adminRouter.post("/admins/:id/freeze", requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  if (!admin) return res.status(404).json({ error: "Admin user not found" });
+  await exec('UPDATE "User" SET "banned" = true WHERE "id" = $1', [req.params.id]);
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
 }));

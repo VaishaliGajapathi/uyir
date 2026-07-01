@@ -3,6 +3,7 @@ import { Award, Calendar, Droplet, MapPin, Share2, Download, CheckCircle } from 
 import { Button, Card } from "./ui";
 import html2canvas from "html2canvas";
 import { useApp } from "../contexts/AppContext";
+import { APP_URL, nativeShare, shareWhatsApp, shareFacebook, shareTwitter } from "../lib/share";
 
 interface DonationCertificateProps {
   donorName: string;
@@ -67,20 +68,17 @@ Certificate ID: ${certificateId}
 
 Join UYIR and save lives! 🙏
 #UYIR #BloodDonation #SaveLives`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    shareWhatsApp(message);
   }
 
   function shareToTwitter() {
     const text = `🩸 I just donated blood through UYIR! Every drop counts. Join me in saving lives. 🙏 #UYIR #BloodDonation #SaveLives`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
+    shareTwitter(text, APP_URL);
   }
 
   function shareToFacebook() {
     const message = `🩸 I just donated blood through UYIR! Every drop counts. Join me in saving lives. 🙏 #UYIR #BloodDonation #SaveLives`;
-    const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    shareFacebook(APP_URL, message);
   }
 
   return (
@@ -228,10 +226,21 @@ Join UYIR and save lives! 🙏
               </svg>
             </button>
             <button
-              onClick={() => {
-                const shareLink = window.location.href;
-                navigator.clipboard.writeText(shareLink);
-                alert("Certificate link copied!");
+              onClick={async () => {
+                const message = `🩸 I just donated blood through UYIR!
+
+Donor: ${donorName}
+Blood Group: ${bloodGroup}
+Date: ${new Date(donationDate).toLocaleDateString()}
+Hospital: ${hospitalName}, ${district}
+
+Certificate ID: ${certificateId}
+
+Join UYIR and save lives! 🙏
+#UYIR #BloodDonation #SaveLives`;
+                if (await nativeShare({ title: "UYIR Donation Certificate", text: message, url: APP_URL })) return;
+                try { await navigator.clipboard.writeText(message); } catch { /* noop */ }
+                alert("Certificate details copied!");
               }}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600 text-white hover:bg-slate-700"
             >

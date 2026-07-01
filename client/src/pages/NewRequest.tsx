@@ -7,6 +7,7 @@ import { Button, Input, Select, Card, Badge } from "../components/ui";
 import { VoiceButton } from "../components/VoiceButton";
 import { HospitalAutocomplete } from "../components/HospitalAutocomplete";
 import { BLOOD_GROUPS, COMPONENT_TYPES, EMERGENCY_LEVELS } from "../lib/constants";
+import { requestUrl, nativeShare, shareWhatsApp, shareFacebook } from "../lib/share";
 
 type Phase = "form" | "documents" | "verifying" | "result";
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -359,27 +360,33 @@ export function NewRequest() {
     }
   }
 
-  function shareToWhatsApp() {
-    if (!requestId) return;
+  function buildShareMessage(includeComponent = false) {
+    if (!requestId) return "";
     const patientName = form.patientFirstName.trim();
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${user?.mobile || ""}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    const componentLine = includeComponent ? `\nComponent: ${form.componentType.replace("_", " ")}\nUnits: ${form.unitsRequired}` : "";
+    return `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}${componentLine}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${user?.mobile || ""}\n\n📱 Open UYIR: ${requestUrl(requestId, "accept")}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
   }
 
-  function shareToFacebook() {
+  async function shareToWhatsApp() {
     if (!requestId) return;
-    const patientName = form.patientFirstName.trim();
-    const message = `🩸 UYIR Blood Request - Verified Emergency\n\nPatient: ${patientName}\nBlood Group: ${form.bloodGroup}\nHospital: ${form.hospitalName}, ${form.district}\nContact: ${user?.mobile || ""}\n\nPlease share with eligible donors. Every drop counts! 🙏\n\n#UYIR #TamilNadu #BloodDonation`;
-    const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    const message = buildShareMessage(true);
+    if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(requestId, "accept") })) return;
+    shareWhatsApp(message);
   }
 
-  function copyLink() {
+  async function shareToFacebook() {
     if (!requestId) return;
-    const shareLink = `${window.location.origin}/request/${requestId}`;
-    navigator.clipboard.writeText(shareLink);
-    alert("Link copied! Share this link with donors to help them navigate to the app and login.");
+    const message = buildShareMessage();
+    if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(requestId, "accept") })) return;
+    shareFacebook(requestUrl(requestId, "accept"), message);
+  }
+
+  async function copyLink() {
+    if (!requestId) return;
+    const message = buildShareMessage(true);
+    if (await nativeShare({ title: "UYIR Blood Request", text: message, url: requestUrl(requestId, "accept") })) return;
+    try { await navigator.clipboard.writeText(message); } catch { /* noop */ }
+    alert("Message copied! Share this with donors to help them navigate to the app and login.");
   }
 
   return (
