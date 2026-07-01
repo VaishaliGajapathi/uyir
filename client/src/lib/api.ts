@@ -38,8 +38,11 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export interface User {
-  id: string; name: string; mobile: string; role: string; language: string;
+  id: string; name: string; mobile: string; role: "donor" | "admin" | "verifier" | "ngo_admin" | "super_admin" | "hospital_admin"; language: string;
+  email?: string;
+  designation?: string;
   ngoName?: string;
+  ngoStatus?: string;
   district?: string; taluk?: string; bloodGroup?: string; gender?: string; age?: number;
   dob?: string; // Date of birth
   isPlateletDonor: boolean; shareLocation: boolean;
@@ -55,6 +58,7 @@ export interface User {
   hospitalName?: string;
   hospitalRegistrationId?: string;
   hospitalId?: string;
+  createdAt?: string;
 }
 
 export interface DonorDocument {
@@ -113,6 +117,7 @@ export const api = {
   // users
   me: () => req<User>("/users/me"),
   updateMe: (data: Partial<User>) => req<User>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
+  updateProfile: (data: { name?: string; email?: string; designation?: string; district?: string }) => req<User>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
   setLocation: (lat: number, lng: number, extra: { district?: string; taluk?: string; pincode?: string } = {}) =>
     req("/users/me/location", { method: "POST", body: JSON.stringify({ lat, lng, ...extra }) }),
   registerFcmToken: (token: string) => req("/users/me/fcm-token", { method: "POST", body: JSON.stringify({ token }) }),
@@ -172,6 +177,7 @@ export const api = {
   adminGetAdmins: () => req<any[]>("/admin/admins"),
   adminVerifyHospital: (id: string) => req(`/admin/hospitals/${id}/verify`, { method: "POST" }),
   adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string; district?: string; ngoName?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
+  adminUpdateAdmin: (id: string, data: { name?: string; email?: string; designation?: string; district?: string }) => req<User>(`/admin/admins/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
   adminApproveNgo: (id: string) => req(`/admin/ngos/${id}/approve`, { method: "POST" }),

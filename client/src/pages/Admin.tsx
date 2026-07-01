@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner } from "../components/ui";
 import { timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS } from "../lib/constants";
 
-type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins";
+type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins" | "profile";
 
 export function Admin() {
   const { user, lang } = useApp();
@@ -24,6 +24,9 @@ export function Admin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
+  const [profileForm, setProfileForm] = useState({ name: "", email: "", designation: "", district: "" });
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
@@ -267,6 +270,7 @@ export function Admin() {
             { id: "hospitals", label: "Hospitals", icon: Building2 },
             { id: "ngos", label: "NGOs", icon: Building2 },
             { id: "admins", label: "Admin Users", icon: ShieldCheck },
+            { id: "profile", label: "My Profile", icon: User },
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
@@ -841,14 +845,149 @@ export function Admin() {
                 <div>
                   <p className="text-sm font-semibold text-slate-700">{a.name}</p>
                   <p className="text-xs text-slate-400">{a.mobile} · {a.role} · {timeAgo(a.createdAt)}</p>
-                  {a.role === "ngo_admin" && (
+                  {(a.role as string) === "ngo_admin" && (
                     <p className="text-xs text-slate-400">{a.ngoName} · {a.district}</p>
                   )}
                 </div>
-                <Badge className={a.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}>{a.role}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={a.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}>{a.role}</Badge>
+                  {user?.role === "super_admin" && (
+                    <Button size="sm" variant="outline" className="text-[10px] py-0.5 px-1.5 h-auto" onClick={() => {
+                      setProfileForm({ name: a.name, email: a.email || "", designation: a.designation || "", district: a.district || "" });
+                      setEditingAdminId(a.id);
+                      setShowProfileEdit(true);
+                      setTab("profile");
+                    }}>Edit</Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {tab === "profile" && (
+        <Card className="p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800">{editingAdminId ? "Edit Admin Profile" : "My Profile"}</h3>
+            {!showProfileEdit && (
+              <Button size="sm" onClick={() => {
+                setProfileForm({ name: user?.name || "", email: user?.email || "", designation: user?.designation || "", district: user?.district || "" });
+                setShowProfileEdit(true);
+              }}>Edit Profile</Button>
+            )}
+          </div>
+          
+          {showProfileEdit ? (
+            <div className="rounded-lg bg-slate-50 p-4">
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+                  <input
+                    type="email"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Designation</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.designation}
+                    onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">District</label>
+                  <select
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.district}
+                    onChange={(e) => setProfileForm({ ...profileForm, district: e.target.value })}
+                  >
+                    <option value="">Select district</option>
+                    {districts.map((district) => (
+                      <option key={district} value={district}>{district}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" loading={busy === "updateProfile"} onClick={async () => {
+                  setBusy("updateProfile");
+                  try {
+                    if (editingAdminId) {
+                      await api.adminUpdateAdmin(editingAdminId, profileForm);
+                    } else {
+                      await api.updateProfile(profileForm);
+                    }
+                    await loadAll();
+                    setShowProfileEdit(false);
+                    setEditingAdminId(null);
+                  } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+                }}>Save Changes</Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setShowProfileEdit(false);
+                  setEditingAdminId(null);
+                }}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4">
+                <div>
+                  <p className="text-xs text-slate-500">Name</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Mobile</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.mobile || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Email</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.email || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Role</p>
+                  <Badge className="bg-violet-100 text-violet-700">{user?.role || "—"}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Designation</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.designation || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">District</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.district || "—"}</p>
+                </div>
+                {(user?.role as string) === "ngo_admin" && (
+                  <>
+                    <div>
+                      <p className="text-xs text-slate-500">NGO Name</p>
+                      <p className="text-sm font-semibold text-slate-800">{user?.ngoName || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">NGO Status</p>
+                      <Badge className={user?.ngoStatus === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>{user?.ngoStatus || "—"}</Badge>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="rounded-lg bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">Account Created</p>
+                <p className="text-sm font-semibold text-slate-800">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</p>
+              </div>
+            </div>
+          )}
         </Card>
       )}
       </main>

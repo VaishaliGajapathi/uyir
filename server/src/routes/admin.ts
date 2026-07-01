@@ -248,6 +248,29 @@ adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Au
   res.json({ ok: true, deletedId: req.params.id });
 }));
 
+// SUPER ADMIN ONLY: Update admin user profile
+adminRouter.patch("/admins/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, email, designation, district } = req.body;
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  if (!admin) return res.status(404).json({ error: "Admin user not found" });
+  
+  const updates: string[] = [];
+  const params: any[] = [];
+  
+  if (name !== undefined) { updates.push(`"name" = $${params.length + 1}`); params.push(name); }
+  if (email !== undefined) { updates.push(`"email" = $${params.length + 1}`); params.push(email); }
+  if (designation !== undefined) { updates.push(`"designation" = $${params.length + 1}`); params.push(designation); }
+  if (district !== undefined) { updates.push(`"district" = $${params.length + 1}`); params.push(district); }
+  
+  if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
+  
+  params.push(req.params.id);
+  await exec(`UPDATE "User" SET ${updates.join(", ")} WHERE "id" = $${params.length}`, params);
+  
+  const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  res.json(updated);
+}));
+
 // SUPER ADMIN ONLY: Deactivate an admin user
 adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
