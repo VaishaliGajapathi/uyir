@@ -14,7 +14,7 @@ const MIN_DOCUMENT_VERIFY_SCORE = 70;
 const PUBLIC_REQUEST_STATUSES = ["verified", "alert_sent", "donor_accepted", "completed", "life_saved"];
 
 function isPrivilegedViewer(role?: string) {
-  return ["admin", "verifier", "ngo_admin", "hospital_approver"].includes(role || "");
+  return ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"].includes(role || "");
 }
 
 function canManageRequest(request: any, req: AuthedRequest) {

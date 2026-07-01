@@ -36,7 +36,7 @@ export function NgoAdmin() {
   }, [hospitals, requests]);
 
   useEffect(() => {
-    if (user?.role !== "ngo_admin") return;
+    if (user?.role !== "ngo") return;
     loadAll();
   }, [user]);
 
@@ -106,7 +106,7 @@ export function NgoAdmin() {
     return "bg-slate-200 text-slate-500";
   }
 
-  if (user?.role !== "ngo_admin") {
+  if (user?.role !== "ngo") {
     return (
       <div className="p-10 text-center text-slate-400">
         {lang === "ta" ? "அணுகல் மறுக்கப்பட்டது. NGO நிர்வாகி மட்டும்." : "Access denied. NGO admin only."}

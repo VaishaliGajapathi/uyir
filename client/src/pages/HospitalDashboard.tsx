@@ -31,7 +31,7 @@ export function HospitalDashboard() {
   }
 
   useEffect(() => {
-    if (user?.role === "hospital_approver") {
+    if (user?.role === "hospital") {
       loadRequests();
     }
   }, [user]);
@@ -54,7 +54,7 @@ export function HospitalDashboard() {
     nav("/hospital-login");
   }
 
-  if (user?.role !== "hospital_approver") {
+  if (user?.role !== "hospital") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <Card className="max-w-md p-6 text-center">

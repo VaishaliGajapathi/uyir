@@ -7,9 +7,10 @@ import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
 
 function dashboardPathForRole(role?: string) {
-  if (role === "hospital_approver") return "/hospital-dashboard";
+  if (role === "hospital") return "/hospital-dashboard";
   if (role === "admin" || role === "verifier" || role === "super_admin") return "/admin";
-  if (role === "ngo_admin") return "/ngoadmin";
+  if (role === "ngo") return "/ngoadmin";
+  if (role === "blood_bank") return "/admin";
   return "/home";
 }
 
@@ -28,7 +29,7 @@ export default function AdminLogin() {
       const r = await api.login(mobile, password);
       
       // Only allow admin roles to login via this page
-      const allowedRoles = ["admin", "verifier", "ngo_admin", "super_admin"];
+      const allowedRoles = ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"];
       if (!allowedRoles.includes(r.user.role)) {
         setErr(lang === "ta" ? "இந்த பக்கம் நிர்வாகிகளுக்கு மட்டுமே. வழக்கமான உள்நுழைவைப் பயன்படுத்தவும்." : "This page is for admins only. Please use regular login.");
         setLoading(false);

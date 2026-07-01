@@ -197,7 +197,7 @@ authRouter.post("/hospital/register", asyncHandler(async (req: any, res: any) =>
   const existingHospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE LOWER("name") = LOWER($1) LIMIT 1', [hospitalName]);
   if (existingHospital) return res.status(400).json({ error: "Hospital with this name already exists" });
 
-  const existingApprover = await queryOne<any>('SELECT * FROM "User" WHERE "hospitalRegistrationId" = $1 AND "role" = $2 LIMIT 1', [hospitalRegistrationId, "hospital_approver"]);
+  const existingApprover = await queryOne<any>('SELECT * FROM "User" WHERE "hospitalRegistrationId" = $1 AND "role" = $2 LIMIT 1', [hospitalRegistrationId, "hospital"]);
   if (existingApprover) return res.status(400).json({ error: "Hospital approver with this registration ID already exists" });
 
   const { TN_DISTRICTS } = await import("../lib/districts.js");
@@ -213,7 +213,7 @@ authRouter.post("/hospital/register", asyncHandler(async (req: any, res: any) =>
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await queryOne<any>(
     'INSERT INTO "User" ("id","name","mobile","password","role","district","hospitalName","hospitalRegistrationId","hospitalId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
-    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), hashedPassword, "hospital_approver", district, hospitalName, hospitalRegistrationId, hospital.id]
+    [contactPerson, contactMobile.replace(/\D/g, "").slice(-10), hashedPassword, "hospital", district, hospitalName, hospitalRegistrationId, hospital.id]
   );
 
   const token = signToken(user.id, user.role);

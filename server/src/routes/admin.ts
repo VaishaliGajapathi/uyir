@@ -5,7 +5,7 @@ import { requireAuth, requireAdminOrVerifier, requireAdminOrNgo, requireSuperAdm
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
-const ADMIN_ROLES = ["admin", "verifier", "ngo_admin", "super_admin"] as const;
+const ADMIN_ROLES = ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"] as const;
 
 function asyncHandler(fn: (req: AuthedRequest, res: Response, next: NextFunction) => Promise<any>) {
   return (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -26,7 +26,7 @@ adminRouter.get("/stats", requireAdminOrNgo, asyncHandler(async (_req: AuthedReq
   const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
   const reports = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "FraudReport"');
   const hospitals = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "Hospital"');
-  const ngoUsers = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["ngo_admin"]);
+  const ngoUsers = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["ngo"]);
   res.json({
     totalUsers: users?.cnt || 0,
     totalDonors: donors?.cnt || 0,
@@ -106,11 +106,11 @@ adminRouter.post("/verify-request/:id", requireAdminOrNgo, asyncHandler(async (r
 
 // Admin users list
 adminRouter.get("/admins", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
-  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3,$4) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo_admin", "super_admin"]);
+  const admins = await query<any>('SELECT * FROM "User" WHERE "role" IN ($1,$2,$3,$4,$5,$6) ORDER BY "createdAt" DESC', ["admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
   
   // Add activity statistics for NGO admins
   for (const admin of admins) {
-    if (admin.role === "ngo_admin") {
+    if (admin.role === "ngo") {
       const requestsProcessed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "verifiedById" = $1', [admin.id]);
       const hospitalsVerified = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "Hospital" WHERE "verifiedById" = $1', [admin.id]);
       const donationsFacilitated = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" dr JOIN "BloodRequest" br ON dr."requestId" = br.id WHERE br."verifiedById" = $1 AND dr."status" = $2', [admin.id, "completed"]);
@@ -129,7 +129,7 @@ adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Aut
   const { name, mobile, email, role, password, district, ngoName, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
-  if (role === "ngo_admin" && (!district || !ngoName)) {
+  if (role === "ngo" && (!district || !ngoName)) {
     return res.status(400).json({ error: "district and ngoName are required for NGO admins" });
   }
   const bcrypt = await import("bcryptjs");
@@ -139,7 +139,7 @@ adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Aut
   if (existingUser) return res.status(400).json({ error: "User with this mobile already exists" });
   const user = await queryOne<any>(
     'INSERT INTO "User" ("id","name","mobile","email","password","role","language","verified","district","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()) RETURNING *',
-    [name, sanitizedMobile, email || null, hashedPassword, role, "ta", role === "ngo_admin" ? district : null, role === "ngo_admin" ? ngoName : null, designation || null, role === "ngo_admin" ? ngoAddress || null : null, role === "ngo_admin" ? ngoRegistrationNumber || null : null, role === "ngo_admin" ? ngoPhone || null : null, role === "ngo_admin" ? ngoEmail || null : null, role === "ngo_admin" ? "pending" : null]
+    [name, sanitizedMobile, email || null, hashedPassword, role, "ta", role === "ngo" ? district : null, role === "ngo" ? ngoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? "pending" : null]
   );
   res.status(201).json(user);
 }));
@@ -242,7 +242,7 @@ adminRouter.post("/hospitals/:id/freeze", requireSuperAdmin, asyncHandler(async 
 
 // SUPER ADMIN ONLY: Delete an admin user
 adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('DELETE FROM "User" WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true, deletedId: req.params.id });
@@ -251,7 +251,7 @@ adminRouter.delete("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Au
 // SUPER ADMIN ONLY: Update admin user profile
 adminRouter.patch("/admins/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const { name, email, designation, district } = req.body;
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   
   const updates: string[] = [];
@@ -273,7 +273,7 @@ adminRouter.patch("/admins/:id", requireSuperAdmin, asyncHandler(async (req: Aut
 
 // SUPER ADMIN ONLY: Deactivate an admin user
 adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('UPDATE "User" SET "verified" = false WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);
@@ -282,7 +282,7 @@ adminRouter.post("/admins/:id/deactivate", requireSuperAdmin, asyncHandler(async
 
 // SUPER ADMIN ONLY: Freeze an admin user
 adminRouter.post("/admins/:id/freeze", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5) LIMIT 1', [req.params.id, "admin", "verifier", "ngo_admin", "super_admin"]);
+  const admin = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 AND "role" IN ($2,$3,$4,$5,$6,$7) LIMIT 1', [req.params.id, "admin", "verifier", "ngo", "blood_bank", "hospital", "super_admin"]);
   if (!admin) return res.status(404).json({ error: "Admin user not found" });
   await exec('UPDATE "User" SET "banned" = true WHERE "id" = $1', [req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "User" WHERE "id" = $1 LIMIT 1', [req.params.id]);

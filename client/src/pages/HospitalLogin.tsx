@@ -25,7 +25,7 @@ export function HospitalLogin() {
     setErr("");
     try {
       const res = await api.login(form.mobile, form.password);
-      if (res.user.role !== "hospital_approver") {
+      if (res.user.role !== "hospital") {
         setErr("This account is not a hospital approver");
         return;
       }

@@ -113,7 +113,7 @@ export function RequestDetail() {
   const sm = statusMeta[r.status];
   const canShareRequest = ["verified", "alert_sent", "donor_accepted", "completed", "life_saved"].includes(r.status);
   const canManageRequest = ["verified", "alert_sent", "donor_accepted"].includes(r.status);
-  const isOwner = r.createdById === user?.id || user?.role === "admin" || user?.role === "verifier" || user?.role === "ngo_admin";
+  const isOwner = r.createdById === user?.id || user?.role === "admin" || user?.role === "verifier" || user?.role === "ngo" || user?.role === "blood_bank" || user?.role === "hospital" || user?.role === "super_admin";
   const isDonor = user?.role === "donor" && r.createdById !== user?.id;
   const accepted = (r.responses || []).filter((x: any) => ["accepted", "arrived", "completed"].includes(x.status));
   const myResponse = (r.responses || []).find((x: any) => x.donorId === user?.id);

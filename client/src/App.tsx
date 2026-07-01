@@ -29,15 +29,16 @@ const Ratings = lazy(() => import("./pages/Ratings"));
 
 function dashboardPathForRole(user: User | null) {
   if (!user) return "/";
-  if (user.role === "hospital_approver") return "/hospital-dashboard";
+  if (user.role === "hospital") return "/hospital-dashboard";
   if (user.role === "admin" || user.role === "verifier" || user.role === "super_admin") return "/admin";
-  if (user.role === "ngo_admin") return "/ngoadmin";
+  if (user.role === "ngo") return "/ngoadmin";
+  if (user.role === "blood_bank") return "/admin";
   return "/home";
 }
 
 function AppShell({ children }: { children: ReactNode }) {
   const { user } = useApp();
-  const showEndUserShell = user?.role !== "hospital_approver" && user?.role !== "admin" && user?.role !== "verifier" && user?.role !== "ngo_admin" && user?.role !== "super_admin";
+  const showEndUserShell = user?.role !== "hospital" && user?.role !== "admin" && user?.role !== "verifier" && user?.role !== "ngo" && user?.role !== "blood_bank" && user?.role !== "super_admin";
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {showEndUserShell && <BottomNav />}
@@ -80,7 +81,7 @@ function Inner() {
         <Route path="/ngoadmin" element={protectedElement(<NgoAdmin />)} />
         <Route path="/hospital-dashboard" element={protectedElement(<HospitalDashboard />)} />
         <Route path="/ratings" element={protectedElement(<Ratings />)} />
-        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital_approver" || user.role === "ngo_admin" || user.role === "super_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
+        <Route path="/home" element={user && (user.role === "admin" || user.role === "verifier" || user.role === "hospital" || user.role === "ngo" || user.role === "blood_bank" || user.role === "super_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

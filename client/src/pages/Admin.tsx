@@ -108,7 +108,7 @@ export function Admin() {
       setHospitals(h);
       setAdmins(a);
       // Filter NGO admins from admins list
-      setNgos(a.filter((u: any) => u.role === "ngo_admin"));
+      setNgos(a.filter((u: any) => u.role === "ngo"));
     } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   }
 
@@ -208,7 +208,7 @@ export function Admin() {
       alert("Please fill all required fields");
       return;
     }
-    if (adminForm.role === "ngo_admin" && (!adminForm.ngoName || !adminForm.district)) {
+    if (adminForm.role === "ngo" && (!adminForm.ngoName || !adminForm.district)) {
       alert("Please provide NGO name and district for NGO admin");
       return;
     }
@@ -774,7 +774,9 @@ export function Admin() {
                 >
                   <option value="admin">Admin</option>
                   <option value="verifier">Verifier</option>
-                  <option value="ngo_admin">NGO Admin</option>
+                  <option value="ngo">NGO</option>
+                  <option value="blood_bank">Blood Bank</option>
+                  <option value="hospital">Hospital</option>
                 </select>
                 <input
                   type="password"
@@ -783,7 +785,7 @@ export function Admin() {
                   value={adminForm.password}
                   onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
                 />
-                {adminForm.role === "ngo_admin" && (
+                {adminForm.role === "ngo" && (
                   <>
                     <input
                       type="text"
@@ -845,7 +847,7 @@ export function Admin() {
                 <div>
                   <p className="text-sm font-semibold text-slate-700">{a.name}</p>
                   <p className="text-xs text-slate-400">{a.mobile} · {a.role} · {timeAgo(a.createdAt)}</p>
-                  {(a.role as string) === "ngo_admin" && (
+                  {(a.role as string) === "ngo" && (
                     <p className="text-xs text-slate-400">{a.ngoName} · {a.district}</p>
                   )}
                 </div>
@@ -969,7 +971,7 @@ export function Admin() {
                   <p className="text-xs text-slate-500">District</p>
                   <p className="text-sm font-semibold text-slate-800">{user?.district || "—"}</p>
                 </div>
-                {(user?.role as string) === "ngo_admin" && (
+                {(user?.role as string) === "ngo" && (
                   <>
                     <div>
                       <p className="text-xs text-slate-500">NGO Name</p>

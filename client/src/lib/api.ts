@@ -38,7 +38,7 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export interface User {
-  id: string; name: string; mobile: string; role: "donor" | "admin" | "verifier" | "ngo_admin" | "super_admin" | "hospital_admin"; language: string;
+  id: string; name: string; mobile: string; role: "donor" | "admin" | "verifier" | "ngo" | "blood_bank" | "hospital" | "super_admin"; language: string;
   email?: string;
   designation?: string;
   ngoName?: string;

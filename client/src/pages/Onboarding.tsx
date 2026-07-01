@@ -8,9 +8,10 @@ import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
 
 function dashboardPathForRole(role?: string) {
-  if (role === "hospital_approver") return "/hospital-dashboard";
+  if (role === "hospital") return "/hospital-dashboard";
   if (role === "admin" || role === "verifier") return "/admin";
-  if (role === "ngo_admin") return "/ngoadmin";
+  if (role === "ngo") return "/ngoadmin";
+  if (role === "blood_bank") return "/admin";
   return "/home";
 }
 

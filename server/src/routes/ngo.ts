@@ -84,7 +84,7 @@ ngoRouter.post("/verify-request/:id", asyncHandler(async (req: AuthedRequest, re
 
   const updated = await queryOne<any>(
     'UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW(), "verifiedBy" = $3, "verifiedByType" = $4 WHERE "id" = $5 RETURNING *',
-    [status, notes, req.userId!, "ngo_admin", req.params.id]
+    [status, notes, req.userId!, "ngo", req.params.id]
   );
   res.json(updated);
 }));
