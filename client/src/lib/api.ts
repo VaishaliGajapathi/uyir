@@ -174,6 +174,8 @@ export const api = {
   adminCreateAdmin: (data: { name: string; mobile: string; role: string; password?: string; district?: string; ngoName?: string }) => req<any>("/admin/admins", { method: "POST", body: JSON.stringify(data) }),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
+  adminApproveNgo: (id: string) => req(`/admin/ngos/${id}/approve`, { method: "POST" }),
+  adminRejectNgo: (id: string) => req(`/admin/ngos/${id}/reject`, { method: "POST" }),
   // ngo
   ngoStats: () => req<{ district: string; ngoName?: string | null; totalUsers: number; totalDonors: number; totalRequests: number; pendingVerifications: number; activeRequests: number; completedDonations: number; livesSaved: number; totalHospitals: number }>("/ngo/stats"),
   ngoRequests: () => req<any[]>("/ngo/requests"),

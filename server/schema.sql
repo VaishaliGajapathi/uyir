@@ -56,6 +56,14 @@ CREATE TABLE "User" (
     "hospitalName" TEXT,
     "hospitalRegistrationId" TEXT,
     "hospitalId" TEXT,
+    "ngoAddress" TEXT,
+    "ngoRegistrationNumber" TEXT,
+    "ngoCertificates" TEXT,
+    "ngoStatus" TEXT DEFAULT 'pending',
+    "ngoLat" DOUBLE PRECISION,
+    "ngoLng" DOUBLE PRECISION,
+    "ngoPhone" TEXT,
+    "ngoEmail" TEXT,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -70,6 +78,8 @@ CREATE TABLE "Hospital" (
     "lat" DOUBLE PRECISION,
     "lng" DOUBLE PRECISION,
     "verified" BOOLEAN NOT NULL DEFAULT false,
+    "verifiedById" TEXT,
+    "verifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Hospital_pkey" PRIMARY KEY ("id")
@@ -97,6 +107,8 @@ CREATE TABLE "BloodRequest" (
     "status" TEXT NOT NULL DEFAULT 'pending_verification',
     "verificationScore" INTEGER NOT NULL DEFAULT 0,
     "verificationNotes" TEXT,
+    "verifiedById" TEXT,
+    "verifiedAt" TIMESTAMP(3),
     "alertRadiusKm" INTEGER NOT NULL DEFAULT 25,
     "escalationLevel" INTEGER NOT NULL DEFAULT 0,
     "escalatedAt" TIMESTAMP(3),
@@ -105,7 +117,6 @@ CREATE TABLE "BloodRequest" (
     "closedAt" TIMESTAMP(3),
     "verifiedBy" TEXT,
     "verifiedByType" TEXT,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "BloodRequest_pkey" PRIMARY KEY ("id")
 );

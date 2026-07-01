@@ -23,7 +23,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
   const [donorBloodFilter, setDonorBloodFilter] = useState("");
   const [donorDistrictFilter, setDonorDistrictFilter] = useState("");
   const [donorSearch, setDonorSearch] = useState("");
@@ -213,9 +213,33 @@ export function Admin() {
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "" });
+      setAdminForm({ name: "", mobile: "", email: "", role: "admin", password: "", district: "", ngoName: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function approveNgo(id: string) {
+    setBusy(`approve-${id}`);
+    try {
+      await api.adminApproveNgo(id);
+      await loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rejectNgo(id: string) {
+    setBusy(`reject-${id}`);
+    try {
+      await api.adminRejectNgo(id);
+      await loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (user?.role !== "admin" && user?.role !== "verifier") {
@@ -641,24 +665,33 @@ export function Admin() {
       {tab === "ngos" && (
         <Card className="p-4">
           <h3 className="mb-2 font-bold text-slate-800">NGO Admins & Activities ({ngos.length})</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-96 overflow-y-auto">
             {ngos.length === 0 && <p className="text-sm text-slate-400">No NGO admins found.</p>}
             {ngos.map((n) => (
               <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700">{n.name}</p>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-700">{n.name}</p>
+                      <Badge className={n.ngoStatus === "approved" ? "bg-emerald-100 text-emerald-700" : n.ngoStatus === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}>
+                        {n.ngoStatus || "Pending"}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-slate-400">{n.mobile} · {n.district || "No district"}</p>
-                    {n.ngoName && <p className="text-xs text-slate-500">NGO: {n.ngoName}</p>}
+                    {n.ngoName && <p className="text-xs font-medium text-slate-600">NGO: {n.ngoName}</p>}
+                    {n.ngoAddress && <p className="text-xs text-slate-500">📍 {n.ngoAddress}</p>}
+                    {n.ngoRegistrationNumber && <p className="text-xs text-slate-500">📋 Reg: {n.ngoRegistrationNumber}</p>}
+                    {n.ngoPhone && <p className="text-xs text-slate-500">📞 {n.ngoPhone}</p>}
+                    {n.ngoEmail && <p className="text-xs text-slate-500">✉️ {n.ngoEmail}</p>}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-end gap-2">
                     <Badge className="bg-violet-100 text-violet-700">NGO Admin</Badge>
                     <Badge className={n.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>
                       {n.verified ? "Verified" : "Unverified"}
                     </Badge>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 rounded-lg bg-white p-2 text-center">
+                <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-white p-2 text-center">
                   <div>
                     <p className="text-xs text-slate-500">{lang === "ta" ? "கோரிக்கைகள்" : "Requests"}</p>
                     <p className="text-sm font-bold text-slate-800">{n.requestsProcessed || 0}</p>
@@ -676,6 +709,16 @@ export function Admin() {
                   <Button size="sm" variant="outline" loading={busy === n.id} onClick={() => banUser(n.id)}>
                     <Ban className="h-3 w-3" /> Ban
                   </Button>
+                  {n.ngoStatus === "pending" && (
+                    <>
+                      <Button size="sm" className="bg-emerald-600" loading={busy === `approve-${n.id}`} onClick={() => approveNgo(n.id)}>
+                        <CheckCircle2 className="h-3 w-3" /> Approve
+                      </Button>
+                      <Button size="sm" variant="outline" loading={busy === `reject-${n.id}`} onClick={() => rejectNgo(n.id)}>
+                        <XCircle className="h-3 w-3" /> Reject
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -744,6 +787,34 @@ export function Admin() {
                       className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                       value={adminForm.ngoName}
                       onChange={(e) => setAdminForm({ ...adminForm, ngoName: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      placeholder="NGO Address"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.ngoAddress}
+                      onChange={(e) => setAdminForm({ ...adminForm, ngoAddress: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      placeholder="NGO Registration Number"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.ngoRegistrationNumber}
+                      onChange={(e) => setAdminForm({ ...adminForm, ngoRegistrationNumber: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      placeholder="NGO Phone"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.ngoPhone}
+                      onChange={(e) => setAdminForm({ ...adminForm, ngoPhone: e.target.value })}
+                    />
+                    <input
+                      type="email"
+                      placeholder="NGO Email"
+                      className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                      value={adminForm.ngoEmail}
+                      onChange={(e) => setAdminForm({ ...adminForm, ngoEmail: e.target.value })}
                     />
                     <select
                       className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
