@@ -6,6 +6,7 @@ import { verifyRequest, verifyDocument } from "../services/verification.js";
 import { haversineKm, TN_DISTRICTS } from "../lib/districts.js";
 import { runAlertCycle, escalateRadius } from "../services/alerts.js";
 import { logAudit, AuditActions } from "../lib/audit.js";
+import { addAiJob, addDocumentVerificationJob, addNotificationJob } from "../queues/index.js";
 
 export const requestsRouter = Router();
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -130,12 +131,24 @@ requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, re
   const request = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   if (!request) return res.status(404).json({ error: "Request not found" });
   if (!canManageRequest(request, req)) return res.status(403).json({ error: "Not allowed to upload documents for this request" });
-  const ai = await verifyDocument(base64, mimeType, documentType || "requirement_slip", request.patientName);
   const doc = await queryOne<any>(
     'INSERT INTO "RequestDocument" ("id","requestId","fileUrl","documentType","aiVerified","aiScore","aiNotes","uploadedAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,NOW()) RETURNING *',
-    [req.params.id, `inline:${mimeType}`, documentType || "requirement_slip", ai.verified, ai.score, ai.notes]
+    [req.params.id, `inline:${mimeType}`, documentType || "requirement_slip", false, 0, "Document verification queued."]
   );
-  res.status(201).json({ document: doc, ai });
+  const queued = await addDocumentVerificationJob({
+    requestId: req.params.id,
+    documentId: doc.id,
+    base64,
+    mimeType,
+    documentType: documentType || "requirement_slip",
+    patientName: request.patientName,
+  });
+  if (!queued) {
+    const ai = await verifyDocument(base64, mimeType, documentType || "requirement_slip", request.patientName);
+    await exec('UPDATE "RequestDocument" SET "aiVerified"=$1,"aiScore"=$2,"aiNotes"=$3 WHERE "id"=$4', [ai.verified, ai.score, ai.notes, doc.id]);
+    return res.status(201).json({ document: { ...doc, aiVerified: ai.verified, aiScore: ai.score, aiNotes: ai.notes }, ai, queued: false });
+  }
+  res.status(202).json({ document: doc, queued: true, message: "Document verification queued" });
 });
 
 requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: any) => {
@@ -153,27 +166,26 @@ requestsRouter.post("/:id/verify", requireAuth, async (req: AuthedRequest, res: 
   const documentAiUnavailable = Number(latestDocument.aiScore || 0) === 0 && String(latestDocument.aiNotes || "").includes("Automatic document verification could not run");
   const aiFailed = !latestDocument.aiVerified || latestDocument.aiScore < MIN_DOCUMENT_VERIFY_SCORE;
   
-  const baseResult = await verifyRequest(request, documents.length > 0);
-  
-  // If AI failed or unavailable, mark for manual review but don't block
-  if (documentAiUnavailable || aiFailed) {
-    const result = { 
-      ...baseResult, 
-      verified: false, 
-      notes: `${baseResult.notes} ${documentAiUnavailable ? "Automatic document AI verification is unavailable" : `AI verification failed (score: ${latestDocument.aiScore}%)`}, so this request requires NGO/manual review before alerts are sent.`, 
-      checks: { ...baseResult.checks, documentAutoVerificationUnavailable: documentAiUnavailable, aiVerificationFailed: aiFailed } 
-    };
-    const status = "pending_verification";
-    await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [result.score, result.notes, status, request.id]);
+  const queued = await addAiJob({ type: "request-verification", requestId: request.id });
+  if (queued) {
+    await exec('UPDATE "BloodRequest" SET "verificationNotes"=$1 WHERE "id"=$2', ["AI request verification queued.", request.id]);
     const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [request.id]);
-    return res.json({ request: updated, verification: result });
+    return res.status(202).json({ request: updated, queued: true, message: "AI verification queued" });
   }
-  
-  // AI passed, proceed normally
-  const status = baseResult.verified ? "verified" : "pending_verification";
-  await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [baseResult.score, baseResult.notes, status, request.id]);
+
+  const baseResult = await verifyRequest(request, documents.length > 0);
+  const result = documentAiUnavailable || aiFailed
+    ? {
+        ...baseResult,
+        verified: false,
+        notes: `${baseResult.notes} ${documentAiUnavailable ? "Automatic document AI verification is unavailable" : `AI verification failed (score: ${latestDocument.aiScore}%)`}, so this request requires NGO/manual review before alerts are sent.`,
+        checks: { ...baseResult.checks, documentAutoVerificationUnavailable: documentAiUnavailable, aiVerificationFailed: aiFailed },
+      }
+    : baseResult;
+  const status = result.verified ? "verified" : "pending_verification";
+  await exec('UPDATE "BloodRequest" SET "verificationScore"=$1, "verificationNotes"=$2, "status"=$3 WHERE "id"=$4', [result.score, result.notes, status, request.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [request.id]);
-  res.json({ request: updated, verification: baseResult });
+  res.json({ request: updated, verification: result, queued: false });
 });
 
 requestsRouter.post("/:id/approve", requireAuth, async (req: AuthedRequest, res: any) => {
@@ -193,6 +205,19 @@ requestsRouter.post("/:id/alert", requireAuth, async (req: AuthedRequest, res: a
   if (request.status === "verified") {
     await exec('UPDATE "BloodRequest" SET "status" = $1 WHERE "id" = $2', ["alert_sent", request.id]);
   }
+  const queued = await addNotificationJob({ type: "alert-cycle", requestId: request.id });
+  if (queued) {
+    await logAudit({
+      userId: req.userId!,
+      action: AuditActions.REQUEST_ALERT,
+      entityType: "BloodRequest",
+      entityId: request.id,
+      details: JSON.stringify({ queued: true }),
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    return res.status(202).json({ ok: true, queued: true, message: "Alert cycle queued" });
+  }
   const result = await runAlertCycle(request.id);
   await logAudit({
     userId: req.userId!,
@@ -203,7 +228,7 @@ requestsRouter.post("/:id/alert", requireAuth, async (req: AuthedRequest, res: a
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   });
-  res.json({ ok: true, message: "Alert cycle triggered", ...result });
+  res.json({ ok: true, queued: false, message: "Alert cycle triggered", ...result });
 });
 
 requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res: any) => {
@@ -212,6 +237,19 @@ requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res
   if (!canManageRequest(request, req)) return res.status(403).json({ error: "Not allowed to escalate this request" });
   if (!["verified", "alert_sent", "donor_accepted"].includes(String(request.status || ""))) {
     return res.status(400).json({ error: "Request must be AI/admin verified before escalation" });
+  }
+  const queued = await addNotificationJob({ type: "escalate-radius", requestId: request.id });
+  if (queued) {
+    await logAudit({
+      userId: req.userId!,
+      action: AuditActions.REQUEST_ESCALATE,
+      entityType: "BloodRequest",
+      entityId: request.id,
+      details: JSON.stringify({ queued: true }),
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    return res.status(202).json({ queued: true, message: "Escalation queued" });
   }
   const newRadius = await escalateRadius(request.id);
   await logAudit({
@@ -223,7 +261,7 @@ requestsRouter.post("/:id/escalate", requireAuth, async (req: AuthedRequest, res
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   });
-  res.json({ radiusKm: newRadius, message: "Escalated to next radius tier" });
+  res.json({ radiusKm: newRadius, queued: false, message: "Escalated to next radius tier" });
 });
 
 requestsRouter.post("/:id/check-escalation", requireAuth, async (req: AuthedRequest, res: any) => {
