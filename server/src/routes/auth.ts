@@ -137,13 +137,16 @@ authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: an
     mobile: z.string().min(10), accessToken: z.string(),
     name: z.string().optional(), role: z.enum(["donor","requester"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
+    age: z.number().optional(), bloodGroup: z.string().optional(), district: z.string().optional(),
+    gender: z.enum(["male","female"]).optional(), isPlateletDonor: z.boolean().optional(),
+    lat: z.number().optional(), lng: z.number().optional(),
   });
   const parse = schema.safeParse(req.body);
   if (!parse.success) {
     console.log("[otp/verify] validation failed:", parse.error.flatten());
     return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   }
-  const { accessToken, name, role, language, password } = parse.data;
+  const { accessToken, name, role, language, password, age, bloodGroup, district, gender, isPlateletDonor, lat, lng } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
 
   const verified = await verifyOtpForMobile(mobile, accessToken);
@@ -156,10 +159,22 @@ authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: an
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
   if (!user) {
-    user = await queryOne<any>(
-      'INSERT INTO "User" ("id","mobile","name","role","language","password","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,NOW()) RETURNING *',
-      [mobile, name || "UYIR User", role || "donor", language || "ta", hashedPassword]
-    );
+    const insertFields = ['"id"','"mobile"','"name"','"role"','"language"','"password"','"createdAt"'];
+    const insertParams: any[] = [mobile, name || "UYIR User", role || "donor", language || "ta", hashedPassword];
+    
+    // Add donor details if provided
+    if (age !== undefined) { insertFields.push('"age"'); insertParams.push(age); }
+    if (bloodGroup) { insertFields.push('"bloodGroup"'); insertParams.push(bloodGroup); }
+    if (district) { insertFields.push('"district"'); insertParams.push(district); }
+    if (gender) { insertFields.push('"gender"'); insertParams.push(gender); }
+    if (isPlateletDonor !== undefined) { insertFields.push('"isPlateletDonor"'); insertParams.push(isPlateletDonor); }
+    if (lat !== undefined) { insertFields.push('"lat"'); insertParams.push(lat); }
+    if (lng !== undefined) { insertFields.push('"lng"'); insertParams.push(lng); }
+    
+    const placeholders = insertParams.map((_, i) => '$' + (i + 1)).join(',');
+    const sql = `INSERT INTO "User" (${insertFields.join(',')}) VALUES (gen_random_uuid(),${placeholders},NOW()) RETURNING *`;
+    
+    user = await queryOne<any>(sql, insertParams);
   } else if (!user.password && hashedPassword) {
     await exec('UPDATE "User" SET "password" = $1 WHERE "mobile" = $2', [hashedPassword, mobile]);
     user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
