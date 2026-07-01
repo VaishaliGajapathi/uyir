@@ -70,6 +70,32 @@ export function NgoAdmin() {
     }
   }
 
+  async function approveRequest(id: string) {
+    setBusy(id);
+    try {
+      await api.adminVerifyRequest(id, true, "");
+      await loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rejectRequest(id: string) {
+    const notes = prompt(lang === "ta" ? "நிராகரிப்பு காரணம் உள்ளிடவும்" : "Enter rejection reason");
+    if (notes === null) return;
+    setBusy(id);
+    try {
+      await api.adminVerifyRequest(id, false, notes);
+      await loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function statusClass(status: string) {
     if (status === "pending_verification") return "bg-amber-100 text-amber-700";
     if (status === "verified") return "bg-emerald-100 text-emerald-700";
@@ -232,6 +258,16 @@ export function NgoAdmin() {
                   <p className="text-slate-500">{lang === "ta" ? "அவசரம்" : "Emergency"}: {r.emergencyLevel}</p>
                   <p className="text-slate-500">{lang === "ta" ? "தொடர்பு" : "Contact"}: {r.contactPerson} · {r.contactNumber}</p>
                 </div>
+                {r.status === "pending_verification" && (
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" className="bg-emerald-600" loading={busy === r.id} onClick={() => approveRequest(r.id)}>
+                      <CheckCircle2 className="h-4 w-4" /> {lang === "ta" ? "ஒப்புதல்" : "Approve"}
+                    </Button>
+                    <Button size="sm" variant="outline" loading={busy === r.id} onClick={() => rejectRequest(r.id)}>
+                      <XCircle className="h-4 w-4" /> {lang === "ta" ? "நிராகரி" : "Reject"}
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

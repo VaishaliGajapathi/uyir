@@ -96,7 +96,7 @@ adminRouter.post("/reports/:id/dismiss", requireAdminOrVerifier, asyncHandler(as
 }));
 
 // Verify (approve/reject) a blood request
-adminRouter.post("/verify-request/:id", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
+adminRouter.post("/verify-request/:id", requireAdminOrNgo, asyncHandler(async (req: Request, res: Response) => {
   const { approved, notes } = req.body;
   const status = approved ? "verified" : "rejected";
   await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW() WHERE "id" = $3', [status, notes || "", req.params.id]);
@@ -131,14 +131,14 @@ adminRouter.post("/admins", requireAdminOrVerifier, asyncHandler(async (req: Req
 }));
 
 // Close a request
-adminRouter.post("/requests/:id/close", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
+adminRouter.post("/requests/:id/close", requireAdminOrNgo, asyncHandler(async (req: Request, res: Response) => {
   await exec('UPDATE "BloodRequest" SET "status" = $1, "closedAt" = NOW() WHERE "id" = $2', ["closed", req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
 }));
 
 // Reject a request
-adminRouter.post("/requests/:id/reject", requireAdminOrVerifier, asyncHandler(async (req: Request, res: Response) => {
+adminRouter.post("/requests/:id/reject", requireAdminOrNgo, asyncHandler(async (req: Request, res: Response) => {
   const { notes } = req.body;
   await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW() WHERE "id" = $3', ["rejected", notes || "", req.params.id]);
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);

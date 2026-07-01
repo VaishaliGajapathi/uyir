@@ -9,7 +9,7 @@ import { BLOOD_GROUPS } from "../lib/constants";
 type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins";
 
 export function Admin() {
-  const { user } = useApp();
+  const { user, lang } = useApp();
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<any>(null);
   const [donors, setDonors] = useState<any[]>([]);
@@ -640,11 +640,11 @@ export function Admin() {
 
       {tab === "ngos" && (
         <Card className="p-4">
-          <h3 className="mb-2 font-bold text-slate-800">NGO Admins ({ngos.length})</h3>
+          <h3 className="mb-2 font-bold text-slate-800">NGO Admins & Activities ({ngos.length})</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {ngos.length === 0 && <p className="text-sm text-slate-400">No NGO admins found.</p>}
             {ngos.map((n) => (
-              <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-2">
+              <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-700">{n.name}</p>
@@ -656,6 +656,20 @@ export function Admin() {
                     <Badge className={n.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>
                       {n.verified ? "Verified" : "Unverified"}
                     </Badge>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 rounded-lg bg-white p-2 text-center">
+                  <div>
+                    <p className="text-xs text-slate-500">{lang === "ta" ? "கோரிக்கைகள்" : "Requests"}</p>
+                    <p className="text-sm font-bold text-slate-800">{n.requestsProcessed || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">{lang === "ta" ? "மருத்துவமனைகள்" : "Hospitals"}</p>
+                    <p className="text-sm font-bold text-slate-800">{n.hospitalsVerified || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">{lang === "ta" ? "தானங்கள்" : "Donations"}</p>
+                    <p className="text-sm font-bold text-slate-800">{n.donationsFacilitated || 0}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex gap-2">
