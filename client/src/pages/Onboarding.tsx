@@ -4,8 +4,9 @@ import { Phone, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp } from "../lib/msg91";
 import { useApp } from "../contexts/AppContext";
-import { Button } from "../components/ui";
+import { Button, SearchableSelect } from "../components/ui";
 import type { Lang } from "../lib/constants";
+import { TN_DISTRICTS } from "../lib/constants";
 
 function dashboardPathForRole(role?: string) {
   if (role === "hospital") return "/hospital-dashboard";
@@ -457,9 +458,13 @@ export default function Onboarding() {
 
               <div>
                 <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "மாவட்டம்" : "District"}</label>
-                <input type="text" placeholder={lang === "ta" ? "உங்கள் மாவட்டம்" : "Your district"}
-                  value={donorDetails.district} onChange={(e) => setDonorDetails({ ...donorDetails, district: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
+                <SearchableSelect
+                  options={TN_DISTRICTS}
+                  value={donorDetails.district}
+                  onChange={(v) => setDonorDetails({ ...donorDetails, district: v })}
+                  placeholder={lang === "ta" ? "உங்கள் மாவட்டம்" : "Your district"}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm h-12"
+                />
               </div>
 
               <div>
