@@ -130,6 +130,8 @@ const allowedOrigins = [
   "https://www.uyirngo.in",
   "https://uyirngo.netlify.app",
   "https://uyirproduction.onrender.com",
+  "https://uyir.pages.dev",
+  "https://c9597aab.uyir.pages.dev",
   "http://localhost:5000",
   "http://localhost:3000",
   "http://localhost:5173",
@@ -140,7 +142,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".uyir.pages.dev") || origin.endsWith(".pages.dev")) {
       callback(null, true);
     } else {
       callback(new Error(`Origin ${origin} not allowed by CORS`), false);
