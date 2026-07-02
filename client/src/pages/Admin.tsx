@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network, FileCheck2, LogOut, Pencil } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network, FileCheck2, LogOut, Pencil, Menu, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui";
@@ -20,6 +20,7 @@ function fileToBase64(file: File): Promise<string> {
 export function Admin() {
   const { user, lang, logout } = useApp();
   const [tab, setTab] = useState<Tab>("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [donors, setDonors] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -496,10 +497,29 @@ export function Admin() {
 
   return (
     <div className="flex h-screen bg-slate-50">
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <img src="/uyir-logo.png" alt="UYIR" className="h-8 w-auto" />
+          <span className="text-sm font-bold text-slate-800 capitalize">{tab.replace(/_/g, " ")}</span>
+        </div>
+        <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-md hover:bg-slate-100">
+          <Menu className="h-5 w-5 text-slate-600" />
+        </button>
+      </div>
+
+      {/* Mobile Overlay */}
+      {sidebarOpen && <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setSidebarOpen(false)} />}
+
       {/* Left Sidebar */}
-      <aside className="w-60 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
+      <aside className={`w-60 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto fixed md:static inset-y-0 left-0 z-50 transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-4 border-b border-slate-100">
-          <img src="/uyir-logo.png" alt="UYIR" className="h-10 w-auto object-contain mb-2" />
+          <div className="flex items-center justify-between">
+            <img src="/uyir-logo.png" alt="UYIR" className="h-10 w-auto object-contain mb-2" />
+            <button className="md:hidden p-1" onClick={() => setSidebarOpen(false)}>
+              <X className="h-5 w-5 text-slate-400" />
+            </button>
+          </div>
           <h2 className="text-lg font-bold text-slate-800">Hi, {user?.name?.split(" ")[0] || "Admin"}</h2>
           <p className="text-xs text-slate-500 capitalize">{user?.role?.replace(/_/g, " ")} Dashboard</p>
         </div>
@@ -532,7 +552,7 @@ export function Admin() {
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+              <button key={item.id} onClick={() => { setTab(item.id as Tab); setSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
                 <Icon className="h-4 w-4" /> {item.label}
               </button>
@@ -552,7 +572,7 @@ export function Admin() {
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+              <button key={item.id} onClick={() => { setTab(item.id as Tab); setSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
                 <Icon className="h-4 w-4" /> {item.label}
               </button>
@@ -566,7 +586,7 @@ export function Admin() {
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+              <button key={item.id} onClick={() => { setTab(item.id as Tab); setSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
                 <Icon className="h-4 w-4" /> {item.label}
               </button>
@@ -582,7 +602,7 @@ export function Admin() {
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} onClick={() => setTab(item.id as Tab)}
+              <button key={item.id} onClick={() => { setTab(item.id as Tab); setSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-uyir-50 text-uyir-700" : "text-slate-600 hover:bg-slate-50"}`}>
                 <Icon className="h-4 w-4" /> {item.label}
               </button>
@@ -617,13 +637,13 @@ export function Admin() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 pt-16 md:pt-6">
 
 
 
       {tab === "overview" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <StatCard icon={Users} label="Total Donors" value={stats?.totalDonors} color="bg-blue-50 text-blue-600" />
             <StatCard icon={Droplet} label="Total Requests" value={stats?.totalRequests} color="bg-red-50 text-red-600" />
             <StatCard icon={ShieldCheck} label="Pending Verification" value={stats?.pendingVerifications} color="bg-amber-50 text-amber-600" />
@@ -810,7 +830,7 @@ export function Admin() {
                           <div><span className="text-slate-500">Reputation:</span> <span className="font-medium">{d.reputationScore ?? 0}</span></div>
                           <div><span className="text-slate-500">Last Donation:</span> <span className="font-medium">{d.lastDonationDate ? new Date(d.lastDonationDate).toLocaleDateString() : "—"}</span></div>
                           <div><span className="text-slate-500">Joined:</span> <span className="font-medium">{d.createdAt ? timeAgo(d.createdAt) : "—"}</span></div>
-                          <div className="col-span-2"><span className="text-slate-500">User ID:</span> <span className="font-mono text-[10px]">{d.id}</span></div>
+                          <div className="col-span-1 sm:col-span-2"><span className="text-slate-500">User ID:</span> <span className="font-mono text-[10px]">{d.id}</span></div>
                         </div>
                       </td>
                     </tr>
@@ -1000,8 +1020,8 @@ export function Admin() {
           </div>
           {showHospitalForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
-              <div className="mb-2 grid grid-cols-2 gap-2">
-                <div className="col-span-2 flex items-center gap-3">
+              <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="col-span-1 sm:col-span-2 flex items-center gap-3">
                   {hospitalForm.logo && <img src={hospitalForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
                   <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
                     Upload Logo
@@ -1039,7 +1059,7 @@ export function Admin() {
                 <input
                   type="text"
                   placeholder="Registration ID"
-                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className="col-span-1 sm:col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   value={hospitalForm.registrationId}
                   onChange={(e) => setHospitalForm({ ...hospitalForm, registrationId: e.target.value })}
                 />
@@ -1102,8 +1122,8 @@ export function Admin() {
           </div>
           {showNgoForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
-              <div className="mb-2 grid grid-cols-2 gap-2">
-                <div className="col-span-2 flex items-center gap-3">
+              <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="col-span-1 sm:col-span-2 flex items-center gap-3">
                   {ngoForm.logo && <img src={ngoForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
                   <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
                     Upload Logo
@@ -1169,13 +1189,13 @@ export function Admin() {
                 <input
                   type="text"
                   placeholder="Address"
-                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className="col-span-1 sm:col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   value={ngoForm.address}
                   onChange={(e) => setNgoForm({ ...ngoForm, address: e.target.value })}
                 />
                 <textarea
                   placeholder="NGO Description / Details"
-                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className="col-span-1 sm:col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   rows={2}
                   value={ngoForm.description}
                   onChange={(e) => setNgoForm({ ...ngoForm, description: e.target.value })}
@@ -1239,7 +1259,7 @@ export function Admin() {
                     </Badge>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-white p-2 text-center">
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg bg-white p-2 text-center">
                   <div>
                     <p className="text-xs text-slate-500">{lang === "ta" ? "கோரிக்கைகள்" : "Requests"}</p>
                     <p className="text-sm font-bold text-slate-800">{n.requestsProcessed || 0}</p>
@@ -1285,8 +1305,8 @@ export function Admin() {
           </div>
           {showBloodBankForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
-              <div className="mb-2 grid grid-cols-2 gap-2">
-                <div className="col-span-2 flex items-center gap-3">
+              <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="col-span-1 sm:col-span-2 flex items-center gap-3">
                   {bloodBankForm.logo && <img src={bloodBankForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
                   <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
                     Upload Logo
@@ -1352,13 +1372,13 @@ export function Admin() {
                 <input
                   type="text"
                   placeholder="Address"
-                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className="col-span-1 sm:col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   value={bloodBankForm.address}
                   onChange={(e) => setBloodBankForm({ ...bloodBankForm, address: e.target.value })}
                 />
                 <textarea
                   placeholder="Description / Details"
-                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  className="col-span-1 sm:col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                   rows={2}
                   value={bloodBankForm.description}
                   onChange={(e) => setBloodBankForm({ ...bloodBankForm, description: e.target.value })}
@@ -1427,7 +1447,7 @@ export function Admin() {
           </div>
           {showAdminForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
-              <div className="mb-2 grid grid-cols-2 gap-2">
+              <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="text"
                   placeholder="Name"
@@ -1477,7 +1497,7 @@ export function Admin() {
                 />
                 {adminForm.role === "ngo" && (
                   <>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-slate-600">Select existing NGO or create new</label>
                       <select
                         className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
@@ -1538,13 +1558,13 @@ export function Admin() {
                       </>
                     )}
                     {adminForm.ngoId && (
-                      <div className="col-span-2 text-xs text-slate-500 bg-emerald-50 rounded p-2">
+                      <div className="col-span-1 sm:col-span-2 text-xs text-slate-500 bg-emerald-50 rounded p-2">
                         Linking to existing NGO: <strong>{ngoOrganizations.find((n: any) => n.id === adminForm.ngoId)?.name}</strong>
                       </div>
                     )}
                     {adminForm.role === "hospital" && (
                       <>
-                        <div className="col-span-2">
+                        <div className="col-span-1 sm:col-span-2">
                           <label className="mb-1 block text-xs font-medium text-slate-600">Select Hospital</label>
                           <select
                             className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
@@ -1574,7 +1594,7 @@ export function Admin() {
                     )}
                     {adminForm.role === "blood_bank" && (
                       <>
-                        <div className="col-span-2">
+                        <div className="col-span-1 sm:col-span-2">
                           <label className="mb-1 block text-xs font-medium text-slate-600">Select Blood Bank</label>
                           <select
                             className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
@@ -1708,7 +1728,7 @@ export function Admin() {
           
           {showPasswordChange && !editingAdminId && (
             <div className="mb-4 rounded-lg bg-slate-50 p-4">
-              <div className="mb-3 grid grid-cols-3 gap-3">
+              <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Current Password</label>
                   <input
@@ -1761,7 +1781,7 @@ export function Admin() {
           
           {showProfileEdit ? (
             <div className="rounded-lg bg-slate-50 p-4">
-              <div className="mb-3 grid grid-cols-2 gap-3">
+              <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
                   <input
@@ -1822,7 +1842,7 @@ export function Admin() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4">
                 <div>
                   <p className="text-xs text-slate-500">Name</p>
                   <p className="text-sm font-semibold text-slate-800">{user?.name || "—"}</p>
@@ -1905,14 +1925,14 @@ export function Admin() {
         <div className="space-y-4">
           {bloodInventory ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
                 <StatCard icon={CheckCircle2} label="Eligible Donors (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
               </div>
               {bloodInventory.byGroup?.length > 0 ? (
                 <Card className="p-4">
                   <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {bloodInventory.byGroup.map((g: any) => (
                       <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
                         <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
@@ -1961,7 +1981,7 @@ export function Admin() {
           <>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Request Fulfillment Pipeline</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="rounded-lg bg-slate-50 p-3 text-center">
                 <p className="text-xs text-slate-500">Total</p>
                 <p className="text-2xl font-extrabold text-slate-800">{pipeline.fulfillmentRate?.total || 0}</p>
@@ -2008,7 +2028,7 @@ export function Admin() {
               ))}
             </div>
           </Card>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card className="p-4">
               <h3 className="mb-3 font-bold text-slate-800">By Blood Group</h3>
               <div className="space-y-2">
@@ -2042,7 +2062,7 @@ export function Admin() {
       {/* ============ ANALYTICS ============ */}
       {tab === "analytics" && analytics && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card className="p-4">
               <h3 className="mb-3 font-bold text-slate-800">Requests (Last 30 Days)</h3>
               <div className="flex items-end gap-1 h-32">
@@ -2088,7 +2108,7 @@ export function Admin() {
           </Card>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">District Heatmap</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {analytics.districtHeatmap.map((d: any) => (
                 <div key={d.district} className="rounded-lg p-3" style={{ backgroundColor: `rgba(239, 68, 68, ${Math.min(d.requests / 20, 0.9)})` }}>
                   <p className="text-sm font-bold text-white">{d.district}</p>

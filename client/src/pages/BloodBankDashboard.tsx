@@ -139,11 +139,11 @@ export function BloodBankDashboard() {
 
   return (
     <div className="px-4 py-4">
-      <header className="mb-4 flex items-center justify-between py-4">
+      <header className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 py-4">
         <div className="flex items-center gap-3">
-          <img src={user?.facilityLogo || "/uyir-logo.png"} alt="Logo" className="h-14 w-auto object-contain" />
+          <img src={user?.facilityLogo || "/uyir-logo.png"} alt="Logo" className="h-10 sm:h-14 w-auto object-contain" />
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800">
+            <h1 className="text-lg sm:text-xl font-extrabold text-slate-800">
               {lang === "ta" ? "இரத்த வங்கி மேலாண்மை" : "Blood Bank Dashboard"}
             </h1>
             <p className="text-xs text-slate-500">
@@ -151,7 +151,7 @@ export function BloodBankDashboard() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 self-end sm:self-auto">
           <Button size="sm" onClick={loadAll}>Refresh</Button>
           <Button size="sm" variant="outline" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
@@ -159,7 +159,7 @@ export function BloodBankDashboard() {
         </div>
       </header>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard icon={Droplet} label={lang === "ta" ? "மொத்த கோரிக்கைகள்" : "Total Requests"} value={stats?.totalRequests} color="bg-red-50 text-red-600" />
         <StatCard icon={Users} label={lang === "ta" ? "தானம் செய்தோர்" : "Donations"} value={stats?.completedDonations} color="bg-blue-50 text-blue-600" />
         <StatCard icon={Building2} label={lang === "ta" ? "மருத்துவமனைகள்" : "Hospitals"} value={stats?.totalHospitals} color="bg-emerald-50 text-emerald-600" />
@@ -342,13 +342,13 @@ export function BloodBankDashboard() {
       {/* ============ BLOOD INVENTORY ============ */}
       {tab === "inventory" && bloodInventory && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
             <StatCard icon={CheckCircle2} label="Eligible (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
           </div>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {bloodInventory.byGroup.map((g: any) => (
                 <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
                   <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
@@ -383,7 +383,7 @@ export function BloodBankDashboard() {
         <div className="space-y-3">
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Fulfillment Pipeline</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="rounded-lg bg-slate-50 p-3 text-center">
                 <p className="text-xs text-slate-500">Total</p>
                 <p className="text-2xl font-extrabold text-slate-800">{pipeline.fulfillmentRate?.total || 0}</p>
@@ -427,7 +427,7 @@ export function BloodBankDashboard() {
               ))}
             </div>
           </Card>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Card className="p-4">
               <h3 className="mb-3 font-bold text-slate-800">By Blood Group</h3>
               <div className="space-y-2">
@@ -457,7 +457,7 @@ export function BloodBankDashboard() {
       {/* ============ ANALYTICS ============ */}
       {tab === "analytics" && analytics && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Card className="p-4">
               <h3 className="mb-3 font-bold text-slate-800">Requests (30 Days)</h3>
               <div className="flex items-end gap-1 h-32">

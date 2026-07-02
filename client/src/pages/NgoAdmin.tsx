@@ -118,11 +118,11 @@ export function NgoAdmin() {
 
   return (
     <div className="px-4 py-4">
-      <header className="mb-4 flex items-center justify-between py-4">
+      <header className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 py-4">
         <div className="flex items-center gap-3">
-          <img src={user?.facilityLogo || "/uyir-logo.png"} alt="Logo" className="h-14 w-auto object-contain" />
+          <img src={user?.facilityLogo || "/uyir-logo.png"} alt="Logo" className="h-10 sm:h-14 w-auto object-contain" />
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800">
+            <h1 className="text-lg sm:text-xl font-extrabold text-slate-800">
               {lang === "ta" ? "NGO நிர்வாக மையம்" : "NGO Admin Dashboard"}
             </h1>
             <p className="text-xs text-slate-500">
@@ -130,7 +130,7 @@ export function NgoAdmin() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 self-end sm:self-auto">
           <Button size="sm" onClick={loadAll}>Refresh</Button>
           <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => { logout(); window.location.href = "/admin-login"; }}>
             <LogOut className="h-4 w-4" /> Sign out
@@ -138,7 +138,7 @@ export function NgoAdmin() {
         </div>
       </header>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard icon={Droplet} label={lang === "ta" ? "மொத்த கோரிக்கைகள்" : "Total Requests"} value={stats?.totalRequests} color="bg-red-50 text-red-600" />
         <StatCard icon={Users} label={lang === "ta" ? "தானம் செய்தோர்" : "Donations"} value={stats?.completedDonations} color="bg-blue-50 text-blue-600" />
         <StatCard icon={Building2} label={lang === "ta" ? "மருத்துவமனைகள்" : "Hospitals"} value={stats?.totalHospitals} color="bg-emerald-50 text-emerald-600" />
