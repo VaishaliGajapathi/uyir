@@ -3,11 +3,18 @@
   command = "npm run build"
   publish = "client/dist"
 
-# Proxy API requests to Render backend.
-# IMPORTANT: Replace with your actual Render service URL.
+# Proxy API requests to backend.
+# IMPORTANT: Replace with your actual backend URL (Render or Railway).
 [[redirects]]
   from = "/api/*"
   to = "https://uyirproduction.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Proxy auth routes
+[[redirects]]
+  from = "/auth/*"
+  to = "https://uyirproduction.onrender.com/auth/:splat"
   status = 200
   force = true
 
@@ -19,3 +26,28 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# CDN cache headers for static assets (works with Cloudflare CDN)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=()"

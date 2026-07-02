@@ -143,3 +143,63 @@ usersRouter.delete("/me/documents/:id", requireAuth, async (req: AuthedRequest, 
   await exec('DELETE FROM "DonorDocument" WHERE "id" = $1', [req.params.id]);
   res.json({ ok: true });
 });
+
+// ============ FCM Token Management ============
+
+usersRouter.post("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: any) => {
+  const schema = z.object({
+    token: z.string().min(10),
+    platform: z.enum(["android", "ios", "web"]).optional(),
+  });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
+
+  const { token, platform } = parse.data;
+
+  await exec('UPDATE "User" SET "fcmToken" = $1, "fcmPlatform" = $2, "fcmTokenUpdatedAt" = NOW() WHERE "id" = $3', [token, platform || null, req.userId]);
+
+  try {
+    const { subscribeToTopic } = await import("../lib/firebase.js");
+    const user = await queryOne<any>('SELECT "bloodGroup", "district" FROM "User" WHERE "id" = $1', [req.userId]);
+    if (user?.bloodGroup) {
+      await subscribeToTopic([token], `blood-group-${user.bloodGroup.replace("+", "pos").replace("-", "neg")}`);
+    }
+    if (user?.district) {
+      await subscribeToTopic([token], `district-${user.district.toLowerCase().replace(/\s+/g, "-")}`);
+    }
+    await subscribeToTopic([token], "all-donors");
+  } catch (err: any) {
+    console.warn("[fcm] Topic subscription failed (non-critical):", err.message);
+  }
+
+  res.json({ ok: true });
+});
+
+usersRouter.delete("/me/fcm-token", requireAuth, async (req: AuthedRequest, res: any) => {
+  const user = await queryOne<any>('SELECT "fcmToken" FROM "User" WHERE "id" = $1', [req.userId]);
+  if (user?.fcmToken) {
+    try {
+      const { unsubscribeFromTopic } = await import("../lib/firebase.js");
+      await unsubscribeFromTopic([user.fcmToken], "all-donors");
+    } catch {}
+  }
+  await exec('UPDATE "User" SET "fcmToken" = NULL, "fcmPlatform" = NULL, "fcmTokenUpdatedAt" = NULL WHERE "id" = $1', [req.userId]);
+  res.json({ ok: true });
+});
+
+usersRouter.post("/me/subscribe-topic", requireAuth, async (req: AuthedRequest, res: any) => {
+  const schema = z.object({ topic: z.string().min(2) });
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: "Invalid input" });
+
+  const user = await queryOne<any>('SELECT "fcmToken" FROM "User" WHERE "id" = $1', [req.userId]);
+  if (!user?.fcmToken) return res.status(400).json({ error: "No FCM token registered" });
+
+  try {
+    const { subscribeToTopic } = await import("../lib/firebase.js");
+    const count = await subscribeToTopic([user.fcmToken], parse.data.topic);
+    res.json({ ok: true, subscribed: count });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});

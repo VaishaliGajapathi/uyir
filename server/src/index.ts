@@ -20,8 +20,11 @@ import { ngoRouter } from "./routes/ngo.js";
 import { bloodBanksRouter } from "./routes/bloodbanks.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { disasterRouter } from "./routes/disaster.js";
-import { exec } from "./db.js";
+import { exec, healthCheck as dbHealthCheck } from "./db.js";
 import { TN_DISTRICT_NAMES } from "./lib/districts.js";
+import { cacheMiddleware } from "./middleware/cache.js";
+import { apiRateLimit, authRateLimit } from "./middleware/rateLimit.js";
+import { redisEnabled } from "./lib/redis.js";
 
 process.on("uncaughtException", (err) => logger.fatal({ err }, "uncaughtException"));
 process.on("unhandledRejection", (reason) => logger.fatal({ reason }, "unhandledRejection"));
@@ -59,6 +62,9 @@ app.use(helmet({
 
 async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoName" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmToken" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmPlatform" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmTokenUpdatedAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "hospitalType" TEXT');
   await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
@@ -151,8 +157,23 @@ app.options("*", cors());
 app.use(express.json({ limit: "30mb" }));
 app.use(logRequest);
 
-app.get("/api/health", (_req: Request, res: any) => res.json({ ok: true, service: "uyir-api" }));
-app.get("/api/districts", (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
+if (redisEnabled) {
+  logger.info("Redis caching & rate limiting enabled");
+  app.use("/api/", apiRateLimit);
+  app.use("/auth/", apiRateLimit);
+}
+
+app.get("/api/health", async (_req: Request, res: any) => {
+  const dbHealthy = await dbHealthCheck();
+  res.json({
+    ok: true,
+    service: "uyir-api",
+    database: dbHealthy ? "connected" : "error",
+    redis: redisEnabled ? "connected" : "disabled",
+    timestamp: new Date().toISOString(),
+  });
+});
+app.get("/api/districts", cacheMiddleware(3600), (_req: Request, res: any) => res.json(TN_DISTRICT_NAMES));
 app.get("/api/outbound-ip", async (_req: Request, res: Response) => {
   const ip = await fetch("https://api.ipify.org?format=json").then((r) => r.json());
   res.json(ip);
@@ -168,7 +189,7 @@ app.use("/api/stream", streamRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/ngo", ngoRouter);
 app.use("/api/bloodbanks", bloodBanksRouter);
-app.use("/api/analytics", analyticsRouter);
+app.use("/api/analytics", cacheMiddleware(30), analyticsRouter);
 app.use("/api/disaster", disasterRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);

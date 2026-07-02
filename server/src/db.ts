@@ -1,14 +1,17 @@
 import { Pool, PoolClient } from "pg";
 
 const isProd = process.env.NODE_ENV === "production";
+const isNeon = process.env.DATABASE_URL?.includes("neon.tech");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("neon.tech") ? { rejectUnauthorized: false } : false,
-  max: isProd ? 10 : 5,
+  ssl: isNeon ? { rejectUnauthorized: false } : false,
+  max: isProd ? (isNeon ? 20 : 10) : 5,
   min: 0,
-  idleTimeoutMillis: 10000,
+  idleTimeoutMillis: isNeon ? 20000 : 10000,
   connectionTimeoutMillis: 10000,
+  statement_timeout: 30000,
+  query_timeout: 30000,
 });
 
 pool.on("error", (err) => {
@@ -51,6 +54,30 @@ export async function exec(sql: string, params?: any[]): Promise<{ rowCount: num
     throw e;
   } finally {
     if (client) client.release();
+  }
+}
+
+export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function healthCheck(): Promise<boolean> {
+  try {
+    const result = await pool.query("SELECT 1");
+    return result.rowCount === 1;
+  } catch {
+    return false;
   }
 }
 

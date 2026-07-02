@@ -1,0 +1,21 @@
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=()
+
+# Cache static assets aggressively (Cloudflare CDN + browser)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML should not be cached (SPA)
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Service worker should revalidate
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Manifest
+/manifest.json
+  Cache-Control: public, max-age=86400

@@ -212,6 +212,10 @@ export const api = {
   // push notifications
   savePushSubscription: (subscription: PushSubscription) => req("/users/me/push-subscription", { method: "POST", body: JSON.stringify({ subscription }) }),
   testPushNotification: () => req("/users/me/test-push", { method: "POST" }),
+  // FCM token management
+  registerFcmToken: (token: string, platform?: string) => req("/users/me/fcm-token", { method: "POST", body: JSON.stringify({ token, platform }) }),
+  unregisterFcmToken: () => req("/users/me/fcm-token", { method: "DELETE" }),
+  subscribeToTopic: (topic: string) => req("/users/me/subscribe-topic", { method: "POST", body: JSON.stringify({ topic }) }),
 };
 
 export function streamUrl(path: string) {
