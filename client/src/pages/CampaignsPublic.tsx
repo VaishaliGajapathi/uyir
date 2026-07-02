@@ -3,6 +3,7 @@ import { Megaphone, MapPin, Clock, Calendar, Users, Droplet, Building2, Heart, S
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { SiteFooter } from "../components/SiteFooter";
+import { SiteNav } from "../components/SiteNav";
 import { SearchableSelect } from "../components/ui";
 import { TN_DISTRICTS } from "../lib/constants";
 
@@ -84,6 +85,7 @@ export default function CampaignsPublic() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <SiteNav />
       {/* Hero */}
       <div className="relative bg-gradient-to-r from-uyir-600 to-uyir-700 text-white py-16 px-4">
         <div className="max-w-6xl mx-auto text-center">

@@ -2,6 +2,7 @@ import { Heart, Users, Shield, Globe, Award, Clock, Phone, Mail, MapPin, Faceboo
 import { useNavigate } from "react-router-dom";
 import { t } from "../lib/constants";
 import { SiteFooter } from "../components/SiteFooter";
+import { SiteNav } from "../components/SiteNav";
 
 export default function AboutUs() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function AboutUs() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <SiteNav />
       {/* Thirukkural Running Ribbon */}
       <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 overflow-hidden">
         <div className="flex items-center gap-2 animate-marquee whitespace-nowrap">

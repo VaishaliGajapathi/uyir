@@ -1,9 +1,11 @@
 import { Phone, Mail, MapPin, Clock, Send, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
 import { SiteFooter } from "../components/SiteFooter";
+import { SiteNav } from "../components/SiteNav";
 
 export default function ContactUs() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <SiteNav />
       {/* Hero Section */}
       <div className="relative bg-gradient-to-r from-uyir-600 to-uyir-700 text-white py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">

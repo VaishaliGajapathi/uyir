@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Facebook, Instagram, MessageCircle, Heart } from "lucide-react";
 
 const SOCIAL_LINKS = {
@@ -5,6 +6,14 @@ const SOCIAL_LINKS = {
   facebook: "https://www.facebook.com/uyirngo",
   instagram: "https://www.instagram.com/uyirngo",
 };
+
+const FOOTER_LINKS = [
+  { to: "/about", label: "About Us" },
+  { to: "/donate-request", label: "Donate / Request Blood" },
+  { to: "/campaigns-public", label: "Campaigns" },
+  { to: "/contact", label: "Contact Us" },
+  { to: "/", label: "Sign Up / Login" },
+];
 
 export function SiteFooter() {
   return (
@@ -29,11 +38,11 @@ export function SiteFooter() {
           <div>
             <h4 className="font-bold mb-3">Quick Links</h4>
             <div className="space-y-2 text-sm">
-              <a href="/about" className="block text-uyir-100 hover:text-white transition">About Us</a>
-              <a href="/donate-request" className="block text-uyir-100 hover:text-white transition">Donate / Request Blood</a>
-              <a href="/campaigns" className="block text-uyir-100 hover:text-white transition">Campaigns</a>
-              <a href="/contact" className="block text-uyir-100 hover:text-white transition">Contact Us</a>
-              <a href="/" className="block text-uyir-100 hover:text-white transition">Sign Up / Login</a>
+              {FOOTER_LINKS.map((link) => (
+                <Link key={link.to} to={link.to} className="block text-uyir-100 hover:text-white transition">
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
 
