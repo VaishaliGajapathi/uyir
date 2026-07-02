@@ -312,7 +312,7 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
   }
 
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","bloodBankId","bloodBankName","facilityLogo","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW()) RETURNING *',
+    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","bloodBankId","bloodBankName","facilityLogo","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW()) RETURNING *',
     [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", (role === "ngo" || role === "hospital" || role === "blood_bank") ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null, finalBloodBankId, role === "blood_bank" ? finalBloodBankName : null, finalFacilityLogo]
   );
   res.status(201).json(user);
