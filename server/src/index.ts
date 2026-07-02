@@ -70,6 +70,7 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoEmail" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "designation" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "plainPassword" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "email" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalName" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalRegistrationId" TEXT');
@@ -124,6 +125,10 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "description" TEXT');
   await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "logo" TEXT');
   await exec('ALTER TABLE "Hospital" ADD COLUMN IF NOT EXISTS "logo" TEXT');
+  await exec('ALTER TABLE "Hospital" ADD COLUMN IF NOT EXISTS "hospitalRegistrationId" TEXT');
+  await exec('ALTER TABLE "Hospital" ADD COLUMN IF NOT EXISTS "verifiedById" TEXT');
+  await exec('ALTER TABLE "Hospital" ADD COLUMN IF NOT EXISTS "verifiedAt" TIMESTAMP(3)');
+  await exec('ALTER TABLE "Hospital" ADD COLUMN IF NOT EXISTS "active" BOOLEAN DEFAULT true');
   await exec(`
     CREATE TABLE IF NOT EXISTS "VerificationHistory" (
       "id" TEXT NOT NULL,
