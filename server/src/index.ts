@@ -67,6 +67,8 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalName" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalRegistrationId" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bloodBankId" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bloodBankName" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmToken" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmPlatform" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmTokenUpdatedAt" TIMESTAMP(3)');
@@ -95,6 +97,11 @@ async function ensureRuntimeSchema() {
       "district" TEXT NOT NULL,
       "address" TEXT,
       "phone" TEXT,
+      "email" TEXT,
+      "contactName" TEXT,
+      "registrationNumber" TEXT,
+      "website" TEXT,
+      "description" TEXT,
       "lat" DOUBLE PRECISION,
       "lng" DOUBLE PRECISION,
       "availableBloodGroups" TEXT,
@@ -103,6 +110,11 @@ async function ensureRuntimeSchema() {
       CONSTRAINT "BloodBank_pkey" PRIMARY KEY ("id")
     )
   `);
+  await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "email" TEXT');
+  await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "contactName" TEXT');
+  await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "registrationNumber" TEXT');
+  await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "website" TEXT');
+  await exec('ALTER TABLE "BloodBank" ADD COLUMN IF NOT EXISTS "description" TEXT');
   await exec(`
     CREATE TABLE IF NOT EXISTS "VerificationHistory" (
       "id" TEXT NOT NULL,

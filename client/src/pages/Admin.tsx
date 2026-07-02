@@ -6,7 +6,7 @@ import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui
 import { timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
 
-type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
+type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "blood_banks" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
 
 export function Admin() {
   const { user, lang, logout } = useApp();
@@ -17,13 +17,14 @@ export function Admin() {
   const [pending, setPending] = useState<any[]>([]);
   const [fraudReports, setFraudReports] = useState<any[]>([]);
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [bloodBanks, setBloodBanks] = useState<any[]>([]);
   const [ngos, setNgos] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "", bloodBankId: "" });
   const [profileForm, setProfileForm] = useState({ name: "", email: "", designation: "", district: "" });
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
@@ -40,6 +41,9 @@ export function Admin() {
   const [showHospitalForm, setShowHospitalForm] = useState(false);
   const [hospitalForm, setHospitalForm] = useState({ name: "", district: "", address: "", phone: "", registrationId: "" });
   const [editingHospitalId, setEditingHospitalId] = useState<string | null>(null);
+  const [showBloodBankForm, setShowBloodBankForm] = useState(false);
+  const [bloodBankForm, setBloodBankForm] = useState({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" });
+  const [editingBloodBankId, setEditingBloodBankId] = useState<string | null>(null);
   const [showNgoForm, setShowNgoForm] = useState(false);
   const [ngoForm, setNgoForm] = useState({ name: "", district: "", address: "", registrationNumber: "", registrationYear: "", phone: "", email: "", contactName: "", description: "", website: "" });
   const [viewingDocs, setViewingDocs] = useState<string | null>(null);
@@ -119,13 +123,14 @@ export function Admin() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [s, d, r, p, f, h, a] = await Promise.all([
+      const [s, d, r, p, f, h, bb, a] = await Promise.all([
         api.adminStats(),
         api.adminDonors(),
         api.adminRequests(),
         api.adminPendingVerification(),
         api.adminFraudReports(),
         api.adminHospitals(),
+        api.adminGetBloodBanks(),
         api.adminGetAdmins(),
       ]);
       setStats(s);
@@ -134,6 +139,7 @@ export function Admin() {
       setPending(p);
       setFraudReports(f);
       setHospitals(h);
+      setBloodBanks(bb);
       setAdmins(a);
       // Filter NGO admins from admins list
       setNgos(a.filter((u: any) => u.role === "ngo"));
@@ -264,7 +270,7 @@ export function Admin() {
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "" });
+      setAdminForm({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "", bloodBankId: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -312,6 +318,52 @@ export function Admin() {
       setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  function startEditBloodBank(bb: any) {
+    setEditingBloodBankId(bb.id);
+    setBloodBankForm({
+      name: bb.name || "",
+      district: bb.district || "",
+      address: bb.address || "",
+      phone: bb.phone || "",
+      email: bb.email || "",
+      contactName: bb.contactName || "",
+      registrationNumber: bb.registrationNumber || "",
+      website: bb.website || "",
+      description: bb.description || "",
+      availableBloodGroups: bb.availableBloodGroups || "",
+    });
+    setShowBloodBankForm(true);
+  }
+
+  async function saveBloodBank() {
+    if (!bloodBankForm.name || !bloodBankForm.district) {
+      alert("Blood bank name and district are required");
+      return;
+    }
+    setBusy("saveBloodBank");
+    try {
+      if (editingBloodBankId) {
+        await api.adminEditBloodBank(editingBloodBankId, bloodBankForm);
+      } else {
+        await api.adminCreateBloodBank(bloodBankForm);
+      }
+      setShowBloodBankForm(false);
+      setEditingBloodBankId(null);
+      setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" });
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function verifyBloodBank(id: string) {
+    setBusy(`bb:${id}`);
+    try { await api.adminVerifyBloodBank(id); await loadAll(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function rejectBloodBank(id: string) {
+    setBusy(`bb-reject:${id}`);
+    try { await api.adminRejectBloodBank(id); await loadAll(); } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
   async function createNgo() {
@@ -485,6 +537,7 @@ export function Admin() {
             { id: "fraud", label: "Fraud Reports", icon: AlertTriangle },
             { id: "hospitals", label: "Hospitals", icon: Building2 },
             { id: "ngos", label: "NGOs", icon: Building2 },
+            { id: "blood_banks", label: "Blood Banks", icon: Heart },
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
@@ -1191,6 +1244,138 @@ export function Admin() {
         </div>
       )}
 
+      {tab === "blood_banks" && (
+        <Card className="p-4">
+          <div className="mb-2 flex items-center gap-3">
+            <h3 className="font-bold text-slate-800">Blood Banks ({bloodBanks.length})</h3>
+            {user?.role === "super_admin" && (
+              <Button size="sm" onClick={() => { setEditingBloodBankId(null); setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" }); setShowBloodBankForm(true); }}>+ Add Blood Bank</Button>
+            )}
+          </div>
+          {showBloodBankForm && (
+            <div className="mb-4 rounded-lg bg-slate-50 p-3">
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Blood Bank Name *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.name}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, name: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Contact Person Name"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.contactName}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, contactName: e.target.value })}
+                />
+                <SearchableSelect
+                  options={TN_DISTRICTS}
+                  value={bloodBankForm.district}
+                  onChange={(v) => setBloodBankForm({ ...bloodBankForm, district: v })}
+                  placeholder="Select district *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.phone}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, phone: e.target.value })}
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.email}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, email: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Registration Number"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.registrationNumber}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, registrationNumber: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Website"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.website}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, website: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Available Blood Groups (e.g. A+,B+,O+,O-)"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.availableBloodGroups}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, availableBloodGroups: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Address"
+                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={bloodBankForm.address}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, address: e.target.value })}
+                />
+                <textarea
+                  placeholder="Description / Details"
+                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  rows={2}
+                  value={bloodBankForm.description}
+                  onChange={(e) => setBloodBankForm({ ...bloodBankForm, description: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" loading={busy === "saveBloodBank"} onClick={saveBloodBank}>{editingBloodBankId ? "Save" : "Create"}</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setShowBloodBankForm(false); setEditingBloodBankId(null); }}>Cancel</Button>
+              </div>
+            </div>
+          )}
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {bloodBanks.length === 0 && <p className="text-sm text-slate-400">No blood banks yet.</p>}
+            {bloodBanks.map((bb) => (
+              <div key={bb.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-700">{bb.name}</p>
+                    <p className="text-xs text-slate-400">{bb.district}</p>
+                    {bb.contactName && <p className="text-xs text-slate-500">Contact: {bb.contactName}</p>}
+                    {bb.address && <p className="text-xs text-slate-500">📍 {bb.address}</p>}
+                    {bb.phone && <p className="text-xs text-slate-500">📞 {bb.phone}</p>}
+                    {bb.email && <p className="text-xs text-slate-500">✉️ {bb.email}</p>}
+                    {bb.registrationNumber && <p className="text-xs text-slate-500">📋 Reg: {bb.registrationNumber}</p>}
+                    {bb.website && <p className="text-xs text-slate-500">🌐 {bb.website}</p>}
+                    {bb.availableBloodGroups && <p className="text-xs text-slate-500">🩸 Available: {bb.availableBloodGroups}</p>}
+                    {bb.description && <p className="text-xs text-slate-500 mt-1">{bb.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={bb.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{bb.verified ? "Verified" : "Unverified"}</Badge>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  {user?.role === "super_admin" && (
+                    <Button size="sm" variant="outline" onClick={() => startEditBloodBank(bb)}>
+                      <Pencil className="h-3 w-3" /> Edit
+                    </Button>
+                  )}
+                  {!bb.verified && (
+                    <Button size="sm" className="bg-emerald-600" loading={busy === `bb:${bb.id}`} onClick={() => verifyBloodBank(bb.id)}>
+                      <CheckCircle2 className="h-3 w-3" /> Verify
+                    </Button>
+                  )}
+                  {bb.verified && (
+                    <Button size="sm" variant="outline" loading={busy === `bb-reject:${bb.id}`} onClick={() => rejectBloodBank(bb.id)}>
+                      <XCircle className="h-3 w-3" /> Revoke
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {tab === "admins" && (
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -1335,6 +1520,36 @@ export function Admin() {
                           </select>
                           {hospitals.length === 0 && (
                             <p className="mt-1 text-xs text-amber-600">No hospitals yet. Add one from the Hospitals tab first.</p>
+                          )}
+                        </div>
+                        <SearchableSelect
+                          options={TN_DISTRICTS}
+                          value={adminForm.district}
+                          onChange={(v) => setAdminForm({ ...adminForm, district: v })}
+                          placeholder="Select district"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                        />
+                      </>
+                    )}
+                    {adminForm.role === "blood_bank" && (
+                      <>
+                        <div className="col-span-2">
+                          <label className="mb-1 block text-xs font-medium text-slate-600">Select Blood Bank</label>
+                          <select
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                            value={adminForm.bloodBankId}
+                            onChange={(e) => {
+                              const bb = bloodBanks.find((bb: any) => bb.id === e.target.value);
+                              setAdminForm({ ...adminForm, bloodBankId: e.target.value, district: bb?.district || adminForm.district });
+                            }}
+                          >
+                            <option value="">-- Select blood bank --</option>
+                            {bloodBanks.map((bb) => (
+                              <option key={bb.id} value={bb.id}>{bb.name} ({bb.district})</option>
+                            ))}
+                          </select>
+                          {bloodBanks.length === 0 && (
+                            <p className="mt-1 text-xs text-amber-600">No blood banks yet. Add one from the Blood Banks tab first.</p>
                           )}
                         </div>
                         <SearchableSelect

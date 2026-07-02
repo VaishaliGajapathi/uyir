@@ -112,6 +112,65 @@ adminRouter.patch("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: 
   res.json(updated);
 }));
 
+// ============ BLOOD BANKS ============
+
+// Get all blood banks
+adminRouter.get("/blood-banks", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+  const bloodBanks = await query<any>('SELECT * FROM "BloodBank" ORDER BY "createdAt" DESC');
+  res.json(bloodBanks);
+}));
+
+// Create a blood bank
+adminRouter.post("/blood-banks", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups } = req.body;
+  if (!name || !district) return res.status(400).json({ error: "Blood bank name and district are required" });
+  const existing = await queryOne<any>('SELECT * FROM "BloodBank" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
+  if (existing) return res.status(400).json({ error: "Blood bank with this name already exists" });
+  const { TN_DISTRICTS } = await import("../lib/districts.js");
+  const districtData = Object.values(TN_DISTRICTS).find((d: any) => d.name === district);
+  const lat = districtData?.lat ?? 11.0;
+  const lng = districtData?.lng ?? 78.0;
+  const bloodBank = await queryOne<any>(
+    'INSERT INTO "BloodBank" ("id","name","district","address","phone","email","contactName","registrationNumber","website","description","lat","lng","availableBloodGroups","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,NOW()) RETURNING *',
+    [name, district, address || null, phone || null, email || null, contactName || null, registrationNumber || null, website || null, description || null, lat, lng, availableBloodGroups || null]
+  );
+  res.status(201).json(bloodBank);
+}));
+
+// Edit a blood bank
+adminRouter.patch("/blood-banks/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups } = req.body;
+  const updates: string[] = [];
+  const params: any[] = [];
+  if (name) { updates.push(`"name" = $${params.length + 1}`); params.push(name); }
+  if (district) { updates.push(`"district" = $${params.length + 1}`); params.push(district); }
+  if (address !== undefined) { updates.push(`"address" = $${params.length + 1}`); params.push(address || null); }
+  if (phone !== undefined) { updates.push(`"phone" = $${params.length + 1}`); params.push(phone || null); }
+  if (email !== undefined) { updates.push(`"email" = $${params.length + 1}`); params.push(email || null); }
+  if (contactName !== undefined) { updates.push(`"contactName" = $${params.length + 1}`); params.push(contactName || null); }
+  if (registrationNumber !== undefined) { updates.push(`"registrationNumber" = $${params.length + 1}`); params.push(registrationNumber || null); }
+  if (website !== undefined) { updates.push(`"website" = $${params.length + 1}`); params.push(website || null); }
+  if (description !== undefined) { updates.push(`"description" = $${params.length + 1}`); params.push(description || null); }
+  if (availableBloodGroups !== undefined) { updates.push(`"availableBloodGroups" = $${params.length + 1}`); params.push(availableBloodGroups || null); }
+  if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
+  params.push(req.params.id);
+  await exec(`UPDATE "BloodBank" SET ${updates.join(", ")} WHERE "id" = $${params.length}`, params);
+  const updated = await queryOne<any>('SELECT * FROM "BloodBank" WHERE "id" = $1', [req.params.id]);
+  res.json(updated);
+}));
+
+// Verify a blood bank
+adminRouter.post("/blood-banks/:id/verify", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  await exec('UPDATE "BloodBank" SET "verified" = true WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Revoke blood bank verification
+adminRouter.post("/blood-banks/:id/reject", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  await exec('UPDATE "BloodBank" SET "verified" = false WHERE "id" = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 // Fraud reports
 adminRouter.get("/fraud-reports", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const reports = await query<any>('SELECT * FROM "FraudReport" ORDER BY "createdAt" DESC', []);
@@ -186,7 +245,7 @@ adminRouter.get("/admins", requireAdminOrVolunteer, asyncHandler(async (_req: Au
 
 // Create admin user (SUPER ADMIN ONLY)
 adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, mobile, email, role, password, district, ngoName, ngoId, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail, hospitalId, hospitalName } = req.body;
+  const { name, mobile, email, role, password, district, ngoName, ngoId, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail, hospitalId, hospitalName, bloodBankId } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
   if (role === "ngo" && (!district || !ngoName) && !ngoId) {
@@ -194,6 +253,9 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
   }
   if (role === "hospital" && !hospitalId && !hospitalName) {
     return res.status(400).json({ error: "Hospital selection is required for hospital users" });
+  }
+  if (role === "blood_bank" && !bloodBankId) {
+    return res.status(400).json({ error: "Blood bank selection is required for blood bank users" });
   }
   const bcrypt = await import("bcryptjs");
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
@@ -229,9 +291,18 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
     finalHospitalName = hospital.name;
   }
 
+  // Resolve blood bank info
+  let finalBloodBankId = bloodBankId || null;
+  let finalBloodBankName: string | null = null;
+  if (role === "blood_bank" && bloodBankId) {
+    const bloodBank = await queryOne<any>('SELECT * FROM "BloodBank" WHERE "id" = $1 LIMIT 1', [bloodBankId]);
+    if (!bloodBank) return res.status(400).json({ error: "Blood bank not found" });
+    finalBloodBankName = bloodBank.name;
+  }
+
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW()) RETURNING *',
-    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", role === "ngo" || role === "hospital" ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null]
+    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","bloodBankId","bloodBankName","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW()) RETURNING *',
+    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", (role === "ngo" || role === "hospital" || role === "blood_bank") ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null, finalBloodBankId, role === "blood_bank" ? finalBloodBankName : null]
   );
   res.status(201).json(user);
 }));
