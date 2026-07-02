@@ -26,6 +26,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  VITE_API_URL = "https://uyirproduction.onrender.com/api"
 
 # CDN cache headers for static assets (works with Cloudflare CDN)
 [[headers]]
