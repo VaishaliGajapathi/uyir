@@ -64,6 +64,11 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoName" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoId" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoStatus" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoAddress" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoRegistrationNumber" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoPhone" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoEmail" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "designation" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "plainPassword" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "hospitalName" TEXT');
