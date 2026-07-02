@@ -71,7 +71,7 @@ export function HospitalDashboard() {
     <div className="min-h-screen bg-slate-50 px-4 py-4">
       <header className="mb-6 flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
-          <img src="/uyir-logo.png" alt="Life Saver" className="h-14 w-auto object-contain" />
+          <img src={user?.facilityLogo || "/uyir-logo.png"} alt="Logo" className="h-14 w-auto object-contain" />
           <div>
             <h1 className="text-xl font-extrabold text-slate-800">Hospital Dashboard</h1>
             <p className="text-sm text-slate-500">{user?.hospitalName}</p>

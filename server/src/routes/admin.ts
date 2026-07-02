@@ -97,7 +97,7 @@ adminRouter.post("/hospitals/:id/reject", requireAdminOrVolunteer, asyncHandler(
 
 // Edit a hospital
 adminRouter.patch("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, district, address, phone, registrationId } = req.body;
+  const { name, district, address, phone, registrationId, logo } = req.body;
   const updates: string[] = [];
   const params: any[] = [];
   if (name) { updates.push(`"name" = $${params.length + 1}`); params.push(name); }
@@ -105,6 +105,7 @@ adminRouter.patch("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: 
   if (address !== undefined) { updates.push(`"address" = $${params.length + 1}`); params.push(address || null); }
   if (phone !== undefined) { updates.push(`"phone" = $${params.length + 1}`); params.push(phone || null); }
   if (registrationId !== undefined) { updates.push(`"hospitalRegistrationId" = $${params.length + 1}`); params.push(registrationId || null); }
+  if (logo !== undefined) { updates.push(`"logo" = $${params.length + 1}`); params.push(logo || null); }
   if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
   params.push(req.params.id);
   await exec(`UPDATE "Hospital" SET ${updates.join(", ")} WHERE "id" = $${params.length}`, params);
@@ -122,7 +123,7 @@ adminRouter.get("/blood-banks", requireAdminOrVolunteer, asyncHandler(async (_re
 
 // Create a blood bank
 adminRouter.post("/blood-banks", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups } = req.body;
+  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups, logo } = req.body;
   if (!name || !district) return res.status(400).json({ error: "Blood bank name and district are required" });
   const existing = await queryOne<any>('SELECT * FROM "BloodBank" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
   if (existing) return res.status(400).json({ error: "Blood bank with this name already exists" });
@@ -131,15 +132,15 @@ adminRouter.post("/blood-banks", requireSuperAdmin, asyncHandler(async (req: Aut
   const lat = districtData?.lat ?? 11.0;
   const lng = districtData?.lng ?? 78.0;
   const bloodBank = await queryOne<any>(
-    'INSERT INTO "BloodBank" ("id","name","district","address","phone","email","contactName","registrationNumber","website","description","lat","lng","availableBloodGroups","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,NOW()) RETURNING *',
-    [name, district, address || null, phone || null, email || null, contactName || null, registrationNumber || null, website || null, description || null, lat, lng, availableBloodGroups || null]
+    'INSERT INTO "BloodBank" ("id","name","district","address","phone","email","contactName","registrationNumber","website","description","lat","lng","availableBloodGroups","logo","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true,NOW()) RETURNING *',
+    [name, district, address || null, phone || null, email || null, contactName || null, registrationNumber || null, website || null, description || null, lat, lng, availableBloodGroups || null, logo || null]
   );
   res.status(201).json(bloodBank);
 }));
 
 // Edit a blood bank
 adminRouter.patch("/blood-banks/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups } = req.body;
+  const { name, district, address, phone, email, contactName, registrationNumber, website, description, availableBloodGroups, logo } = req.body;
   const updates: string[] = [];
   const params: any[] = [];
   if (name) { updates.push(`"name" = $${params.length + 1}`); params.push(name); }
@@ -152,6 +153,7 @@ adminRouter.patch("/blood-banks/:id", requireSuperAdmin, asyncHandler(async (req
   if (website !== undefined) { updates.push(`"website" = $${params.length + 1}`); params.push(website || null); }
   if (description !== undefined) { updates.push(`"description" = $${params.length + 1}`); params.push(description || null); }
   if (availableBloodGroups !== undefined) { updates.push(`"availableBloodGroups" = $${params.length + 1}`); params.push(availableBloodGroups || null); }
+  if (logo !== undefined) { updates.push(`"logo" = $${params.length + 1}`); params.push(logo || null); }
   if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
   params.push(req.params.id);
   await exec(`UPDATE "BloodBank" SET ${updates.join(", ")} WHERE "id" = $${params.length}`, params);
@@ -285,10 +287,12 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
   // Resolve hospital info
   let finalHospitalId = hospitalId || null;
   let finalHospitalName = hospitalName || null;
+  let finalFacilityLogo: string | null = null;
   if (role === "hospital" && hospitalId) {
     const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [hospitalId]);
     if (!hospital) return res.status(400).json({ error: "Hospital not found" });
     finalHospitalName = hospital.name;
+    finalFacilityLogo = hospital.logo || null;
   }
 
   // Resolve blood bank info
@@ -298,11 +302,18 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
     const bloodBank = await queryOne<any>('SELECT * FROM "BloodBank" WHERE "id" = $1 LIMIT 1', [bloodBankId]);
     if (!bloodBank) return res.status(400).json({ error: "Blood bank not found" });
     finalBloodBankName = bloodBank.name;
+    finalFacilityLogo = bloodBank.logo || null;
+  }
+
+  // For NGO role, fetch logo from linked NGO
+  if (role === "ngo" && finalNgoId) {
+    const ngo = await queryOne<any>('SELECT * FROM "Ngo" WHERE "id" = $1 LIMIT 1', [finalNgoId]);
+    if (ngo) finalFacilityLogo = ngo.logo || null;
   }
 
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","bloodBankId","bloodBankName","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW()) RETURNING *',
-    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", (role === "ngo" || role === "hospital" || role === "blood_bank") ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null, finalBloodBankId, role === "blood_bank" ? finalBloodBankName : null]
+    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","bloodBankId","bloodBankName","facilityLogo","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW()) RETURNING *',
+    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", (role === "ngo" || role === "hospital" || role === "blood_bank") ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null, finalBloodBankId, role === "blood_bank" ? finalBloodBankName : null, finalFacilityLogo]
   );
   res.status(201).json(user);
 }));
@@ -496,13 +507,13 @@ adminRouter.get("/ngos", requireAdminOrVolunteer, asyncHandler(async (_req: Auth
 
 // Create an NGO
 adminRouter.post("/ngos", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, address, registrationNumber, registrationYear, phone, email, district, contactName, description, website } = req.body;
+  const { name, address, registrationNumber, registrationYear, phone, email, district, contactName, description, website, logo } = req.body;
   if (!name || !district) return res.status(400).json({ error: "NGO name and district are required" });
   const existing = await queryOne<any>('SELECT * FROM "Ngo" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
   if (existing) return res.status(400).json({ error: "NGO with this name already exists" });
   const ngo = await queryOne<any>(
-    'INSERT INTO "Ngo" ("name","address","registrationNumber","registrationYear","phone","email","district","contactName","description","website","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *',
-    [name, address || null, registrationNumber || null, registrationYear || null, phone || null, email || null, district, contactName || null, description || null, website || null, "approved"]
+    'INSERT INTO "Ngo" ("name","address","registrationNumber","registrationYear","phone","email","district","contactName","description","website","logo","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW()) RETURNING *',
+    [name, address || null, registrationNumber || null, registrationYear || null, phone || null, email || null, district, contactName || null, description || null, website || null, logo || null, "approved"]
   );
   res.status(201).json(ngo);
 }));

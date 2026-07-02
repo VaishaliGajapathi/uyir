@@ -58,6 +58,9 @@ export interface User {
   hospitalName?: string;
   hospitalRegistrationId?: string;
   hospitalId?: string;
+  bloodBankId?: string;
+  bloodBankName?: string;
+  facilityLogo?: string;
   createdAt?: string;
 }
 
@@ -169,11 +172,11 @@ export const api = {
   adminPendingVerification: () => req<any[]>("/admin/pending-verification"),
   adminFraudReports: () => req<any[]>("/admin/fraud-reports"),
   adminHospitals: () => req<any[]>("/admin/hospitals"),
-  adminCreateHospital: (data: { name: string; district: string; address?: string; phone?: string; registrationId?: string }) => req<any>("/admin/hospitals", { method: "POST", body: JSON.stringify(data) }),
-  adminEditHospital: (id: string, data: { name?: string; district?: string; address?: string; phone?: string; registrationId?: string }) => req<any>(`/admin/hospitals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  adminCreateHospital: (data: { name: string; district: string; address?: string; phone?: string; registrationId?: string; logo?: string }) => req<any>("/admin/hospitals", { method: "POST", body: JSON.stringify(data) }),
+  adminEditHospital: (id: string, data: { name?: string; district?: string; address?: string; phone?: string; registrationId?: string; logo?: string }) => req<any>(`/admin/hospitals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   adminGetBloodBanks: () => req<any[]>("/admin/blood-banks"),
-  adminCreateBloodBank: (data: { name: string; district: string; address?: string; phone?: string; email?: string; contactName?: string; registrationNumber?: string; website?: string; description?: string; availableBloodGroups?: string }) => req<any>("/admin/blood-banks", { method: "POST", body: JSON.stringify(data) }),
-  adminEditBloodBank: (id: string, data: { name?: string; district?: string; address?: string; phone?: string; email?: string; contactName?: string; registrationNumber?: string; website?: string; description?: string; availableBloodGroups?: string }) => req<any>(`/admin/blood-banks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  adminCreateBloodBank: (data: { name: string; district: string; address?: string; phone?: string; email?: string; contactName?: string; registrationNumber?: string; website?: string; description?: string; availableBloodGroups?: string; logo?: string }) => req<any>("/admin/blood-banks", { method: "POST", body: JSON.stringify(data) }),
+  adminEditBloodBank: (id: string, data: { name?: string; district?: string; address?: string; phone?: string; email?: string; contactName?: string; registrationNumber?: string; website?: string; description?: string; availableBloodGroups?: string; logo?: string }) => req<any>(`/admin/blood-banks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   adminVerifyBloodBank: (id: string) => req(`/admin/blood-banks/${id}/verify`, { method: "POST" }),
   adminRejectBloodBank: (id: string) => req(`/admin/blood-banks/${id}/reject`, { method: "POST" }),
   adminVerifyRequest: (id: string, approved: boolean, notes: string) => req(`/admin/verify-request/${id}`, { method: "POST", body: JSON.stringify({ approved, notes }) }),
@@ -192,7 +195,7 @@ export const api = {
   adminDeleteUser: (id: string) => req(`/admin/admins/${id}`, { method: "DELETE" }),
   changePassword: (currentPassword: string, newPassword: string) => req("/admin/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
   adminGetNgos: () => req<any[]>("/admin/ngos"),
-  adminCreateNgo: (data: { name: string; district: string; address?: string; registrationNumber?: string; registrationYear?: string; phone?: string; email?: string; contactName?: string; description?: string; website?: string }) => req<any>("/admin/ngos", { method: "POST", body: JSON.stringify(data) }),
+  adminCreateNgo: (data: { name: string; district: string; address?: string; registrationNumber?: string; registrationYear?: string; phone?: string; email?: string; contactName?: string; description?: string; website?: string; logo?: string }) => req<any>("/admin/ngos", { method: "POST", body: JSON.stringify(data) }),
   // CRM
   adminActivity: (limit = 50) => req<any[]>(`/admin/activity?limit=${limit}`),
   adminUserActivity: (id: string) => req<any[]>(`/admin/users/${id}/activity`),

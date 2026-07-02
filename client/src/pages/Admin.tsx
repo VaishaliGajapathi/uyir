@@ -8,6 +8,15 @@ import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
 
 type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "blood_banks" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function Admin() {
   const { user, lang, logout } = useApp();
   const [tab, setTab] = useState<Tab>("overview");
@@ -39,13 +48,13 @@ export function Admin() {
   const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
   const [donorPage, setDonorPage] = useState(1);
   const [showHospitalForm, setShowHospitalForm] = useState(false);
-  const [hospitalForm, setHospitalForm] = useState({ name: "", district: "", address: "", phone: "", registrationId: "" });
+  const [hospitalForm, setHospitalForm] = useState({ name: "", district: "", address: "", phone: "", registrationId: "", logo: "" });
   const [editingHospitalId, setEditingHospitalId] = useState<string | null>(null);
   const [showBloodBankForm, setShowBloodBankForm] = useState(false);
-  const [bloodBankForm, setBloodBankForm] = useState({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" });
+  const [bloodBankForm, setBloodBankForm] = useState({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "", logo: "" });
   const [editingBloodBankId, setEditingBloodBankId] = useState<string | null>(null);
   const [showNgoForm, setShowNgoForm] = useState(false);
-  const [ngoForm, setNgoForm] = useState({ name: "", district: "", address: "", registrationNumber: "", registrationYear: "", phone: "", email: "", contactName: "", description: "", website: "" });
+  const [ngoForm, setNgoForm] = useState({ name: "", district: "", address: "", registrationNumber: "", registrationYear: "", phone: "", email: "", contactName: "", description: "", website: "", logo: "" });
   const [viewingDocs, setViewingDocs] = useState<string | null>(null);
   const [requestDocs, setRequestDocs] = useState<any[]>([]);
   const [donorSortBy, setDonorSortBy] = useState("createdAt");
@@ -284,7 +293,7 @@ export function Admin() {
     try {
       await api.adminCreateHospital(hospitalForm);
       setShowHospitalForm(false);
-      setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "" });
+      setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "", logo: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -297,6 +306,7 @@ export function Admin() {
       address: h.address || "",
       phone: h.phone || "",
       registrationId: h.hospitalRegistrationId || "",
+      logo: h.logo || "",
     });
     setShowHospitalForm(true);
   }
@@ -315,7 +325,7 @@ export function Admin() {
       }
       setShowHospitalForm(false);
       setEditingHospitalId(null);
-      setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "" });
+      setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "", logo: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -333,6 +343,7 @@ export function Admin() {
       website: bb.website || "",
       description: bb.description || "",
       availableBloodGroups: bb.availableBloodGroups || "",
+      logo: bb.logo || "",
     });
     setShowBloodBankForm(true);
   }
@@ -351,7 +362,7 @@ export function Admin() {
       }
       setShowBloodBankForm(false);
       setEditingBloodBankId(null);
-      setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" });
+      setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "", logo: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -375,7 +386,7 @@ export function Admin() {
     try {
       await api.adminCreateNgo(ngoForm);
       setShowNgoForm(false);
-      setNgoForm({ name: "", district: "", address: "", registrationNumber: "", registrationYear: "", phone: "", email: "", contactName: "", description: "", website: "" });
+      setNgoForm({ name: "", district: "", address: "", registrationNumber: "", registrationYear: "", phone: "", email: "", contactName: "", description: "", website: "", logo: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -984,12 +995,19 @@ export function Admin() {
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
             {user?.role === "super_admin" && (
-              <Button size="sm" onClick={() => { setEditingHospitalId(null); setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "" }); setShowHospitalForm(true); }}>+ Add Hospital</Button>
+              <Button size="sm" onClick={() => { setEditingHospitalId(null); setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "", logo: "" }); setShowHospitalForm(true); }}>+ Add Hospital</Button>
             )}
           </div>
           {showHospitalForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
               <div className="mb-2 grid grid-cols-2 gap-2">
+                <div className="col-span-2 flex items-center gap-3">
+                  {hospitalForm.logo && <img src={hospitalForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
+                  <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+                    Upload Logo
+                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setHospitalForm({ ...hospitalForm, logo: await fileToBase64(f) }); }} />
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="Hospital Name *"
@@ -1036,12 +1054,15 @@ export function Admin() {
             {hospitals.map((h) => (
               <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-700">{h.hospitalName || h.name}</p>
-                    <p className="text-xs text-slate-400">{h.district}</p>
-                    {h.address && <p className="text-xs text-slate-500">📍 {h.address}</p>}
-                    {h.phone && <p className="text-xs text-slate-500">📞 {h.phone}</p>}
-                    {h.hospitalRegistrationId && <p className="text-xs text-slate-500">📋 Reg: {h.hospitalRegistrationId}</p>}
+                  <div className="flex-1 flex items-start gap-2">
+                    {h.logo && <img src={h.logo} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200 flex-shrink-0" />}
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-700">{h.hospitalName || h.name}</p>
+                      <p className="text-xs text-slate-400">{h.district}</p>
+                      {h.address && <p className="text-xs text-slate-500">📍 {h.address}</p>}
+                      {h.phone && <p className="text-xs text-slate-500">📞 {h.phone}</p>}
+                      {h.hospitalRegistrationId && <p className="text-xs text-slate-500">📋 Reg: {h.hospitalRegistrationId}</p>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={h.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{h.verified ? "Verified" : "Unverified"}</Badge>
@@ -1082,6 +1103,13 @@ export function Admin() {
           {showNgoForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
               <div className="mb-2 grid grid-cols-2 gap-2">
+                <div className="col-span-2 flex items-center gap-3">
+                  {ngoForm.logo && <img src={ngoForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
+                  <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+                    Upload Logo
+                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setNgoForm({ ...ngoForm, logo: await fileToBase64(f) }); }} />
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="NGO Name *"
@@ -1164,14 +1192,17 @@ export function Admin() {
             {ngoOrganizations.map((n) => (
               <div key={n.id} className="rounded-lg bg-slate-50 px-3 py-2">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-700">{n.name}</p>
-                    <p className="text-xs text-slate-400">{n.district} · {n.contactName || "No contact"}</p>
-                    {n.registrationNumber && <p className="text-xs text-slate-500">Reg: {n.registrationNumber}{n.registrationYear ? ` (${n.registrationYear})` : ""}</p>}
-                    {n.phone && <p className="text-xs text-slate-500">📞 {n.phone}</p>}
-                    {n.email && <p className="text-xs text-slate-500">✉️ {n.email}</p>}
-                    {n.website && <p className="text-xs text-slate-500">🌐 {n.website}</p>}
-                    {n.description && <p className="text-xs text-slate-500 mt-1">{n.description}</p>}
+                  <div className="flex-1 flex items-start gap-2">
+                    {n.logo && <img src={n.logo} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200 flex-shrink-0" />}
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-700">{n.name}</p>
+                      <p className="text-xs text-slate-400">{n.district} · {n.contactName || "No contact"}</p>
+                      {n.registrationNumber && <p className="text-xs text-slate-500">Reg: {n.registrationNumber}{n.registrationYear ? ` (${n.registrationYear})` : ""}</p>}
+                      {n.phone && <p className="text-xs text-slate-500">📞 {n.phone}</p>}
+                      {n.email && <p className="text-xs text-slate-500">✉️ {n.email}</p>}
+                      {n.website && <p className="text-xs text-slate-500">🌐 {n.website}</p>}
+                      {n.description && <p className="text-xs text-slate-500 mt-1">{n.description}</p>}
+                    </div>
                   </div>
                   <Badge className={n.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>{n.status || "approved"}</Badge>
                 </div>
@@ -1249,12 +1280,19 @@ export function Admin() {
           <div className="mb-2 flex items-center gap-3">
             <h3 className="font-bold text-slate-800">Blood Banks ({bloodBanks.length})</h3>
             {user?.role === "super_admin" && (
-              <Button size="sm" onClick={() => { setEditingBloodBankId(null); setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "" }); setShowBloodBankForm(true); }}>+ Add Blood Bank</Button>
+              <Button size="sm" onClick={() => { setEditingBloodBankId(null); setBloodBankForm({ name: "", district: "", address: "", phone: "", email: "", contactName: "", registrationNumber: "", website: "", description: "", availableBloodGroups: "", logo: "" }); setShowBloodBankForm(true); }}>+ Add Blood Bank</Button>
             )}
           </div>
           {showBloodBankForm && (
             <div className="mb-4 rounded-lg bg-slate-50 p-3">
               <div className="mb-2 grid grid-cols-2 gap-2">
+                <div className="col-span-2 flex items-center gap-3">
+                  {bloodBankForm.logo && <img src={bloodBankForm.logo} alt="Logo" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />}
+                  <label className="cursor-pointer rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+                    Upload Logo
+                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setBloodBankForm({ ...bloodBankForm, logo: await fileToBase64(f) }); }} />
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="Blood Bank Name *"
@@ -1337,17 +1375,20 @@ export function Admin() {
             {bloodBanks.map((bb) => (
               <div key={bb.id} className="rounded-lg bg-slate-50 px-3 py-2">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-700">{bb.name}</p>
-                    <p className="text-xs text-slate-400">{bb.district}</p>
-                    {bb.contactName && <p className="text-xs text-slate-500">Contact: {bb.contactName}</p>}
-                    {bb.address && <p className="text-xs text-slate-500">📍 {bb.address}</p>}
-                    {bb.phone && <p className="text-xs text-slate-500">📞 {bb.phone}</p>}
-                    {bb.email && <p className="text-xs text-slate-500">✉️ {bb.email}</p>}
-                    {bb.registrationNumber && <p className="text-xs text-slate-500">📋 Reg: {bb.registrationNumber}</p>}
-                    {bb.website && <p className="text-xs text-slate-500">🌐 {bb.website}</p>}
-                    {bb.availableBloodGroups && <p className="text-xs text-slate-500">🩸 Available: {bb.availableBloodGroups}</p>}
-                    {bb.description && <p className="text-xs text-slate-500 mt-1">{bb.description}</p>}
+                  <div className="flex-1 flex items-start gap-2">
+                    {bb.logo && <img src={bb.logo} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200 flex-shrink-0" />}
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-700">{bb.name}</p>
+                      <p className="text-xs text-slate-400">{bb.district}</p>
+                      {bb.contactName && <p className="text-xs text-slate-500">Contact: {bb.contactName}</p>}
+                      {bb.address && <p className="text-xs text-slate-500">📍 {bb.address}</p>}
+                      {bb.phone && <p className="text-xs text-slate-500">📞 {bb.phone}</p>}
+                      {bb.email && <p className="text-xs text-slate-500">✉️ {bb.email}</p>}
+                      {bb.registrationNumber && <p className="text-xs text-slate-500">📋 Reg: {bb.registrationNumber}</p>}
+                      {bb.website && <p className="text-xs text-slate-500">🌐 {bb.website}</p>}
+                      {bb.availableBloodGroups && <p className="text-xs text-slate-500">🩸 Available: {bb.availableBloodGroups}</p>}
+                      {bb.description && <p className="text-xs text-slate-500 mt-1">{bb.description}</p>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={bb.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{bb.verified ? "Verified" : "Unverified"}</Badge>
