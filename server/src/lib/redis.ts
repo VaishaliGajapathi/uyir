@@ -23,8 +23,16 @@ if (redis) {
   });
 }
 
+// In-memory fallback when Redis is not configured
+const memCache = new Map<string, { value: any; expiresAt: number }>();
+
 export async function cacheGet<T = any>(key: string): Promise<T | null> {
-  if (!redis) return null;
+  if (!redis) {
+    const entry = memCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) { memCache.delete(key); return null; }
+    return entry.value as T;
+  }
   try {
     const data = await redis.get(key);
     if (!data) return null;
@@ -35,7 +43,10 @@ export async function cacheGet<T = any>(key: string): Promise<T | null> {
 }
 
 export async function cacheSet(key: string, value: any, ttlSeconds = 60): Promise<void> {
-  if (!redis) return;
+  if (!redis) {
+    memCache.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return;
+  }
   try {
     await redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
   } catch (err: any) {
@@ -44,7 +55,10 @@ export async function cacheSet(key: string, value: any, ttlSeconds = 60): Promis
 }
 
 export async function cacheDel(key: string): Promise<void> {
-  if (!redis) return;
+  if (!redis) {
+    memCache.delete(key);
+    return;
+  }
   try {
     await redis.del(key);
   } catch (err: any) {

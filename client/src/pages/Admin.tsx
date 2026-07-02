@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network, FileCheck2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui";
@@ -41,6 +41,8 @@ export function Admin() {
   const [hospitalForm, setHospitalForm] = useState({ name: "", district: "", address: "", phone: "", registrationId: "" });
   const [showNgoForm, setShowNgoForm] = useState(false);
   const [ngoForm, setNgoForm] = useState({ name: "", district: "", address: "", registrationNumber: "", phone: "", email: "" });
+  const [viewingDocs, setViewingDocs] = useState<string | null>(null);
+  const [requestDocs, setRequestDocs] = useState<any[]>([]);
   const [donorSortBy, setDonorSortBy] = useState("createdAt");
   const [donorSortOrder, setDonorSortOrder] = useState<"asc" | "desc">("desc");
   const [donorHistory, setDonorHistory] = useState<any[]>([]);
@@ -291,6 +293,15 @@ export function Admin() {
       setShowNgoForm(false);
       setNgoForm({ name: "", district: "", address: "", registrationNumber: "", phone: "", email: "" });
       await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function viewDocuments(requestId: string) {
+    setBusy(`docs:${requestId}`);
+    try {
+      const res = await api.adminGetDocuments(requestId);
+      setRequestDocs(res.documents || []);
+      setViewingDocs(requestId);
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
@@ -826,6 +837,9 @@ export function Admin() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="outline" loading={busy === `docs:${r.id}`} onClick={() => viewDocuments(r.id)}>
+                    <FileCheck2 className="h-4 w-4" /> View Document
+                  </Button>
                   <Button size="sm" className="flex-1 bg-emerald-600" loading={busy === r.id} onClick={() => verifyRequest(r.id, true)}>
                     <CheckCircle2 className="h-4 w-4" /> Approve
                   </Button>
@@ -1780,6 +1794,49 @@ export function Admin() {
           ) : (
             <Card className="p-8 text-center text-slate-400">Loading role hierarchy...</Card>
           )}
+        </div>
+      )}
+
+      {/* ============ DOCUMENT VIEWER MODAL ============ */}
+      {viewingDocs && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setViewingDocs(null); setRequestDocs([]); }}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">Uploaded Documents</h3>
+              <button onClick={() => { setViewingDocs(null); setRequestDocs([]); }} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            {requestDocs.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                <FileCheck2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No documents uploaded for this request.</p>
+                <p className="mt-1 text-xs">Documents may have expired (24h TTL) or were not uploaded.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {requestDocs.map((doc, i) => (
+                  <div key={i} className="rounded-lg border border-slate-200 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">{doc.documentType?.replace(/_/g, " ") || "Document"}</p>
+                        <p className="text-xs text-slate-400">Uploaded: {new Date(doc.uploadedAt).toLocaleString()}</p>
+                      </div>
+                      <Badge className="bg-slate-200 text-slate-600">{doc.mimeType}</Badge>
+                    </div>
+                    {doc.mimeType?.startsWith("image/") ? (
+                      <img src={`data:${doc.mimeType};base64,${doc.base64}`} alt="Document" className="w-full rounded-lg border border-slate-200" />
+                    ) : doc.mimeType?.includes("pdf") ? (
+                      <iframe src={`data:${doc.mimeType};base64,${doc.base64}`} className="w-full h-[500px] rounded-lg border border-slate-200" title="PDF Document" />
+                    ) : (
+                      <p className="text-sm text-slate-400">Unsupported document type: {doc.mimeType}</p>
+                    )}
+                  </div>
+                ))}
+                <p className="text-xs text-slate-400 text-center">
+                  Documents are stored temporarily and will be auto-deleted after verification.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

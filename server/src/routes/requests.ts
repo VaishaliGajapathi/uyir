@@ -8,6 +8,7 @@ import { runAlertCycle, escalateRadius } from "../services/alerts.js";
 import { logAudit, AuditActions } from "../lib/audit.js";
 import { addAiJob, addDocumentVerificationJob, addNotificationJob, addOperationalJob } from "../queues/index.js";
 import { calculatePriorityScore, getPriorityLabel } from "../services/priority.js";
+import { cacheSet, cacheGet, cacheDel } from "../lib/redis.js";
 
 export const requestsRouter = Router();
 const MIN_DOCUMENT_VERIFY_SCORE = 70;
@@ -151,6 +152,11 @@ requestsRouter.post("/:id/documents", requireAuth, async (req: AuthedRequest, re
     'INSERT INTO "RequestDocument" ("id","requestId","fileUrl","documentType","aiVerified","aiScore","aiNotes","uploadedAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,NOW()) RETURNING *',
     [req.params.id, `inline:${mimeType}`, documentType || "requirement_slip", false, 0, "Document verification queued."]
   );
+  // Store document in Redis cache (24h TTL) for admin verification viewing
+  await cacheSet(`doc:${doc.id}`, { base64, mimeType, documentType: documentType || "requirement_slip", uploadedAt: new Date().toISOString() }, 86400);
+  // Also store a lookup from request -> document IDs for admin to find all docs
+  const existingDocIds = await cacheGet<string[]>(`req-docs:${req.params.id}`);
+  await cacheSet(`req-docs:${req.params.id}`, [...(existingDocIds || []), doc.id], 86400);
   const queued = await addDocumentVerificationJob({
     requestId: req.params.id,
     documentId: doc.id,

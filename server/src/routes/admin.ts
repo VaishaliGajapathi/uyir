@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { query, queryOne, exec } from "../db.js";
 import { requireAuth, requireAdminOrVolunteer, requireAdminOrNgo, requireSuperAdmin, AuthedRequest } from "../middleware/auth.js";
+import { cacheGet, cacheDel } from "../lib/redis.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -113,10 +114,35 @@ adminRouter.post("/reports/:id/dismiss", requireAdminOrVolunteer, asyncHandler(a
 }));
 
 // Verify (approve/reject) a blood request
+// Get documents for a request (from Redis cache — temporary storage for admin verification)
+adminRouter.get("/requests/:id/documents", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const docIds = await cacheGet<string[]>(`req-docs:${req.params.id}`);
+  if (!docIds || docIds.length === 0) {
+    return res.json({ documents: [] });
+  }
+  const documents = [];
+  for (const docId of docIds) {
+    const doc = await cacheGet<any>(`doc:${docId}`);
+    if (doc) {
+      documents.push({ id: docId, ...doc });
+    }
+  }
+  res.json({ documents });
+}));
+
+// Verify a request — also auto-deletes cached documents after verification
 adminRouter.post("/verify-request/:id", requireAdminOrNgo, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const { approved, notes } = req.body;
   const status = approved ? "verified" : "rejected";
   await exec('UPDATE "BloodRequest" SET "status" = $1, "verificationNotes" = $2, "verifiedAt" = NOW(), "verifiedById" = $3 WHERE "id" = $4', [status, notes || "", req.userId, req.params.id]);
+  // Auto-delete cached documents after verification (no longer needed)
+  const docIds = await cacheGet<string[]>(`req-docs:${req.params.id}`);
+  if (docIds) {
+    for (const docId of docIds) {
+      await cacheDel(`doc:${docId}`);
+    }
+    await cacheDel(`req-docs:${req.params.id}`);
+  }
   const updated = await queryOne<any>('SELECT * FROM "BloodRequest" WHERE "id" = $1 LIMIT 1', [req.params.id]);
   res.json(updated);
 }));
