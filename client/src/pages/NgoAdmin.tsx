@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, Building2, ShieldCheck, CheckCircle2, XCircle, MapPin } from "lucide-react";
+import { Users, Droplet, Building2, ShieldCheck, CheckCircle2, XCircle, MapPin, LogOut } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner } from "../components/ui";
@@ -8,7 +8,7 @@ import { timeAgo } from "../lib/utils";
 type Tab = "overview" | "requests" | "hospitals";
 
 export function NgoAdmin() {
-  const { user, lang } = useApp();
+  const { user, lang, logout } = useApp();
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -130,7 +130,12 @@ export function NgoAdmin() {
             </p>
           </div>
         </div>
-        <Button size="sm" onClick={loadAll}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={loadAll}>Refresh</Button>
+          <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => { logout(); window.location.href = "/admin-login"; }}>
+            <LogOut className="h-4 w-4" /> Sign out
+          </Button>
+        </div>
       </header>
 
       <div className="mb-4 grid grid-cols-3 gap-3">

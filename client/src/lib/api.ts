@@ -171,6 +171,7 @@ export const api = {
   adminFraudReports: () => req<any[]>("/admin/fraud-reports"),
   adminHospitals: () => req<any[]>("/admin/hospitals"),
   adminCreateHospital: (data: { name: string; district: string; address?: string; phone?: string; registrationId?: string }) => req<any>("/admin/hospitals", { method: "POST", body: JSON.stringify(data) }),
+  adminEditHospital: (id: string, data: { name?: string; district?: string; address?: string; phone?: string; registrationId?: string }) => req<any>(`/admin/hospitals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   adminVerifyRequest: (id: string, approved: boolean, notes: string) => req(`/admin/verify-request/${id}`, { method: "POST", body: JSON.stringify({ approved, notes }) }),
   adminGetDocuments: (id: string) => req<{ documents: any[] }>(`/admin/requests/${id}/documents`),
   adminCloseRequest: (id: string) => req(`/admin/requests/${id}/close`, { method: "POST" }),
@@ -187,7 +188,7 @@ export const api = {
   adminDeleteUser: (id: string) => req(`/admin/admins/${id}`, { method: "DELETE" }),
   changePassword: (currentPassword: string, newPassword: string) => req("/admin/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
   adminGetNgos: () => req<any[]>("/admin/ngos"),
-  adminCreateNgo: (data: { name: string; district: string; address?: string; registrationNumber?: string; phone?: string; email?: string }) => req<any>("/admin/ngos", { method: "POST", body: JSON.stringify(data) }),
+  adminCreateNgo: (data: { name: string; district: string; address?: string; registrationNumber?: string; registrationYear?: string; phone?: string; email?: string; contactName?: string; description?: string; website?: string }) => req<any>("/admin/ngos", { method: "POST", body: JSON.stringify(data) }),
   // CRM
   adminActivity: (limit = 50) => req<any[]>(`/admin/activity?limit=${limit}`),
   adminUserActivity: (id: string) => req<any[]>(`/admin/users/${id}/activity`),

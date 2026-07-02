@@ -121,14 +121,22 @@ async function ensureRuntimeSchema() {
       "name" TEXT NOT NULL,
       "address" TEXT,
       "registrationNumber" TEXT,
+      "registrationYear" TEXT,
       "phone" TEXT,
       "email" TEXT,
       "district" TEXT,
+      "contactName" TEXT,
+      "description" TEXT,
+      "website" TEXT,
       "status" TEXT NOT NULL DEFAULT 'pending',
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "Ngo_pkey" PRIMARY KEY ("id")
     )
   `);
+  await exec('ALTER TABLE "Ngo" ADD COLUMN IF NOT EXISTS "contactName" TEXT');
+  await exec('ALTER TABLE "Ngo" ADD COLUMN IF NOT EXISTS "registrationYear" TEXT');
+  await exec('ALTER TABLE "Ngo" ADD COLUMN IF NOT EXISTS "description" TEXT');
+  await exec('ALTER TABLE "Ngo" ADD COLUMN IF NOT EXISTS "website" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoId" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoStatus" TEXT');
   await exec(`

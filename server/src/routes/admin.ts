@@ -95,6 +95,23 @@ adminRouter.post("/hospitals/:id/reject", requireAdminOrVolunteer, asyncHandler(
   res.json({ ok: true });
 }));
 
+// Edit a hospital
+adminRouter.patch("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, district, address, phone, registrationId } = req.body;
+  const updates: string[] = [];
+  const params: any[] = [];
+  if (name) { updates.push(`"name" = $${params.length + 1}`); params.push(name); }
+  if (district) { updates.push(`"district" = $${params.length + 1}`); params.push(district); }
+  if (address !== undefined) { updates.push(`"address" = $${params.length + 1}`); params.push(address || null); }
+  if (phone !== undefined) { updates.push(`"phone" = $${params.length + 1}`); params.push(phone || null); }
+  if (registrationId !== undefined) { updates.push(`"hospitalRegistrationId" = $${params.length + 1}`); params.push(registrationId || null); }
+  if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
+  params.push(req.params.id);
+  await exec(`UPDATE "Hospital" SET ${updates.join(", ")} WHERE "id" = $${params.length}`, params);
+  const updated = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1', [req.params.id]);
+  res.json(updated);
+}));
+
 // Fraud reports
 adminRouter.get("/fraud-reports", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const reports = await query<any>('SELECT * FROM "FraudReport" ORDER BY "createdAt" DESC', []);
@@ -408,13 +425,13 @@ adminRouter.get("/ngos", requireAdminOrVolunteer, asyncHandler(async (_req: Auth
 
 // Create an NGO
 adminRouter.post("/ngos", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, address, registrationNumber, phone, email, district } = req.body;
+  const { name, address, registrationNumber, registrationYear, phone, email, district, contactName, description, website } = req.body;
   if (!name || !district) return res.status(400).json({ error: "NGO name and district are required" });
   const existing = await queryOne<any>('SELECT * FROM "Ngo" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
   if (existing) return res.status(400).json({ error: "NGO with this name already exists" });
   const ngo = await queryOne<any>(
-    'INSERT INTO "Ngo" ("name","address","registrationNumber","phone","email","district","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *',
-    [name, address || null, registrationNumber || null, phone || null, email || null, district, "approved"]
+    'INSERT INTO "Ngo" ("name","address","registrationNumber","registrationYear","phone","email","district","contactName","description","website","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *',
+    [name, address || null, registrationNumber || null, registrationYear || null, phone || null, email || null, district, contactName || null, description || null, website || null, "approved"]
   );
   res.status(201).json(ngo);
 }));
