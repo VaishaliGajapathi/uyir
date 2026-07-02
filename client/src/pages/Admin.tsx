@@ -23,7 +23,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
-  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
+  const [adminForm, setAdminForm] = useState({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "" });
   const [profileForm, setProfileForm] = useState({ name: "", email: "", designation: "", district: "" });
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
@@ -37,6 +37,10 @@ export function Admin() {
   const [donorSearch, setDonorSearch] = useState("");
   const [expandedDonorId, setExpandedDonorId] = useState<string | null>(null);
   const [donorPage, setDonorPage] = useState(1);
+  const [showHospitalForm, setShowHospitalForm] = useState(false);
+  const [hospitalForm, setHospitalForm] = useState({ name: "", district: "", address: "", phone: "", registrationId: "" });
+  const [showNgoForm, setShowNgoForm] = useState(false);
+  const [ngoForm, setNgoForm] = useState({ name: "", district: "", address: "", registrationNumber: "", phone: "", email: "" });
   const [donorSortBy, setDonorSortBy] = useState("createdAt");
   const [donorSortOrder, setDonorSortOrder] = useState<"asc" | "desc">("desc");
   const [donorHistory, setDonorHistory] = useState<any[]>([]);
@@ -257,7 +261,35 @@ export function Admin() {
     try {
       await api.adminCreateAdmin(adminForm);
       setShowAdminForm(false);
-      setAdminForm({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "" });
+      setAdminForm({ name: "", mobile: "", email: "", role: "administrator", password: "", district: "", ngoName: "", ngoId: "", designation: "", ngoAddress: "", ngoRegistrationNumber: "", ngoPhone: "", ngoEmail: "", hospitalId: "", hospitalName: "" });
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function createHospital() {
+    if (!hospitalForm.name || !hospitalForm.district) {
+      alert("Hospital name and district are required");
+      return;
+    }
+    setBusy("createHospital");
+    try {
+      await api.adminCreateHospital(hospitalForm);
+      setShowHospitalForm(false);
+      setHospitalForm({ name: "", district: "", address: "", phone: "", registrationId: "" });
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
+  async function createNgo() {
+    if (!ngoForm.name || !ngoForm.district) {
+      alert("NGO name and district are required");
+      return;
+    }
+    setBusy("createNgo");
+    try {
+      await api.adminCreateNgo(ngoForm);
+      setShowNgoForm(false);
+      setNgoForm({ name: "", district: "", address: "", registrationNumber: "", phone: "", email: "" });
       await loadAll();
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
@@ -849,7 +881,55 @@ export function Admin() {
             <Button size="sm" variant="outline" onClick={exportHospitalsCSV}>
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
+            {user?.role === "super_admin" && (
+              <Button size="sm" onClick={() => setShowHospitalForm(true)}>+ Add Hospital</Button>
+            )}
           </div>
+          {showHospitalForm && (
+            <div className="mb-4 rounded-lg bg-slate-50 p-3">
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Hospital Name *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={hospitalForm.name}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })}
+                />
+                <SearchableSelect
+                  options={TN_DISTRICTS}
+                  value={hospitalForm.district}
+                  onChange={(v) => setHospitalForm({ ...hospitalForm, district: v })}
+                  placeholder="Select district *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                />
+                <input
+                  type="text"
+                  placeholder="Address"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={hospitalForm.address}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, address: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={hospitalForm.phone}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, phone: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Registration ID"
+                  className="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={hospitalForm.registrationId}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, registrationId: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" loading={busy === "createHospital"} onClick={createHospital}>Create</Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowHospitalForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {hospitals.map((h) => (
               <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
@@ -882,7 +962,64 @@ export function Admin() {
 
       {tab === "ngos" && (
         <Card className="p-4">
-          <h3 className="mb-2 font-bold text-slate-800">NGO Admins & Activities ({ngos.length})</h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800">NGO Admins & Activities ({ngos.length})</h3>
+            {user?.role === "super_admin" && (
+              <Button size="sm" onClick={() => setShowNgoForm(true)}>+ Add NGO</Button>
+            )}
+          </div>
+          {showNgoForm && (
+            <div className="mb-4 rounded-lg bg-slate-50 p-3">
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="NGO Name *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={ngoForm.name}
+                  onChange={(e) => setNgoForm({ ...ngoForm, name: e.target.value })}
+                />
+                <SearchableSelect
+                  options={TN_DISTRICTS}
+                  value={ngoForm.district}
+                  onChange={(v) => setNgoForm({ ...ngoForm, district: v })}
+                  placeholder="Select district *"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                />
+                <input
+                  type="text"
+                  placeholder="Address"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={ngoForm.address}
+                  onChange={(e) => setNgoForm({ ...ngoForm, address: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Registration Number"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={ngoForm.registrationNumber}
+                  onChange={(e) => setNgoForm({ ...ngoForm, registrationNumber: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={ngoForm.phone}
+                  onChange={(e) => setNgoForm({ ...ngoForm, phone: e.target.value })}
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                  value={ngoForm.email}
+                  onChange={(e) => setNgoForm({ ...ngoForm, email: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" loading={busy === "createNgo"} onClick={createNgo}>Create</Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowNgoForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {ngos.length === 0 && <p className="text-sm text-slate-400">No NGO admins found.</p>}
             {ngos.map((n) => (
@@ -1069,6 +1206,37 @@ export function Admin() {
                         Linking to existing NGO: <strong>{ngoOrganizations.find((n: any) => n.id === adminForm.ngoId)?.name}</strong>
                       </div>
                     )}
+                    {adminForm.role === "hospital" && (
+                      <>
+                        <div className="col-span-2">
+                          <label className="mb-1 block text-xs font-medium text-slate-600">Select Hospital</label>
+                          <select
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                            value={adminForm.hospitalId}
+                            onChange={(e) => {
+                              const h = hospitals.find((h: any) => h.id === e.target.value);
+                              setAdminForm({ ...adminForm, hospitalId: e.target.value, hospitalName: h?.name || "", district: h?.district || adminForm.district });
+                            }}
+                          >
+                            <option value="">-- Select hospital --</option>
+                            {hospitals.map((h) => (
+                              <option key={h.id} value={h.id}>{h.name} ({h.district})</option>
+                            ))}
+                          </select>
+                          {hospitals.length === 0 && (
+                            <p className="mt-1 text-xs text-amber-600">No hospitals yet. Add one from the Hospitals tab first.</p>
+                          )}
+                        </div>
+                        <SearchableSelect
+                          options={TN_DISTRICTS}
+                          value={adminForm.district}
+                          onChange={(v) => setAdminForm({ ...adminForm, district: v })}
+                          placeholder="Select district"
+                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
+                        />
+                      </>
+                    )}
+                    {adminForm.role === "ngo" && (
                     <SearchableSelect
                       options={TN_DISTRICTS}
                       value={adminForm.district}
@@ -1076,6 +1244,7 @@ export function Admin() {
                       placeholder="Select district"
                       className="rounded-md border border-slate-200 px-2 py-1.5 text-sm h-9"
                     />
+                    )}
                   </>
                 )}
               </div>

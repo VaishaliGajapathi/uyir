@@ -65,6 +65,23 @@ adminRouter.get("/hospitals", requireAdminOrVolunteer, asyncHandler(async (_req:
   res.json(hospitals);
 }));
 
+// Create a hospital
+adminRouter.post("/hospitals", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, district, address, phone, registrationId } = req.body;
+  if (!name || !district) return res.status(400).json({ error: "Hospital name and district are required" });
+  const existing = await queryOne<any>('SELECT * FROM "Hospital" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
+  if (existing) return res.status(400).json({ error: "Hospital with this name already exists" });
+  const { TN_DISTRICTS } = await import("../lib/districts.js");
+  const districtData = Object.values(TN_DISTRICTS).find((d: any) => d.name === district);
+  const lat = districtData?.lat ?? 11.0;
+  const lng = districtData?.lng ?? 78.0;
+  const hospital = await queryOne<any>(
+    'INSERT INTO "Hospital" ("id","name","district","address","phone","lat","lng","verified","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,true,NOW()) RETURNING *',
+    [name, district, address || null, phone || null, lat, lng]
+  );
+  res.status(201).json(hospital);
+}));
+
 // Verify a hospital
 adminRouter.post("/hospitals/:id/verify", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "Hospital" SET "verified" = true, "verifiedById" = $1, "verifiedAt" = NOW() WHERE "id" = $2', [req.userId, req.params.id]);
@@ -126,11 +143,14 @@ adminRouter.get("/admins", requireAdminOrVolunteer, asyncHandler(async (_req: Au
 
 // Create admin user (SUPER ADMIN ONLY)
 adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
-  const { name, mobile, email, role, password, district, ngoName, ngoId, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail } = req.body;
+  const { name, mobile, email, role, password, district, ngoName, ngoId, designation, ngoAddress, ngoRegistrationNumber, ngoPhone, ngoEmail, hospitalId, hospitalName } = req.body;
   if (!name || !mobile || !role) return res.status(400).json({ error: "Missing fields" });
   if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: "Invalid role" });
   if (role === "ngo" && (!district || !ngoName) && !ngoId) {
     return res.status(400).json({ error: "district and ngoName (or ngoId) are required for NGO admins" });
+  }
+  if (role === "hospital" && !hospitalId && !hospitalName) {
+    return res.status(400).json({ error: "Hospital selection is required for hospital users" });
   }
   const bcrypt = await import("bcryptjs");
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
@@ -157,9 +177,18 @@ adminRouter.post("/admins", requireSuperAdmin, asyncHandler(async (req: AuthedRe
     finalNgoStatus = "pending";
   }
 
+  // Resolve hospital info
+  let finalHospitalId = hospitalId || null;
+  let finalHospitalName = hospitalName || null;
+  if (role === "hospital" && hospitalId) {
+    const hospital = await queryOne<any>('SELECT * FROM "Hospital" WHERE "id" = $1 LIMIT 1', [hospitalId]);
+    if (!hospital) return res.status(400).json({ error: "Hospital not found" });
+    finalHospitalName = hospital.name;
+  }
+
   const user = await queryOne<any>(
-    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW()) RETURNING *',
-    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", role === "ngo" ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null]
+    'INSERT INTO "User" ("id","name","mobile","email","password","plainPassword","role","language","verified","district","ngoId","ngoName","designation","ngoAddress","ngoRegistrationNumber","ngoPhone","ngoEmail","ngoStatus","hospitalId","hospitalName","hospitalRegistrationId","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW()) RETURNING *',
+    [name, sanitizedMobile, email || null, hashedPassword, password || null, role, "ta", role === "ngo" || role === "hospital" ? district : null, finalNgoId, role === "ngo" ? finalNgoName : null, designation || null, role === "ngo" ? ngoAddress || null : null, role === "ngo" ? ngoRegistrationNumber || null : null, role === "ngo" ? ngoPhone || null : null, role === "ngo" ? ngoEmail || null : null, role === "ngo" ? finalNgoStatus : null, finalHospitalId, role === "hospital" ? finalHospitalName : null, role === "hospital" ? finalHospitalName : null]
   );
   res.status(201).json(user);
 }));
@@ -349,6 +378,19 @@ adminRouter.post("/change-password", requireAuth, asyncHandler(async (req: Authe
 adminRouter.get("/ngos", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const ngos = await query<any>('SELECT * FROM "Ngo" ORDER BY "createdAt" DESC');
   res.json(ngos);
+}));
+
+// Create an NGO
+adminRouter.post("/ngos", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const { name, address, registrationNumber, phone, email, district } = req.body;
+  if (!name || !district) return res.status(400).json({ error: "NGO name and district are required" });
+  const existing = await queryOne<any>('SELECT * FROM "Ngo" WHERE LOWER("name") = LOWER($1) LIMIT 1', [name]);
+  if (existing) return res.status(400).json({ error: "NGO with this name already exists" });
+  const ngo = await queryOne<any>(
+    'INSERT INTO "Ngo" ("name","address","registrationNumber","phone","email","district","status","createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *',
+    [name, address || null, registrationNumber || null, phone || null, email || null, district, "approved"]
+  );
+  res.status(201).json(ngo);
 }));
 
 // ============ CRM ENDPOINTS ============
