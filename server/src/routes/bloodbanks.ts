@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from "express";
 import { z } from "zod";
 import { query, queryOne, exec } from "../db.js";
-import { requireAuth, requireAdminOrVerifier, AuthedRequest } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrVolunteer, AuthedRequest } from "../middleware/auth.js";
 import { logAudit, AuditActions } from "../lib/audit.js";
 
 export const bloodBanksRouter = Router();
@@ -50,7 +50,7 @@ bloodBanksRouter.get("/:id", asyncHandler(async (req: AuthedRequest, res: Respon
 }));
 
 // Create blood bank (admin only)
-bloodBanksRouter.post("/", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+bloodBanksRouter.post("/", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const schema = z.object({
     name: z.string().min(2),
     district: z.string().min(2),
@@ -83,7 +83,7 @@ bloodBanksRouter.post("/", requireAdminOrVerifier, asyncHandler(async (req: Auth
 }));
 
 // Update blood bank (admin only)
-bloodBanksRouter.put("/:id", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+bloodBanksRouter.put("/:id", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const { name, district, address, phone, lat, lng, availableBloodGroups, verified } = req.body;
   const updates: string[] = [];
   const params: any[] = [];
@@ -107,7 +107,7 @@ bloodBanksRouter.put("/:id", requireAdminOrVerifier, asyncHandler(async (req: Au
 }));
 
 // Verify blood bank (admin only)
-bloodBanksRouter.post("/:id/verify", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+bloodBanksRouter.post("/:id/verify", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('UPDATE "BloodBank" SET "verified" = true WHERE "id" = $1', [req.params.id]);
   await logAudit({
     userId: req.userId!,
@@ -121,7 +121,7 @@ bloodBanksRouter.post("/:id/verify", requireAdminOrVerifier, asyncHandler(async 
 }));
 
 // Delete blood bank (admin only)
-bloodBanksRouter.delete("/:id", requireAdminOrVerifier, asyncHandler(async (req: AuthedRequest, res: Response) => {
+bloodBanksRouter.delete("/:id", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
   await exec('DELETE FROM "BloodBank" WHERE "id" = $1', [req.params.id]);
   await logAudit({
     userId: req.userId!,

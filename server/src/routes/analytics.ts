@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from "express";
 import { query, queryOne } from "../db.js";
-import { requireAuth, requireAdminOrVerifier, AuthedRequest } from "../middleware/auth.js";
+import { requireAuth, requireAdminOrVolunteer, AuthedRequest } from "../middleware/auth.js";
 
 export const analyticsRouter = Router();
 analyticsRouter.use(requireAuth);
@@ -15,7 +15,7 @@ function asyncHandler(fn: (req: AuthedRequest, res: Response, next: NextFunction
 }
 
 // Overview stats
-analyticsRouter.get("/overview", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+analyticsRouter.get("/overview", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const avgResponseTime = await queryOne<any>(`
     SELECT AVG(EXTRACT(EPOCH FROM (dr."acceptedAt" - dr."createdAt")) / 60) as avg_minutes
     FROM "DonorResponse" dr
@@ -96,7 +96,7 @@ analyticsRouter.get("/overview", requireAdminOrVerifier, asyncHandler(async (_re
 }));
 
 // Request status breakdown
-analyticsRouter.get("/request-status", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+analyticsRouter.get("/request-status", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const statusBreakdown = await query<any>(`
     SELECT status, COUNT(*)::int as count
     FROM "BloodRequest"
@@ -108,7 +108,7 @@ analyticsRouter.get("/request-status", requireAdminOrVerifier, asyncHandler(asyn
 }));
 
 // Donor activity
-analyticsRouter.get("/donor-activity", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+analyticsRouter.get("/donor-activity", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const topDonors = await query<any>(`
     SELECT u."name", u."bloodGroup", u."donationCount", u."livesSavedCount"
     FROM "User" u
@@ -130,7 +130,7 @@ analyticsRouter.get("/donor-activity", requireAdminOrVerifier, asyncHandler(asyn
 }));
 
 // Alert effectiveness
-analyticsRouter.get("/alert-effectiveness", requireAdminOrVerifier, asyncHandler(async (_req: AuthedRequest, res: Response) => {
+analyticsRouter.get("/alert-effectiveness", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const alertStats = await query<any>(`
     SELECT 
       COUNT(*)::int as total_alerts,
