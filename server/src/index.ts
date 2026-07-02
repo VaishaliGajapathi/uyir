@@ -20,6 +20,7 @@ import { ngoRouter } from "./routes/ngo.js";
 import { bloodBanksRouter } from "./routes/bloodbanks.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { disasterRouter } from "./routes/disaster.js";
+import { campaignsRouter } from "./routes/campaigns.js";
 import { exec, healthCheck as dbHealthCheck } from "./db.js";
 import { TN_DISTRICT_NAMES } from "./lib/districts.js";
 import { cacheMiddleware } from "./middleware/cache.js";
@@ -178,6 +179,38 @@ async function ensureRuntimeSchema() {
       CONSTRAINT "DisasterBroadcast_pkey" PRIMARY KEY ("id")
     )
   `);
+  await exec(`
+    CREATE TABLE IF NOT EXISTS "Campaign" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+      "title" TEXT NOT NULL,
+      "description" TEXT,
+      "venue" TEXT NOT NULL,
+      "district" TEXT NOT NULL,
+      "address" TEXT,
+      "startDate" TIMESTAMP(3) NOT NULL,
+      "endDate" TIMESTAMP(3) NOT NULL,
+      "startTime" TEXT,
+      "endTime" TEXT,
+      "partnerType" TEXT NOT NULL DEFAULT 'hospital',
+      "hospitalId" TEXT,
+      "hospitalName" TEXT,
+      "ngoId" TEXT,
+      "ngoName" TEXT,
+      "bloodBankId" TEXT,
+      "bloodBankName" TEXT,
+      "contactPerson" TEXT,
+      "contactPhone" TEXT,
+      "expectedDonors" INTEGER DEFAULT 0,
+      "collectedUnits" INTEGER DEFAULT 0,
+      "registeredDonors" INTEGER DEFAULT 0,
+      "status" TEXT NOT NULL DEFAULT 'active',
+      "imageUrl" TEXT,
+      "createdById" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
+    )
+  `);
 }
 
 const allowedOrigins = [
@@ -249,6 +282,7 @@ app.use("/api/ngo", ngoRouter);
 app.use("/api/bloodbanks", bloodBanksRouter);
 app.use("/api/analytics", cacheMiddleware(30), analyticsRouter);
 app.use("/api/disaster", disasterRouter);
+app.use("/api/campaigns", campaignsRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/requests", requestsRouter);

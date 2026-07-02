@@ -1,5 +1,6 @@
 import { Droplet, Heart, Clock, MapPin, Phone, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SiteFooter } from "../components/SiteFooter";
 
 export default function DonateRequest() {
   const navigate = useNavigate();
@@ -206,6 +207,8 @@ export default function DonateRequest() {
           </div>
         </div>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

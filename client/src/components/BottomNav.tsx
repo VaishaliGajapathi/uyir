@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, Droplet, MapPin, Award, User, Shield, Star } from "lucide-react";
+import { Home, Droplet, MapPin, Award, User, Shield, Star, Megaphone } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 import { tr } from "../lib/constants";
 import { cn } from "../lib/utils";
@@ -9,6 +9,7 @@ const mainItems = [
   { to: "/", key: "home", icon: Home, end: true },
   { to: "/requests", key: "requests", icon: Droplet },
   { to: "/nearby", key: "nearby", icon: MapPin },
+  { to: "/campaigns", key: "campaigns", icon: Megaphone },
   { to: "/impact", key: "impact", icon: Award },
   { to: "/ratings", key: "ratings", icon: Star },
 ] as const;

@@ -1,7 +1,10 @@
-import { Heart, Users, Shield, Globe, Award, Clock, Phone, Mail, MapPin, Facebook, Instagram, Twitter, Quote } from "lucide-react";
+import { Heart, Users, Shield, Globe, Award, Clock, Phone, Mail, MapPin, Facebook, Instagram, Twitter, Quote, ArrowRight, Droplet } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { t } from "../lib/constants";
+import { SiteFooter } from "../components/SiteFooter";
 
 export default function AboutUs() {
+  const navigate = useNavigate();
   const thirukkuralText = [
     t.thirukkural.en[0],
     t.thirukkural.en[1],
@@ -280,13 +283,32 @@ export default function AboutUs() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="bg-slate-900 text-white py-8 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-slate-400 mb-2">© 2024 UYIR - Tamil Nadu Blood & Platelet Emergency Network</p>
-          <p className="text-sm text-slate-500">Saving lives, one drop at a time. உயிர் - உயிரைக் காப்போம்</p>
+      {/* CTA - Save a Life */}
+      <div className="bg-gradient-to-r from-uyir-600 to-uyir-700 text-white py-16 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <Droplet className="h-12 w-12 mx-auto mb-4 fill-white/20" />
+          <h2 className="text-3xl font-bold mb-4">Save a Life - Sign Up Today</h2>
+          <p className="text-xl text-uyir-100 mb-8">
+            Every 2 seconds, someone needs blood. Your one donation can save up to 3 lives. Join UYIR's network of lifesavers across Tamil Nadu.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => navigate("/")}
+              className="bg-white text-uyir-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-100 transition flex items-center justify-center gap-2"
+            >
+              Sign Up as Donor <ArrowRight className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => navigate("/donate-request")}
+              className="bg-uyir-800 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-uyir-900 transition"
+            >
+              Request Blood
+            </button>
+          </div>
         </div>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

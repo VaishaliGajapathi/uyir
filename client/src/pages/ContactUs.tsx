@@ -1,4 +1,5 @@
 import { Phone, Mail, MapPin, Clock, Send, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
+import { SiteFooter } from "../components/SiteFooter";
 
 export default function ContactUs() {
   return (
@@ -31,7 +32,7 @@ export default function ContactUs() {
               <Mail className="h-8 w-8 text-blue-600" />
             </div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">Email Support</h3>
-            <p className="text-lg font-semibold text-slate-700 mb-2">help@uyir.org</p>
+            <p className="text-lg font-semibold text-slate-700 mb-2">support@uyirngo.in</p>
             <p className="text-sm text-slate-500">Response within 24 hours</p>
           </div>
 
@@ -183,12 +184,7 @@ export default function ContactUs() {
       </div>
 
       {/* Footer */}
-      <div className="bg-slate-900 text-white py-8 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-slate-400 mb-2">© 2024 UYIR - Tamil Nadu Blood & Platelet Emergency Network</p>
-          <p className="text-sm text-slate-500">Saving lives, one drop at a time. உயிர் - உயிரைக் காப்போம்</p>
-        </div>
-      </div>
+      <SiteFooter />
     </div>
   );
 }

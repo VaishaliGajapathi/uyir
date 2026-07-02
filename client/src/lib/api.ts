@@ -227,6 +227,20 @@ export const api = {
   registerFcmToken: (token: string, platform?: string) => req("/users/me/fcm-token", { method: "POST", body: JSON.stringify({ token, platform }) }),
   unregisterFcmToken: () => req("/users/me/fcm-token", { method: "DELETE" }),
   subscribeToTopic: (topic: string) => req("/users/me/subscribe-topic", { method: "POST", body: JSON.stringify({ topic }) }),
+  // campaigns
+  campaigns: (params?: Record<string, string>) => req<any[]>(`/campaigns?${params ? new URLSearchParams(params) : ""}`),
+  upcomingCampaigns: () => req<any[]>("/campaigns/upcoming"),
+  pastCampaigns: () => req<any[]>("/campaigns/past"),
+  districtCampaigns: (district: string) => req<any[]>(`/campaigns/district/${encodeURIComponent(district)}`),
+  campaignDetail: (id: string) => req<any>(`/campaigns/${id}`),
+  campaignAnalytics: () => req<any>("/campaigns/analytics/summary"),
+  createCampaign: (data: any) => req<any>("/campaigns", { method: "POST", body: JSON.stringify(data) }),
+  updateCampaign: (id: string, data: any) => req<any>(`/campaigns/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  pauseCampaign: (id: string) => req<any>(`/campaigns/${id}/pause`, { method: "POST" }),
+  resumeCampaign: (id: string) => req<any>(`/campaigns/${id}/resume`, { method: "POST" }),
+  cancelCampaign: (id: string) => req<any>(`/campaigns/${id}/cancel`, { method: "POST" }),
+  completeCampaign: (id: string, data: { collectedUnits?: number; registeredDonors?: number }) => req<any>(`/campaigns/${id}/complete`, { method: "POST", body: JSON.stringify(data) }),
+  deleteCampaign: (id: string) => req(`/campaigns/${id}`, { method: "DELETE" }),
 };
 
 export function streamUrl(path: string) {

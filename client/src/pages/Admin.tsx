@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network, FileCheck2, LogOut, Pencil, Menu, X } from "lucide-react";
+import { Users, Droplet, ShieldCheck, AlertTriangle, Building2, CheckCircle2, XCircle, Ban, Search, Download, ChevronDown, ChevronUp, User, Activity, BarChart3, Layers, Heart, Snowflake, Eye, KeyRound, Network, FileCheck2, LogOut, Pencil, Menu, X, Megaphone } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Card, Button, Badge, Spinner, SearchableSelect } from "../components/ui";
 import { timeAgo } from "../lib/utils";
 import { BLOOD_GROUPS, TN_DISTRICTS } from "../lib/constants";
+import { AdminCampaigns } from "./AdminCampaigns";
 
-type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "blood_banks" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
+type Tab = "overview" | "donors" | "requests" | "verification" | "fraud" | "hospitals" | "ngos" | "blood_banks" | "campaigns" | "admins" | "activity" | "inventory" | "pipeline" | "analytics" | "hierarchy" | "profile";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -569,6 +570,7 @@ export function Admin() {
             { id: "hospitals", label: "Hospitals", icon: Building2 },
             { id: "ngos", label: "NGOs", icon: Building2 },
             { id: "blood_banks", label: "Blood Banks", icon: Heart },
+            { id: "campaigns", label: "Campaigns", icon: Megaphone },
           ] as const).map((item) => {
             const Icon = item.icon;
             return (
@@ -1435,6 +1437,10 @@ export function Admin() {
             ))}
           </div>
         </Card>
+      )}
+
+      {tab === "campaigns" && (
+        <AdminCampaigns />
       )}
 
       {tab === "admins" && (
