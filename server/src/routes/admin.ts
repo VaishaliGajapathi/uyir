@@ -498,13 +498,16 @@ adminRouter.get("/role-hierarchy", requireAdminOrVolunteer, asyncHandler(async (
      WHERE "role" IN ('super_admin','administrator','volunteer','ngo','blood_bank','hospital','donor')
      GROUP BY "role" ORDER BY cnt DESC`
   );
-  const ngoUsers = await query<any>(
-    `SELECT n."name" as "ngoName", n."district", n."status", COUNT(u."id")::int as "userCount"
-     FROM "Ngo" n
-     LEFT JOIN "User" u ON u."ngoId" = n."id"
-     GROUP BY n."id", n."name", n."district", n."status"
-     ORDER BY n."name"`
-  );
+  let ngoUsers: any[] = [];
+  try {
+    ngoUsers = await query<any>(
+      `SELECT n."name" as "ngoName", n."district", n."status", COUNT(u."id")::int as "userCount"
+       FROM "Ngo" n
+       LEFT JOIN "User" u ON u."ngoId" = n."id"
+       GROUP BY n."id", n."name", n."district", n."status"
+       ORDER BY n."name"`
+    );
+  } catch { ngoUsers = []; }
   res.json({ byRole, ngoUsers });
 }));
 

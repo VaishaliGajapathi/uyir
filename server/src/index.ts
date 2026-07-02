@@ -111,6 +111,22 @@ async function ensureRuntimeSchema() {
     )
   `);
   await exec(`
+    CREATE TABLE IF NOT EXISTS "Ngo" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+      "name" TEXT NOT NULL,
+      "address" TEXT,
+      "registrationNumber" TEXT,
+      "phone" TEXT,
+      "email" TEXT,
+      "district" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'pending',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Ngo_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoId" TEXT');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "ngoStatus" TEXT');
+  await exec(`
     CREATE TABLE IF NOT EXISTS "DisasterBroadcast" (
       "id" TEXT NOT NULL,
       "district" TEXT,

@@ -421,7 +421,6 @@ export function Admin() {
           })}
 
           {/* Blood Bank CRM Section */}
-          <p className="px-3 py-1 mt-2 text-[10px] font-bold uppercase text-slate-400 tracking-wider">Blood Bank CRM</p>
           {([
             { id: "inventory", label: "Blood Inventory", icon: Heart },
             { id: "pipeline", label: "Request Pipeline", icon: Layers },
@@ -1367,47 +1366,64 @@ export function Admin() {
       )}
 
       {/* ============ BLOOD INVENTORY ============ */}
-      {tab === "inventory" && bloodInventory && (
+      {tab === "inventory" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
-            <StatCard icon={CheckCircle2} label="Eligible Donors (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
-          </div>
-          <Card className="p-4">
-            <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
-            <div className="grid grid-cols-4 gap-3">
-              {bloodInventory.byGroup.map((g: any) => (
-                <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
-                  <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <p className="text-slate-600">Donors: <span className="font-bold">{g.donorCount}</span></p>
-                    <p className="text-emerald-600">Eligible: <span className="font-bold">{g.eligibleDonors}</span></p>
-                    <p className="text-violet-600">Platelet: <span className="font-bold">{g.plateletDonors}</span></p>
+          {bloodInventory ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Heart} label="Total Donors" value={bloodInventory.totalDonors} color="bg-red-50 text-red-600" />
+                <StatCard icon={CheckCircle2} label="Eligible Donors (90d+)" value={bloodInventory.totalEligible} color="bg-emerald-50 text-emerald-600" />
+              </div>
+              {bloodInventory.byGroup?.length > 0 ? (
+                <Card className="p-4">
+                  <h3 className="mb-3 font-bold text-slate-800">Blood Group Inventory</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    {bloodInventory.byGroup.map((g: any) => (
+                      <div key={g.bloodGroup} className="rounded-lg border border-slate-200 p-3 text-center">
+                        <p className="text-2xl font-extrabold text-red-600">{g.bloodGroup}</p>
+                        <div className="mt-2 space-y-1 text-xs">
+                          <p className="text-slate-600">Donors: <span className="font-bold">{g.donorCount}</span></p>
+                          <p className="text-emerald-600">Eligible: <span className="font-bold">{g.eligibleDonors}</span></p>
+                          <p className="text-violet-600">Platelet: <span className="font-bold">{g.plateletDonors}</span></p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Card className="p-4">
-            <h3 className="mb-3 font-bold text-slate-800">Donors by District</h3>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {bloodInventory.byDistrict.map((d: any) => (
-                <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-sm font-medium text-slate-700">{d.district}</span>
-                  <div className="flex gap-2">
-                    <Badge className="bg-blue-100 text-blue-700">{d.donorCount} donors</Badge>
-                    <Badge className="bg-emerald-100 text-emerald-700">{d.eligibleDonors} eligible</Badge>
+                </Card>
+              ) : (
+                <Card className="p-8 text-center text-slate-400">
+                  <Heart className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No verified donors yet. Donors will appear here once verified.</p>
+                </Card>
+              )}
+              {bloodInventory.byDistrict?.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="mb-3 font-bold text-slate-800">Donors by District</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {bloodInventory.byDistrict.map((d: any) => (
+                      <div key={d.district} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">{d.district}</span>
+                        <div className="flex gap-2">
+                          <Badge className="bg-blue-100 text-blue-700">{d.donorCount} donors</Badge>
+                          <Badge className="bg-emerald-100 text-emerald-700">{d.eligibleDonors} eligible</Badge>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card className="p-8 text-center text-slate-400">Loading inventory...</Card>
+          )}
         </div>
       )}
 
       {/* ============ REQUEST PIPELINE ============ */}
-      {tab === "pipeline" && pipeline && (
+      {tab === "pipeline" && (
         <div className="space-y-4">
+          {pipeline ? (
+          <>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Request Fulfillment Pipeline</h3>
             <div className="grid grid-cols-4 gap-3">
@@ -1481,6 +1497,10 @@ export function Admin() {
               </div>
             </Card>
           </div>
+          </>
+          ) : (
+            <Card className="p-8 text-center text-slate-400">Loading pipeline...</Card>
+          )}
         </div>
       )}
 
@@ -1546,8 +1566,10 @@ export function Admin() {
       )}
 
       {/* ============ ROLE HIERARCHY ============ */}
-      {tab === "hierarchy" && roleHierarchy && (
+      {tab === "hierarchy" && (
         <div className="space-y-4">
+          {roleHierarchy ? (
+          <>
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">Role Distribution</h3>
             <div className="space-y-2">
@@ -1568,8 +1590,8 @@ export function Admin() {
           <Card className="p-4">
             <h3 className="mb-3 font-bold text-slate-800">NGO Parent-Child Hierarchy</h3>
             <div className="space-y-2">
-              {roleHierarchy.ngoUsers.length === 0 && <p className="text-sm text-slate-400">No NGOs registered</p>}
-              {roleHierarchy.ngoUsers.map((n: any, i: number) => (
+              {roleHierarchy.ngoUsers?.length === 0 && <p className="text-sm text-slate-400">No NGOs registered</p>}
+              {roleHierarchy.ngoUsers?.map((n: any, i: number) => (
                 <div key={i} className="rounded-lg bg-slate-50 p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1585,6 +1607,10 @@ export function Admin() {
               ))}
             </div>
           </Card>
+          </>
+          ) : (
+            <Card className="p-8 text-center text-slate-400">Loading role hierarchy...</Card>
+          )}
         </div>
       )}
 
