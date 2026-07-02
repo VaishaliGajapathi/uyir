@@ -5,6 +5,8 @@ import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Input, Card } from "../components/ui";
 
+const SUPPORT_EMAIL = "support@uyirngo.in";
+
 export function HospitalLogin() {
   const nav = useNavigate();
   const { login } = useApp();
@@ -32,7 +34,7 @@ export function HospitalLogin() {
       login(res.token, res.user);
       nav("/hospital-dashboard");
     } catch (e: any) {
-      setErr(e.message || "Login failed");
+      setErr(`${e.message || "Login failed"} If the issue persists, contact: ${SUPPORT_EMAIL}`);
     } finally {
       setBusy(false);
     }
@@ -93,6 +95,10 @@ export function HospitalLogin() {
           </div>
         </div>
       </Card>
+
+      <div className="mt-4 text-center text-xs text-slate-400">
+        Still having queries? <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-uyir-600 hover:underline">{SUPPORT_EMAIL}</a>
+      </div>
     </div>
   );
 }

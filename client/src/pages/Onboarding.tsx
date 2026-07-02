@@ -8,6 +8,12 @@ import { Button, SearchableSelect } from "../components/ui";
 import type { Lang } from "../lib/constants";
 import { TN_DISTRICTS } from "../lib/constants";
 
+const SUPPORT_EMAIL = "support@uyirngo.in";
+
+function withSupport(msg: string, lang: string): string {
+  return `${msg} ${lang === "ta" ? "பிரச்சனை தொடர்ந்தால், தொடர்பு கொள்ளவும்:" : "If the issue persists, contact:"} ${SUPPORT_EMAIL}`;
+}
+
 function dashboardPathForRole(role?: string) {
   if (role === "hospital") return "/hospital-dashboard";
   if (role === "administrator" || role === "volunteer" || role === "super_admin") return "/admin";
@@ -48,7 +54,7 @@ export default function Onboarding() {
       const r = await api.login(mobile, password);
       login(r.token, r.user);
       nav(dashboardPathForRole(r.user.role));
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
   }
 
   async function captureLocation() {
@@ -101,7 +107,7 @@ export default function Onboarding() {
       await sendWidgetOtp(mobile);
       setOtpStep("sent");
       setView("signup");
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
   }
 
   async function handleDonorSignup() {
@@ -150,7 +156,7 @@ export default function Onboarding() {
       }
     } catch (e: any) {
       console.error("[Onboarding] Verification error:", e);
-      setErr(e.message);
+      setErr(withSupport(e.message, lang));
     } finally { setLoading(false); }
   }
 
@@ -166,7 +172,7 @@ export default function Onboarding() {
       await sendWidgetOtp(mobile);
       setOtpStep("sent");
       setView("reset");
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
   }
 
   async function handleReset() {
@@ -180,7 +186,7 @@ export default function Onboarding() {
       setOtpCode("");
       setOtpStep("idle");
       alert(r.message);
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
   }
 
   return (
@@ -601,6 +607,12 @@ export default function Onboarding() {
               {err && <p className="text-center text-xs text-red-500">{err}</p>}
             </div>
           )}
+        </div>
+
+        {/* Support Footer */}
+        <div className="mt-4 text-center text-xs text-slate-400">
+          {lang === "ta" ? "கேள்விகள் இருக்கிறதா? " : "Still having queries? "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-uyir-600 hover:underline">{SUPPORT_EMAIL}</a>
         </div>
       </div>
 

@@ -6,6 +6,8 @@ import { useApp } from "../contexts/AppContext";
 import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
 
+const SUPPORT_EMAIL = "support@uyirngo.in";
+
 function dashboardPathForRole(role?: string) {
   if (role === "hospital") return "/hospital-dashboard";
   if (role === "administrator" || role === "volunteer" || role === "super_admin") return "/admin";
@@ -38,7 +40,7 @@ export default function AdminLogin() {
       
       login(r.token, r.user);
       nav(dashboardPathForRole(r.user.role));
-    } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+    } catch (e: any) { setErr(`${e.message} ${lang === "ta" ? "பிரச்சனை தொடர்ந்தால், தொடர்பு கொள்ளவும்:" : "If the issue persists, contact:"} ${SUPPORT_EMAIL}`); } finally { setLoading(false); }
   }
 
   return (
@@ -144,7 +146,8 @@ export default function AdminLogin() {
         </div>
 
         <div className="mt-4 text-center text-xs text-slate-500">
-          {lang === "ta" ? "© 2026 UYIR. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை." : "© 2026 UYIR. All rights reserved."}
+          {lang === "ta" ? `© 2026 UYIR. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை. | கேள்விகள் இருக்கிறதா? ` : `© 2026 UYIR. All rights reserved. | Still having queries? `}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-uyir-600 hover:underline">{SUPPORT_EMAIL}</a>
         </div>
       </div>
     </div>
