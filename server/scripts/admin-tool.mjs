@@ -25,9 +25,9 @@ const pool = new Pool({
 async function listAdmins() {
   const { rows } = await pool.query(
     `SELECT "mobile","name","role", ("password" IS NOT NULL) AS "hasPassword"
-     FROM "User" WHERE "role" IN ('admin','verifier','ngo_admin','super_admin') ORDER BY "role"`
+     FROM "User" WHERE "role" IN ('administrator','volunteer','ngo','blood_bank','hospital','super_admin') ORDER BY "role"`
   );
-  if (!rows.length) { console.log("No admin/verifier/ngo_admin/super_admin users found."); return; }
+  if (!rows.length) { console.log("No admin users found."); return; }
   console.log("Existing privileged users:");
   for (const r of rows) console.log(`  [${r.role}] ${r.name} — ${r.mobile} (password set: ${r.hasPassword})`);
 }
@@ -42,14 +42,14 @@ async function createAdmin() {
   const hash = bcrypt.hashSync(password, 10);
   const existing = await pool.query('SELECT "id" FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   if (existing.rows.length) {
-    await pool.query('UPDATE "User" SET "role"=\'admin\', "password"=$1, "name"=$2 WHERE "mobile"=$3', [hash, name, mobile]);
-    console.log(`Updated existing user ${mobile} → role=admin, password reset.`);
+    await pool.query('UPDATE "User" SET "role"=\'super_admin\', "password"=$1, "name"=$2 WHERE "mobile"=$3', [hash, name, mobile]);
+    console.log(`Updated existing user ${mobile} → role=super_admin, password reset.`);
   } else {
     await pool.query(
-      'INSERT INTO "User" ("id","mobile","name","role","password","createdAt") VALUES (gen_random_uuid(),$1,$2,\'admin\',$3,NOW())',
+      'INSERT INTO "User" ("id","mobile","name","role","password","createdAt") VALUES (gen_random_uuid(),$1,$2,\'super_admin\',$3,NOW())',
       [mobile, name, hash]
     );
-    console.log(`Created new admin: ${name} — ${mobile}`);
+    console.log(`Created new super_admin: ${name} — ${mobile}`);
   }
   console.log(`Login: mobile=${mobile} password=${password}`);
 }
@@ -66,7 +66,7 @@ async function upgradeRole() {
     console.error("Mobile must be 10 digits");
     process.exit(1);
   }
-  const validRoles = ["admin", "verifier", "ngo_admin", "super_admin", "donor"];
+  const validRoles = ["administrator", "volunteer", "ngo", "blood_bank", "hospital", "super_admin", "donor"];
   if (!validRoles.includes(newRole)) {
     console.error(`Invalid role. Valid roles: ${validRoles.join(", ")}`);
     process.exit(1);

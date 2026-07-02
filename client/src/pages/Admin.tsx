@@ -1019,8 +1019,8 @@ export function Admin() {
                           }
                         }}
                       >
-                        <option value="">-- Select existing NGO --</option>
                         <option value="__new__">+ Create new NGO</option>
+                        {ngoOrganizations.length > 0 && <option value="">-- Select existing NGO --</option>}
                         {ngoOrganizations.map((n: any) => (
                           <option key={n.id} value={n.id}>{n.name} ({n.district})</option>
                         ))}
@@ -1030,7 +1030,7 @@ export function Admin() {
                       <>
                         <input
                           type="text"
-                          placeholder="NGO Name"
+                          placeholder="NGO Name *"
                           className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
                           value={adminForm.ngoName}
                           onChange={(e) => setAdminForm({ ...adminForm, ngoName: e.target.value })}
