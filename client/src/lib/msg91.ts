@@ -190,7 +190,7 @@ export async function retryWidgetOtp(): Promise<void> {
       return reject(new Error("OTP widget not ready"));
     }
     window.retryOtp(
-      null, // channel value (null for default configuration)
+      "SMS", // channel: SMS (can also be "WHATSAPP")
       () => { lastOtpSentAt = Date.now(); resolve(); },
       (error: any) => reject(new Error(error?.message || "Failed to resend OTP")),
       currentReqId || undefined

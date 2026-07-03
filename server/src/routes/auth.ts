@@ -135,7 +135,7 @@ authRouter.post("/reset-password", otpLimiter, asyncHandler(async (req: any, res
 authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: any) => {
   const schema = z.object({
     mobile: z.string().min(10), accessToken: z.string(),
-    name: z.string().optional(), role: z.enum(["donor","requester"]).optional(),
+    name: z.string().optional(), role: z.enum(["donor","requester","requestor"]).optional(),
     language: z.enum(["ta","en"]).optional(), password: z.string().min(4).optional(),
     age: z.number().optional(), bloodGroup: z.string().optional(), district: z.string().optional(),
     gender: z.enum(["male","female"]).optional(), isPlateletDonor: z.boolean().optional(),
@@ -146,8 +146,9 @@ authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: an
     console.log("[otp/verify] validation failed:", parse.error.flatten());
     return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   }
-  const { accessToken, name, role, language, password, age, bloodGroup, district, gender, isPlateletDonor, lat, lng } = parse.data;
+  const { accessToken, name, language, password, age, bloodGroup, district, gender, isPlateletDonor, lat, lng } = parse.data;
   const mobile = parse.data.mobile.replace(/\D/g, "").slice(-10);
+  const role = parse.data.role === "requestor" ? "requester" : parse.data.role;
 
   const verified = await verifyOtpForMobile(mobile, accessToken);
   if (!verified) {
