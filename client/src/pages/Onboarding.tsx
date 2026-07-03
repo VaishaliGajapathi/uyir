@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
-import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp } from "../lib/msg91";
+import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp, clearOtpReqId } from "../lib/msg91";
 import { useApp } from "../contexts/AppContext";
 import { Button, SearchableSelect } from "../components/ui";
 import type { Lang } from "../lib/constants";
@@ -145,6 +145,7 @@ export default function Onboarding() {
       
       const r = await api.verifyOtp(verifyData);
       console.log("[Onboarding] Backend response:", r);
+      clearOtpReqId();
       login(r.token, r.user);
       
       // Show appreciation for donors
@@ -181,6 +182,7 @@ export default function Onboarding() {
     try {
       const accessToken = await verifyWidgetOtp(otpCode);
       const r = await api.resetPassword(mobile, accessToken, password);
+      clearOtpReqId();
       setView("login");
       setPassword("");
       setOtpCode("");

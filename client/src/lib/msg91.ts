@@ -109,6 +109,11 @@ function formatIdentifier(mobile: string): string {
 // Initialize widget on module load
 void initWidget();
 
+// Clear the current OTP request ID (call after server confirms signup/login)
+export function clearOtpReqId() {
+  currentReqId = null;
+}
+
 // Send OTP using MSG91 custom UI
 export async function sendWidgetOtp(mobile: string): Promise<string> {
   const now = Date.now();
@@ -160,7 +165,6 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
         console.log("[msg91] verifyOtp success callback:", data);
         const accessToken = typeof data === "string" ? data : data?.message || data?.accessToken || data?.token;
         if (accessToken) {
-          currentReqId = null;
           console.log("[msg91] Access token extracted:", accessToken);
           resolve(accessToken);
         } else {
