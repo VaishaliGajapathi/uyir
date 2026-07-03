@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Database, MapPin, Phone, Droplet, Lock, Eye, Share2, Trash2, Mail, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Shield, Database, MapPin, Phone, Droplet, Lock, Eye, Share2, Trash2, Mail, Clock, CheckCircle, AlertTriangle, MessageCircle } from "lucide-react";
 import { useApp } from "../contexts/AppContext";
 import { Card } from "../components/ui";
 import { SiteNav } from "../components/SiteNav";
@@ -236,6 +236,34 @@ export function PrivacyPolicy() {
               </>
             )}
           </ul>
+
+          {/* Delete Data CTA */}
+          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Trash2 className="h-4 w-4 text-rose-600" />
+              <h4 className="text-sm font-bold text-rose-800">
+                {lang === "ta" ? "உங்கள் தரவை நீக்க விரும்புகிறீர்களா?" : "Want to Delete Your Data?"}
+              </h4>
+            </div>
+            <p className="text-xs text-rose-700 mb-3 leading-relaxed">
+              {lang === "ta"
+                ? "உங்கள் கணக்கு மற்றும் அனைத்து தனிப்பட்ட தகவல்களையும் நீக்க, கீழே உள்ள மூலம் எங்களை தொடர்பு கொள்ளவும். வேண்டுகோள் பெற்ற 30 நாட்களுக்குள் உங்கள் தரவு நீக்கப்படும்."
+                : "To request deletion of your account and all personal data, contact us using the options below. Your data will be removed within 30 days of receiving your request."}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a href="mailto:support@uyirngo.in?subject=Delete My Data - UYIR Account"
+                className="flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition">
+                <Mail className="h-4 w-4" />
+                {lang === "ta" ? "மின்னஞ்சல் அனுப்பு" : "Email Support"}
+              </a>
+              <a href="https://wa.me/919940874198?text=I%20want%20to%20delete%20my%20UYIR%20account%20and%20all%20my%20data"
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                <MessageCircle className="h-4 w-4" />
+                {lang === "ta" ? "WhatsApp செய்ய" : "WhatsApp Us"}
+              </a>
+            </div>
+          </div>
         </Card>
 
         {/* Data Retention */}
