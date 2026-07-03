@@ -29,6 +29,7 @@ const RateUs = lazy(() => import("./pages/RateUs"));
 const Ratings = lazy(() => import("./pages/Ratings"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
 const CampaignsPublic = lazy(() => import("./pages/CampaignsPublic"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 function dashboardPathForRole(user: User | null) {
   if (!user) return "/";
@@ -87,6 +88,7 @@ function Inner() {
         <Route path="/ratings" element={protectedElement(<Ratings />)} />
         <Route path="/campaigns" element={protectedElement(<Campaigns />)} />
         <Route path="/campaigns-public" element={<CampaignsPublic />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/home" element={user && (user.role === "administrator" || user.role === "volunteer" || user.role === "hospital" || user.role === "ngo" || user.role === "blood_bank" || user.role === "super_admin") ? <Navigate to={defaultDashboard} replace /> : protectedElement(<Home />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -71,6 +71,10 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-8 border-t border-white/20 pt-6 text-center">
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <Link to="/privacy-policy" className="text-xs text-uyir-100 hover:text-white transition">Privacy Policy</Link>
+            <Link to="/terms" className="text-xs text-uyir-100 hover:text-white transition">Terms & Conditions</Link>
+          </div>
           <p className="text-sm text-uyir-100 flex items-center justify-center gap-1">
             © 2026 UYIR - Tamil Nadu Blood & Platelet Emergency Network · Made with <Heart className="h-3 w-3 fill-white" /> for Tamil Nadu
           </p>

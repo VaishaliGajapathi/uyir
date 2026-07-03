@@ -324,10 +324,17 @@ export default function Onboarding() {
                       ? "நான் இந்த இரத்த தானதை இலவசமாக கொடுக்கிறேன், பணத்திற்காக இல்ல. இது ஒரு நல்ல நோக்கத்திற்காக மட்டுமே."
                       : "I pledge to donate blood voluntarily without any monetary compensation. This is for a noble cause to save lives."}
                   </label>
-                  <button type="button" onClick={() => setShowLegalInfo(true)}
-                    className="ml-1 text-xs font-semibold text-uyir-600 hover:underline">
-                    {lang === "ta" ? "மேலும் படிக்க" : "Read more"}
-                  </button>
+                  <div className="mt-0.5">
+                    <button type="button" onClick={() => setShowLegalInfo(true)}
+                      className="ml-1 text-xs font-semibold text-uyir-600 hover:underline">
+                      {lang === "ta" ? "மேலும் படிக்க" : "Read more"}
+                    </button>
+                    <span className="text-xs text-slate-400"> · </span>
+                    <button type="button" onClick={() => nav("/privacy-policy")}
+                      className="text-xs font-semibold text-uyir-600 hover:underline">
+                      {lang === "ta" ? "தனியுரிமை கொள்கை" : "Privacy Policy"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
