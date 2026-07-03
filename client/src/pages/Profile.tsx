@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle, Navigation, MapPin, X } from "lucide-react";
+import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle, Navigation, MapPin, X, Heart, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Card, Input, Badge, Sheet } from "../components/ui";
@@ -492,6 +492,9 @@ export function Profile() {
             support@uyirngo.in
           </a>
         </div>
+        <Button variant="outline" className="w-full" onClick={() => nav("/impact")}>
+          <TrendingUp className="h-4 w-4" /> {lang === "ta" ? "தாக்கம்" : "My Impact"}
+        </Button>
         <Button variant="outline" className="w-full" onClick={() => nav("/rate-us")}>
           <Award className="h-4 w-4" /> {lang === "ta" ? "எங்களை மதிப்பிடுங்கள்" : "Rate Us"}
         </Button>
