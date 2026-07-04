@@ -20,7 +20,8 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     district: z.union([z.string().min(2), z.null()]).optional(),
     taluk: z.union([z.string(), z.null()]).optional(),
     bloodGroup: z.union([z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]), z.null(), z.literal("")]).optional(),
-    gender: z.enum(["male", "female"]).optional(),
+    gender: z.union([z.enum(["male", "female"]), z.null()]).optional(),
+    age: z.union([z.number().int().min(18).max(100), z.null()]).optional(),
     isPlateletDonor: z.boolean().optional(),
     shareLocation: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
@@ -37,7 +38,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   }
 
-  const allowed = ["name","language","district","taluk","bloodGroup","gender","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","lat","lng"];
+  const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","lat","lng"];
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {

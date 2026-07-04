@@ -10,6 +10,7 @@ import { DonationCertificate } from "../components/DonationCertificate";
 const DISTRICTS = ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruppur", "Erode", "Trichy", "Namakkal", "Dindigul", "Tirunelveli", "Vellore", "Thanjavur", "Kancheepuram", "Krishnagiri", "Theni", "Virudhunagar", "Nilgiris"];
 
 function getMissingDonorFields(user: any, form: any, lang: "ta" | "en") {
+  if (user?.role !== "donor") return [];
   const fields: string[] = [];
   const name = String(form?.name ?? user?.name ?? "").trim();
   const bloodGroup = form?.bloodGroup ?? user?.bloodGroup;
@@ -88,6 +89,9 @@ export function Profile() {
       newForm.name !== user.name ||
       newForm.bloodGroup !== user.bloodGroup ||
       newForm.district !== user.district ||
+      newForm.gender !== user.gender ||
+      newForm.age !== user.age ||
+      newForm.isPlateletDonor !== user.isPlateletDonor ||
       newForm.lastDonationDate !== user.lastDonationDate ||
       newForm.notificationsEnabled !== user.notificationsEnabled ||
       newForm.voiceEnabled !== user.voiceEnabled ||
@@ -96,7 +100,7 @@ export function Profile() {
   };
 
   async function save() {
-    if (missingDonorFields.length > 0) {
+    if (user?.role === "donor" && missingDonorFields.length > 0) {
       alert(
         lang === "ta"
           ? `இந்த விவரங்கள் அவசியம்: ${missingDonorFields.join(", ")}`
@@ -316,7 +320,7 @@ export function Profile() {
 
         <div>
           <label className="mb-0.5 block text-sm font-medium text-slate-500">
-            {lang === "ta" ? "இரத்த வகை *" : "Blood Group *"}
+            {lang === "ta" ? "இரத்த வகை" : "Blood Group"}{user?.role === "donor" ? " *" : ""}
           </label>
           <select
             className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
@@ -328,12 +332,12 @@ export function Profile() {
               <option key={bg} value={bg}>{bg}</option>
             ))}
           </select>
-          <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>
+          {user?.role === "donor" && <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>}
         </div>
 
         <div>
           <label className="mb-0.5 block text-sm font-medium text-slate-500">
-            {lang === "ta" ? "மாவட்டம் *" : "District *"}
+            {lang === "ta" ? "மாவட்டம்" : "District"}{user?.role === "donor" ? " *" : ""}
           </label>
           <select
             className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
@@ -345,12 +349,12 @@ export function Profile() {
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
-          <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>
+          {user?.role === "donor" && <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>}
         </div>
 
         <div>
           <label className="mb-0.5 block text-sm font-medium text-slate-500">
-            {lang === "ta" ? "GPS / தற்போதைய இருப்பிடம் *" : "GPS / Current Location *"}
+            {lang === "ta" ? "GPS / தற்போதைய இருப்பிடம்" : "GPS / Current Location"}{user?.role === "donor" ? " *" : ""}
           </label>
           <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             {form.lat != null && form.lng != null ? (
@@ -376,6 +380,54 @@ export function Profile() {
           />
           <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தானம் செய்யவில்லை என்றால் விட்டுவிடவும்" : "Leave blank if never donated"}</p>
         </div>
+
+        <div>
+          <label className="mb-0.5 block text-sm font-medium text-slate-500">
+            {lang === "ta" ? "வயது" : "Age"}
+          </label>
+          <input
+            type="number"
+            min="18"
+            max="100"
+            className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
+            value={form.age ?? ""}
+            onChange={(e) => handleFormChange("age", e.target.value ? parseInt(e.target.value) : null)}
+          />
+        </div>
+
+        <div>
+          <label className="mb-0.5 block text-sm font-medium text-slate-500">
+            {lang === "ta" ? "பாலினம்" : "Gender"}
+          </label>
+          <select
+            className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
+            value={form.gender || ""}
+            onChange={(e) => handleFormChange("gender", e.target.value || null)}
+          >
+            <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
+            <option value="male">{lang === "ta" ? "ஆண்" : "Male"}</option>
+            <option value="female">{lang === "ta" ? "பெண்" : "Female"}</option>
+          </select>
+        </div>
+
+        {user?.role === "donor" && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-700">{lang === "ta" ? "ப்ளேட்லெட் தானர்" : "Platelet Donor"}</p>
+              <p className="text-[10px] text-slate-500">{lang === "ta" ? "ப்ளேட்லெட் தானத்திற்கு தயார்" : "Available for platelet donation"}</p>
+            </div>
+            <button
+              onClick={() => handleFormChange("isPlateletDonor", !form.isPlateletDonor)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                form.isPlateletDonor ? 'bg-uyir-600' : 'bg-slate-300'
+              }`}
+            >
+              <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                form.isPlateletDonor ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+        )}
 
         {(hasChanges || isDonorSetup) && (
           <Button className="w-full py-0.5 text-[9px]" loading={busy} onClick={save}>
