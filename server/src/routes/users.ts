@@ -15,21 +15,21 @@ usersRouter.get("/me", requireAuth, async (req: AuthedRequest, res: any) => {
 usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   console.log("[users/me PATCH] Request body keys:", Object.keys(req.body));
   const schema = z.object({
-    name: z.string().min(2).optional(),
+    name: z.union([z.string().min(2), z.null()]).optional(),
     language: z.enum(["ta", "en"]).optional(),
-    district: z.string().min(2).optional(),
-    taluk: z.string().optional(),
-    bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
+    district: z.union([z.string().min(2), z.null()]).optional(),
+    taluk: z.union([z.string(), z.null()]).optional(),
+    bloodGroup: z.union([z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]), z.null(), z.literal("")]).optional(),
     gender: z.enum(["male", "female"]).optional(),
     isPlateletDonor: z.boolean().optional(),
     shareLocation: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
     voiceEnabled: z.boolean().optional(),
     locationEnabled: z.boolean().optional(),
-    pincode: z.string().optional(),
+    pincode: z.union([z.string(), z.null()]).optional(),
     lastDonationDate: z.union([z.string(), z.null()]).optional(),
-    lat: z.number().optional(),
-    lng: z.number().optional(),
+    lat: z.union([z.number(), z.null()]).optional(),
+    lng: z.union([z.number(), z.null()]).optional(),
   }).passthrough();
   const parse = schema.safeParse(req.body);
   if (!parse.success) {
@@ -41,7 +41,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {
-    if (k in req.body) { sets.push(`"${k}" = $${sets.length + 1}`); vals.push(req.body[k]); }
+    if (k in req.body) { sets.push(`"${k}" = $${sets.length + 1}`); vals.push(req.body[k] ?? null); }
   }
   if ("lastDonationDate" in req.body && req.body.lastDonationDate) {
     sets.push(`"lastDonationDate" = $${sets.length + 1}`); vals.push(new Date(req.body.lastDonationDate));
