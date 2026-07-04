@@ -36,8 +36,13 @@ function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
 // the production MSG91 OTP Widget, which returns a signed access token. We
 // validate that token here against MSG91 — there is no demo/test bypass.
 async function verifyOtpForMobile(mobile: string, accessToken?: string): Promise<boolean> {
-  if (!accessToken) return false;
+  if (!accessToken) {
+    console.log("[otp] verifyOtpForMobile: no accessToken provided");
+    return false;
+  }
+  console.log("[otp] verifyOtpForMobile: calling verifyAccessToken for", mobile);
   const result = await verifyAccessToken(accessToken);
+  console.log("[otp] verifyOtpForMobile: result =", JSON.stringify(result));
   if (!result.ok) return false;
   // If MSG91 returns the verified identifier, ensure it matches the mobile.
   if (result.mobile && result.mobile !== mobile) {
@@ -155,6 +160,7 @@ authRouter.post("/otp/verify", otpLimiter, asyncHandler(async (req: any, res: an
     console.log(`[otp/verify] verification failed for ${mobile}`);
     return res.status(400).json({ error: "Invalid or expired OTP" });
   }
+  console.log(`[otp/verify] OTP verified for ${mobile}, creating/updating user`);
 
   let user = await queryOne<any>('SELECT * FROM "User" WHERE "mobile" = $1 LIMIT 1', [mobile]);
   const hashedPassword = password ? await bcrypt.hash(password, 10) : null;

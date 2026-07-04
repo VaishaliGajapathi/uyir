@@ -162,8 +162,13 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
     window.verifyOtp(
       otp,
       (data: any) => {
-        console.log("[msg91] verifyOtp success callback:", data);
-        const accessToken = typeof data === "string" ? data : data?.message || data?.accessToken || data?.token;
+        console.log("[msg91] verifyOtp success callback (raw):", JSON.stringify(data));
+        const accessToken =
+          typeof data === "string" ? data :
+          typeof data === "object" && data !== null ?
+            (data.accessToken || data.access_token || data.token || data.message || data.data || (typeof data.verifiedToken === "string" ? data.verifiedToken : undefined)) :
+            undefined;
+        console.log("[msg91] Extracted accessToken:", accessToken ? accessToken.substring(0, 20) + "..." : "NONE");
         if (accessToken) {
           console.log("[msg91] Access token extracted:", accessToken);
           resolve(accessToken);
@@ -194,7 +199,7 @@ export async function retryWidgetOtp(): Promise<void> {
       return reject(new Error("OTP widget not ready"));
     }
     window.retryOtp(
-      "SMS", // channel: SMS (can also be "WHATSAPP")
+      null, // channel: null for default widget config, '11' for SMS, '12' for WhatsApp
       () => { lastOtpSentAt = Date.now(); resolve(); },
       (error: any) => reject(new Error(error?.message || "Failed to resend OTP")),
       currentReqId || undefined

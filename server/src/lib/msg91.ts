@@ -30,11 +30,13 @@ export async function verifyAccessToken(accessToken: string): Promise<AccessToke
     });
 
     const data = await response.json();
+    console.log("[msg91/server] verifyAccessToken response:", JSON.stringify(data));
 
     if (data.type === "success") {
       // data.message typically contains the verified identifier (mobile/email)
       const mobile =
         typeof data.message === "string" ? data.message.replace(/\D/g, "").slice(-10) : undefined;
+      console.log("[msg91/server] Token verified, mobile:", mobile);
       return { ok: true, mobile };
     }
 
