@@ -88,10 +88,10 @@ requestsRouter.get("/", optionalAuth, async (req: AuthedRequest, res: any) => {
     if (status) { conditions.push(`"status" = $${params.length + 1}`); params.push(status); }
     if (!isPrivilegedViewer(viewer?.role)) {
       if (viewer?.id) {
-        conditions.push(`("status" IN ('verified','alert_sent','donor_accepted','completed','life_saved') OR "createdById" = $${params.length + 1})`);
+        conditions.push(`("status" IN ('verified','alert_sent','donor_accepted') OR "createdById" = $${params.length + 1})`);
         params.push(viewer.id);
       } else {
-        conditions.push(`"status" IN ('verified','alert_sent','donor_accepted','completed','life_saved')`);
+        conditions.push(`"status" IN ('verified','alert_sent','donor_accepted')`);
       }
     }
   }
