@@ -1,4 +1,9 @@
-export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+export const BLOOD_GROUPS = [
+  "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-",
+  "A1+", "A1-", "A1B+", "A1B-",
+  "A2+", "A2-", "A2B+", "A2B-",
+  "Bombay (Oh)", "Unknown",
+];
 
 export const TN_DISTRICTS = [
   "Ariyalur",

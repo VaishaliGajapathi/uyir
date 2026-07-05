@@ -189,7 +189,11 @@ export default function CampaignsPublic() {
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      {partnerIcon(c.partnerType)}
+                      {c.hostLogoUrl ? (
+                        <img src={c.hostLogoUrl} alt={partnerLabel(c)} className="h-6 w-6 rounded-full object-cover border border-slate-200" />
+                      ) : (
+                        partnerIcon(c.partnerType)
+                      )}
                       <span>{partnerLabel(c)}</span>
                     </div>
                     {c.expectedDonors > 0 && (

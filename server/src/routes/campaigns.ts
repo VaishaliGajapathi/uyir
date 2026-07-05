@@ -135,7 +135,7 @@ campaignsRouter.post("/", requireAdminOrVolunteer, asyncHandler(async (req: Auth
     title, description, venue, district, address,
     startDate, endDate, startTime, endTime,
     partnerType, hospitalId, hospitalName, ngoId, ngoName, bloodBankId, bloodBankName,
-    contactPerson, contactPhone, expectedDonors, imageUrl,
+    contactPerson, contactPhone, expectedDonors, imageUrl, hostLogoUrl,
   } = req.body;
 
   if (!title || !venue || !district || !startDate || !endDate) {
@@ -143,14 +143,14 @@ campaignsRouter.post("/", requireAdminOrVolunteer, asyncHandler(async (req: Auth
   }
 
   const campaign = await queryOne<any>(
-    `INSERT INTO "Campaign" ("title","description","venue","district","address","startDate","endDate","startTime","endTime","partnerType","hospitalId","hospitalName","ngoId","ngoName","bloodBankId","bloodBankName","contactPerson","contactPhone","expectedDonors","imageUrl","status","createdById","createdAt","updatedAt")
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'active',$21,NOW(),NOW()) RETURNING *`,
+    `INSERT INTO "Campaign" ("title","description","venue","district","address","startDate","endDate","startTime","endTime","partnerType","hospitalId","hospitalName","ngoId","ngoName","bloodBankId","bloodBankName","contactPerson","contactPhone","expectedDonors","imageUrl","hostLogoUrl","status","createdById","createdAt","updatedAt")
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'active',$22,NOW(),NOW()) RETURNING *`,
     [
       title, description || null, venue, district, address || null,
       startDate, endDate, startTime || null, endTime || null,
       partnerType || "hospital", hospitalId || null, hospitalName || null,
       ngoId || null, ngoName || null, bloodBankId || null, bloodBankName || null,
-      contactPerson || null, contactPhone || null, expectedDonors || 0, imageUrl || null,
+      contactPerson || null, contactPhone || null, expectedDonors || 0, imageUrl || null, hostLogoUrl || null,
       req.userId,
     ]
   );
@@ -163,7 +163,7 @@ campaignsRouter.patch("/:id", requireAdminOrVolunteer, asyncHandler(async (req: 
     title, description, venue, district, address,
     startDate, endDate, startTime, endTime,
     partnerType, hospitalId, hospitalName, ngoId, ngoName, bloodBankId, bloodBankName,
-    contactPerson, contactPhone, expectedDonors, collectedUnits, registeredDonors, imageUrl,
+    contactPerson, contactPhone, expectedDonors, collectedUnits, registeredDonors, imageUrl, hostLogoUrl,
   } = req.body;
 
   const updates: string[] = [];
@@ -198,6 +198,7 @@ campaignsRouter.patch("/:id", requireAdminOrVolunteer, asyncHandler(async (req: 
   addUpdate("collectedUnits", collectedUnits);
   addUpdate("registeredDonors", registeredDonors);
   addUpdate("imageUrl", imageUrl);
+  addUpdate("hostLogoUrl", hostLogoUrl);
 
   if (updates.length === 0) return res.status(400).json({ error: "No fields to update" });
 

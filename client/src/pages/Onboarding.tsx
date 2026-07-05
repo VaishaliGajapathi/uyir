@@ -6,7 +6,7 @@ import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp, clearOtpReqId } from ".
 import { useApp } from "../contexts/AppContext";
 import { Button, SearchableSelect } from "../components/ui";
 import type { Lang } from "../lib/constants";
-import { TN_DISTRICTS } from "../lib/constants";
+import { TN_DISTRICTS, BLOOD_GROUPS } from "../lib/constants";
 
 const SUPPORT_EMAIL = "support@uyirngo.in";
 
@@ -460,14 +460,7 @@ export default function Onboarding() {
                   className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
                 >
                   <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                  <option value="A+">A+</option>
-                  <option value="A-">A-</option>
-                  <option value="B+">B+</option>
-                  <option value="B-">B-</option>
-                  <option value="AB+">AB+</option>
-                  <option value="AB-">AB-</option>
-                  <option value="O+">O+</option>
-                  <option value="O-">O-</option>
+                  {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
                 </select>
               </div>
 

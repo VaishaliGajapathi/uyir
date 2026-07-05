@@ -25,7 +25,7 @@ function canManageRequest(request: any, req: AuthedRequest) {
 const createSchema = z.object({
   patientName: z.string().min(2),
   patientAge: z.number().int().min(0).max(120).optional(),
-  bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]),
+  bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "A1+", "A1-", "A1B+", "A1B-", "A2+", "A2-", "A2B+", "A2B-", "Bombay (Oh)", "Unknown"]),
   componentType: z.enum(["whole_blood", "platelets", "plasma"]).default("whole_blood"),
   unitsRequired: z.number().int().min(1).max(20),
   hospitalName: z.string().min(2),

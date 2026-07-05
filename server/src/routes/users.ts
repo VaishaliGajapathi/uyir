@@ -19,7 +19,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     language: z.enum(["ta", "en"]).optional(),
     district: z.union([z.string().min(2), z.null()]).optional(),
     taluk: z.union([z.string(), z.null()]).optional(),
-    bloodGroup: z.union([z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]), z.null(), z.literal("")]).optional(),
+    bloodGroup: z.union([z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "A1+", "A1-", "A1B+", "A1B-", "A2+", "A2-", "A2B+", "A2B-", "Bombay (Oh)", "Unknown"]), z.null(), z.literal("")]).optional(),
     gender: z.union([z.enum(["male", "female"]), z.null()]).optional(),
     age: z.union([z.number().int().min(18).max(100), z.null()]).optional(),
     isPlateletDonor: z.boolean().optional(),
