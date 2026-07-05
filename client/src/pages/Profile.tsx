@@ -4,10 +4,8 @@ import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Card, Input, Badge, Sheet } from "../components/ui";
-import { BLOOD_GROUPS, t } from "../lib/constants";
+import { BLOOD_GROUPS, TN_DISTRICTS, t } from "../lib/constants";
 import { DonationCertificate } from "../components/DonationCertificate";
-
-const DISTRICTS = ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruppur", "Erode", "Trichy", "Namakkal", "Dindigul", "Tirunelveli", "Vellore", "Thanjavur", "Kancheepuram", "Krishnagiri", "Theni", "Virudhunagar", "Nilgiris"];
 
 function getMissingDonorFields(user: any, form: any, lang: "ta" | "en") {
   if (user?.role !== "donor") return [];
@@ -148,7 +146,7 @@ export function Profile() {
         const addr = data?.address || {};
         const rawDistrict = addr.county || addr.state_district || addr.city_district || addr.city || addr.town || "";
         const rawText = [rawDistrict, data?.display_name, addr.state, addr.county, addr.city, addr.town].filter(Boolean).join(" ");
-        const matchedDistrict = DISTRICTS.find((item) => rawText.toLowerCase().includes(item.toLowerCase()));
+        const matchedDistrict = TN_DISTRICTS.find((item) => rawText.toLowerCase().includes(item.toLowerCase()));
         district = matchedDistrict || "";
         taluk = addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || "";
         pincode = addr.postcode || "";
@@ -345,7 +343,7 @@ export function Profile() {
             onChange={(e) => handleFormChange("district", e.target.value)}
           >
             <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-            {DISTRICTS.map((d) => (
+            {TN_DISTRICTS.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>

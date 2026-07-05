@@ -4,9 +4,7 @@ import { Building2, Phone, MapPin, User, Lock } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
 import { Button, Card, Input } from "../components/ui";
-import { BLOOD_GROUPS, t } from "../lib/constants";
-
-const DISTRICTS = ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruppur", "Erode", "Trichy", "Namakkal", "Dindigul", "Tirunelveli", "Vellore", "Thanjavur", "Kancheepuram", "Krishnagiri", "Theni", "Virudhunagar", "Nilgiris"];
+import { BLOOD_GROUPS, TN_DISTRICTS, t } from "../lib/constants";
 
 export default function HospitalRegister() {
   const { login, lang } = useApp();
@@ -96,7 +94,7 @@ export default function HospitalRegister() {
                 onChange={(e) => setForm({ ...form, district: e.target.value })}
               >
                 <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                {DISTRICTS.map((d) => (
+                {TN_DISTRICTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
