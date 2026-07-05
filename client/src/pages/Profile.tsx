@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { LogOut, Award, MessageCircle, Bug, Bell, User, Phone, Calendar, Droplet, CheckCircle, AlertTriangle, Navigation, MapPin, X, Heart, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../contexts/AppContext";
-import { Button, Card, Input, Badge, Sheet } from "../components/ui";
+import { Button, Card, Input, Badge, Sheet, SearchableSelect } from "../components/ui";
 import { BLOOD_GROUPS, TN_DISTRICTS, t } from "../lib/constants";
 import { DonationCertificate } from "../components/DonationCertificate";
 
@@ -334,19 +334,13 @@ export function Profile() {
         </div>
 
         <div>
-          <label className="mb-0.5 block text-sm font-medium text-slate-500">
-            {lang === "ta" ? "மாவட்டம்" : "District"}{user?.role === "donor" ? " *" : ""}
-          </label>
-          <select
-            className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm"
+          <SearchableSelect
+            label={`${lang === "ta" ? "மாவட்டம்" : "District"}${user?.role === "donor" ? " *" : ""}`}
+            options={TN_DISTRICTS}
             value={form.district || ""}
-            onChange={(e) => handleFormChange("district", e.target.value)}
-          >
-            <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-            {TN_DISTRICTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+            onChange={(v) => handleFormChange("district", v)}
+            placeholder={lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}
+          />
           {user?.role === "donor" && <p className="mt-1 text-[10px] text-slate-500">{lang === "ta" ? "தேவையானது" : "Required"}</p>}
         </div>
 
