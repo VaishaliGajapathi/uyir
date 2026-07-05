@@ -83,7 +83,6 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmTokenUpdatedAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "hospitalType" TEXT');
-  await exec('ALTER TABLE "Campaign" ADD COLUMN IF NOT EXISTS "hostLogoUrl" TEXT');
   await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
   await exec('CREATE INDEX IF NOT EXISTS idx_blood_request_expiry ON "BloodRequest" ("expiresAt", "status") WHERE "expiresAt" IS NOT NULL');
   await exec(`
@@ -213,6 +212,7 @@ async function ensureRuntimeSchema() {
       CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
     )
   `);
+  await exec('ALTER TABLE "Campaign" ADD COLUMN IF NOT EXISTS "hostLogoUrl" TEXT');
 }
 
 const allowedOrigins = [
