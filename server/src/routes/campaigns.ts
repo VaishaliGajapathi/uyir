@@ -44,7 +44,7 @@ campaignsRouter.get("/", asyncHandler(async (req: AuthedRequest, res: Response) 
 // GET /campaigns/upcoming - public upcoming campaigns
 campaignsRouter.get("/upcoming", asyncHandler(async (_req: AuthedRequest, res: Response) => {
   const campaigns = await query<any>(
-    `SELECT * FROM "Campaign" WHERE "status" = 'active' AND "startDate" > (NOW() AT TIME ZONE 'Asia/Kolkata') ORDER BY "startDate" ASC`
+    `SELECT * FROM "Campaign" WHERE "status" = 'active' AND "endDate" >= (NOW() AT TIME ZONE 'Asia/Kolkata') ORDER BY "startDate" ASC`
   );
   res.json(campaigns);
 }));
@@ -104,7 +104,7 @@ campaignsRouter.get("/analytics/summary", requireAdminOrVolunteer, asyncHandler(
   const totalRegistered = await queryOne<any>(`SELECT COALESCE(SUM("registeredDonors"),0)::int as cnt FROM "Campaign"`);
 
   const upcomingCount = await queryOne<any>(
-    `SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'active' AND "startDate" > (NOW() AT TIME ZONE 'Asia/Kolkata')`
+    `SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'active' AND "endDate" >= (NOW() AT TIME ZONE 'Asia/Kolkata')`
   );
 
   const monthlyTrend = await query<any>(
