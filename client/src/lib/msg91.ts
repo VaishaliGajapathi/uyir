@@ -18,6 +18,7 @@ declare global {
 
 let initPromise: Promise<void> | null = null;
 let currentReqId: string | null = null;
+let verifiedAccessToken: string | null = null;
 let lastOtpSentAt = 0;
 const OTP_COOLDOWN_MS = 60000; // 60 second cooldown between OTP sends
 
@@ -112,6 +113,7 @@ void initWidget();
 // Clear the current OTP request ID (call after server confirms signup/login)
 export function clearOtpReqId() {
   currentReqId = null;
+  verifiedAccessToken = null;
 }
 
 // Send OTP using MSG91 custom UI
@@ -141,6 +143,7 @@ export async function sendWidgetOtp(mobile: string): Promise<string> {
         lastOtpSentAt = Date.now();
         // Store reqId for verify/retry
         currentReqId = typeof data === "string" ? data : data?.reqId || data?.requestId;
+        verifiedAccessToken = null;
         resolve(currentReqId || "sent");
       },
       (error: any) => {
@@ -153,6 +156,7 @@ export async function sendWidgetOtp(mobile: string): Promise<string> {
 
 // Verify OTP using MSG91 custom UI
 export async function verifyWidgetOtp(otp: string): Promise<string> {
+  if (verifiedAccessToken) return verifiedAccessToken;
   await initWidget();
   return new Promise<string>((resolve, reject) => {
     if (typeof window.verifyOtp !== "function") {
@@ -173,6 +177,7 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
         console.log("[msg91] Extracted accessToken:", accessToken ? accessToken.substring(0, 20) + "..." : "NONE");
         if (accessToken) {
           console.log("[msg91] Access token extracted:", accessToken);
+          verifiedAccessToken = accessToken;
           resolve(accessToken);
         } else {
           console.error("[msg91] No access token in response:", data);
@@ -181,7 +186,12 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
       },
       (error: any) => {
         console.error("[msg91] verifyOtp error callback:", error);
-        reject(new Error(error?.message || "Invalid OTP"));
+        const message = String(error?.message || error || "Invalid OTP");
+        if (verifiedAccessToken && message.toLowerCase().includes("already verified")) {
+          resolve(verifiedAccessToken);
+          return;
+        }
+        reject(new Error(message.toLowerCase().includes("already verified") ? "OTP was already verified. Please resend OTP and try again." : message));
       },
       currentReqId || undefined
     );
