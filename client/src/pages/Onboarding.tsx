@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Phone, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { api } from "../lib/api";
 import { sendWidgetOtp, verifyWidgetOtp, retryWidgetOtp, clearOtpReqId } from "../lib/msg91";
 import { useApp } from "../contexts/AppContext";
-import { Button, SearchableSelect } from "../components/ui";
+import { Button } from "../components/ui";
 import type { Lang } from "../lib/constants";
-import { TN_DISTRICTS, BLOOD_GROUPS } from "../lib/constants";
 
 const SUPPORT_EMAIL = "support@uyirngo.in";
 
@@ -25,7 +24,7 @@ function dashboardPathForRole(role?: string) {
 export default function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
-  const [view, setView] = useState<"login" | "signup" | "signup-role" | "signup-donor" | "forgot" | "reset">("login");
+  const [view, setView] = useState<"login" | "signup" | "signup-role" | "forgot" | "reset">("login");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -37,16 +36,7 @@ export default function Onboarding() {
   const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
   const [otpCode, setOtpCode] = useState("");
   const [signupRole, setSignupRole] = useState<"donor" | "requestor" | null>(null);
-  const [donorDetails, setDonorDetails] = useState({
-    age: "",
-    bloodGroup: "",
-    district: "",
-    gender: "",
-    isPlateletDonor: false,
-  });
   const [showAppreciation, setShowAppreciation] = useState(false);
-  const [capturingLocation, setCapturingLocation] = useState(false);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   async function handleLogin() {
     setErr(""); setLoading(true);
@@ -55,25 +45,6 @@ export default function Onboarding() {
       login(r.token, r.user);
       nav(dashboardPathForRole(r.user.role));
     } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
-  }
-
-  async function captureLocation() {
-    setCapturingLocation(true);
-    setErr("");
-    try {
-      if (!navigator.geolocation) {
-        setErr(lang === "ta" ? "புவியியல் இருப்பிடம் ஆதரிக்கப்படவில்லை" : "Geolocation not supported");
-        return;
-      }
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
-      });
-      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    } catch (e: any) {
-      setErr(lang === "ta" ? "இருப்பிடத்தை பெற முடியவில்லை" : "Could not get location");
-    } finally {
-      setCapturingLocation(false);
-    }
   }
 
   async function handleSignup() {
@@ -88,12 +59,7 @@ export default function Onboarding() {
 
   async function handleRoleSelection(role: "donor" | "requestor") {
     setSignupRole(role);
-    if (role === "donor") {
-      setView("signup-donor");
-    } else {
-      // Requestor - proceed to OTP
-      await requestOtpAndSend();
-    }
+    await requestOtpAndSend();
   }
 
   async function requestOtpAndSend() {
@@ -110,15 +76,6 @@ export default function Onboarding() {
     } catch (e: any) { setErr(withSupport(e.message, lang)); } finally { setLoading(false); }
   }
 
-  async function handleDonorSignup() {
-    setErr("");
-    if (!donorDetails.age || !donorDetails.bloodGroup || !donorDetails.district || !donorDetails.gender) {
-      setErr(lang === "ta" ? "அனைத்து தகவல்களையும் உள்ளிடவும்" : "Please fill all required fields");
-      return;
-    }
-    await requestOtpAndSend();
-  }
-
   async function verifySignup() {
     if (!otpCode || otpCode.length < 4) { setErr("Please enter the OTP."); return; }
     setErr(""); setLoading(true);
@@ -129,19 +86,6 @@ export default function Onboarding() {
       console.log("[Onboarding] Calling backend verifyOtp...");
       
       const verifyData: any = { mobile, accessToken, name, role: signupRole || "donor", language: lang, password };
-      
-      // Add donor details if signing up as donor
-      if (signupRole === "donor") {
-        verifyData.age = parseInt(donorDetails.age);
-        verifyData.bloodGroup = donorDetails.bloodGroup;
-        verifyData.district = donorDetails.district;
-        verifyData.gender = donorDetails.gender;
-        verifyData.isPlateletDonor = donorDetails.isPlateletDonor;
-        if (location) {
-          verifyData.lat = location.lat;
-          verifyData.lng = location.lng;
-        }
-      }
       
       const r = await api.verifyOtp(verifyData);
       console.log("[Onboarding] Backend response:", r);
@@ -395,39 +339,23 @@ export default function Onboarding() {
                 {lang === "ta" ? "இரத்ததானம் செய்ய விரும்புகிறீர்களா அல்லது இரத்தம் கேட்க விரும்புகிறீர்களா?" : "Do you want to donate blood or request blood?"}
               </p>
 
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleRoleSelection("donor")}
-                  className="w-full rounded-lg border-2 border-uyir-600 bg-uyir-50 p-4 text-left hover:bg-uyir-100 transition"
+                  disabled={loading}
+                  className="rounded-xl border-2 border-uyir-600 bg-uyir-50 px-3 py-4 text-center transition hover:bg-uyir-100 disabled:opacity-60"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-uyir-600 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{lang === "ta" ? "இரத்த தானம்" : "Blood Donor"}</p>
-                      <p className="text-xs text-slate-500">{lang === "ta" ? "உயிர்களைக் காப்பாற்ற உதவுங்கள்" : "Help save lives by donating blood"}</p>
-                    </div>
-                  </div>
+                  <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்த தானம்" : "Blood Donor"}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "உயிர்களைக் காப்பாற்ற உதவுங்கள்" : "Help save lives"}</p>
                 </button>
 
                 <button
                   onClick={() => handleRoleSelection("requestor")}
-                  className="w-full rounded-lg border-2 border-slate-300 bg-slate-50 p-4 text-left hover:bg-slate-100 transition"
+                  disabled={loading}
+                  className="rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-4 text-center transition hover:bg-slate-100 disabled:opacity-60"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-600 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{lang === "ta" ? "இரத்தம் கேட்பவர்" : "Blood Requestor"}</p>
-                      <p className="text-xs text-slate-500">{lang === "ta" ? "இரத்தம் தேவைப்படும்போது கோருங்கள்" : "Request blood when you need it"}</p>
-                    </div>
-                  </div>
+                  <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்தம் கேட்பவர்" : "Blood Requestor"}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "இரத்தம் தேவைப்படும்போது" : "Request blood"}</p>
                 </button>
               </div>
 
@@ -435,90 +363,6 @@ export default function Onboarding() {
                 className="w-full text-xs text-slate-400">
                 {lang === "ta" ? "திரும்பு" : "Back"}
               </button>
-            </div>
-          )}
-
-          {/* Donor Details View */}
-          {view === "signup-donor" && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "தானம் விவரங்கள்" : "Donor Details"}</h2>
-              <p className="text-center text-sm text-slate-500">
-                {lang === "ta" ? "உங்கள் இரத்த தானம் விவரங்களை உள்ளிடவும்" : "Please provide your blood donation details"}
-              </p>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "வயது" : "Age"}</label>
-                <input type="number" placeholder="18-65" min="18" max="65"
-                  value={donorDetails.age} onChange={(e) => setDonorDetails({ ...donorDetails, age: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500" />
-              </div>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "இரத்த வகை" : "Blood Group"}</label>
-                <select
-                  value={donorDetails.bloodGroup} onChange={(e) => setDonorDetails({ ...donorDetails, bloodGroup: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
-                >
-                  <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                  {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "மாவட்டம்" : "District"}</label>
-                <SearchableSelect
-                  options={TN_DISTRICTS}
-                  value={donorDetails.district}
-                  onChange={(v) => setDonorDetails({ ...donorDetails, district: v })}
-                  placeholder={lang === "ta" ? "உங்கள் மாவட்டம்" : "Your district"}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm h-12"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "பாலினம்" : "Gender"}</label>
-                <select
-                  value={donorDetails.gender} onChange={(e) => setDonorDetails({ ...donorDetails, gender: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500"
-                >
-                  <option value="">{lang === "ta" ? "தேர்வு செய்யவும்" : "Select"}</option>
-                  <option value="male">{lang === "ta" ? "ஆண்" : "Male"}</option>
-                  <option value="female">{lang === "ta" ? "பெண்" : "Female"}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-slate-600">{lang === "ta" ? "இருப்பிடம்" : "Location"}</label>
-                <button
-                  type="button"
-                  onClick={captureLocation}
-                  disabled={capturingLocation}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-uyir-500 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
-                >
-                  {capturingLocation ? (lang === "ta" ? "பெறுகிறது..." : "Getting location...") : location ? (lang === "ta" ? "இருப்பிடம் பெறப்பட்டது ✓" : "Location captured ✓") : (lang === "ta" ? "இருப்பிடத்தை பெறவும்" : "Get Location")}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="platelet" checked={donorDetails.isPlateletDonor}
-                  onChange={(e) => setDonorDetails({ ...donorDetails, isPlateletDonor: e.target.checked })}
-                  className="h-4 w-4 rounded border-slate-300 text-uyir-600 focus:ring-uyir-500" />
-                <label htmlFor="platelet" className="text-xs text-slate-600">
-                  {lang === "ta" ? "பிளேட்லெட் தானம் செய்ய விரும்புகிறேன்" : "I'm willing to donate platelets"}
-                </label>
-              </div>
-
-              <Button className="w-full" size="md" loading={loading}
-                onClick={handleDonorSignup}>
-                {lang === "ta" ? "தொடர்க" : "Continue"}
-              </Button>
-
-              <button onClick={() => { setView("signup-role"); setErr(""); }}
-                className="w-full text-xs text-slate-400">
-                {lang === "ta" ? "திரும்பு" : "Back"}
-              </button>
-
-              {err && <p className="text-center text-xs text-red-500">{err}</p>}
             </div>
           )}
 
