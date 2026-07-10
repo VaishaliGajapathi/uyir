@@ -169,10 +169,13 @@ export async function verifyWidgetOtp(otp: string): Promise<string> {
         console.log("[msg91] verifyOtp success callback (raw):", JSON.stringify(data));
         // MSG91 widget returns the access token as a string or in specific fields.
         // Do NOT use data.message — that's typically a human-readable string like "OTP Verified".
+        const nested = typeof data?.data === "object" && data.data !== null ? data.data : null;
         const accessToken =
           typeof data === "string" ? data :
           typeof data === "object" && data !== null ?
-            (data.accessToken || data.access_token || data.token || (typeof data.data === "string" ? data.data : undefined) || (typeof data.verifiedToken === "string" ? data.verifiedToken : undefined)) :
+            (data.accessToken || data.access_token || data["access-token"] || data.token || data.verifiedToken ||
+              (typeof data.data === "string" ? data.data : undefined) ||
+              nested?.accessToken || nested?.access_token || nested?.["access-token"] || nested?.token || nested?.verifiedToken) :
             undefined;
         console.log("[msg91] Extracted accessToken:", accessToken ? accessToken.substring(0, 20) + "..." : "NONE");
         if (accessToken) {
