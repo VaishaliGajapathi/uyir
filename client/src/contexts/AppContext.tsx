@@ -56,12 +56,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    api.aiStatus().then(setAiStatus).catch(() => {});
     if (getToken()) refreshUser().finally(() => setLoading(false));
     else setLoading(false);
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+    api.aiStatus().then(setAiStatus).catch(() => {});
     void syncNativePush(user);
   }, [user]);
 

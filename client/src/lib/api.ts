@@ -2,6 +2,9 @@ const configuredBase = import.meta.env.VITE_API_URL || "/api";
 const BASE = configuredBase.endsWith("/api") || configuredBase === "/api" ? configuredBase : `${configuredBase.replace(/\/$/, "")}/api`;
 
 let token: string | null = localStorage.getItem("uyir_token");
+const GET_CACHE_TTL_MS = 15000;
+const REQUEST_TIMEOUT_MS = 20000;
+const getCache = new Map<string, { expires: number; promise: Promise<any> }>();
 
 export function setToken(t: string | null) {
   token = t;
@@ -14,27 +17,45 @@ export function getToken() {
 }
 
 async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+  const method = (opts.method || "GET").toUpperCase();
+  const cacheKey = method === "GET" && !token ? path : "";
+  const cached = cacheKey ? getCache.get(cacheKey) : undefined;
+  if (cached && cached.expires > Date.now()) return cached.promise;
+
   const headers: Record<string, string> = { ...(opts.headers as any) };
   if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
-  const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("text/html")) {
-    throw new Error("API returned HTML instead of JSON. Backend may be unreachable.");
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    let message: string;
-    if (typeof err.error === "string") {
-      message = err.error;
-    } else if (err.error) {
-      message = JSON.stringify(err.error);
-    } else {
-      message = `Request failed (${res.status})`;
-    }
-    throw new Error(message);
-  }
-  return res.status === 204 ? (null as any) : res.json();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const request = fetch(`${BASE}${path}`, { ...opts, headers, signal: controller.signal })
+    .then(async (res) => {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        throw new Error("API returned HTML instead of JSON. Backend may be unreachable.");
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        let message: string;
+        if (typeof err.error === "string") {
+          message = err.error;
+        } else if (err.error) {
+          message = JSON.stringify(err.error);
+        } else {
+          message = `Request failed (${res.status})`;
+        }
+        throw new Error(message);
+      }
+      return res.status === 204 ? (null as any) : res.json();
+    })
+    .catch((e: any) => {
+      if (e?.name === "AbortError") throw new Error("Request timed out. Please check your network and try again.");
+      throw e;
+    })
+    .finally(() => clearTimeout(timeoutId));
+
+  if (cacheKey) getCache.set(cacheKey, { expires: Date.now() + GET_CACHE_TTL_MS, promise: request });
+  return request;
 }
 
 export interface User {

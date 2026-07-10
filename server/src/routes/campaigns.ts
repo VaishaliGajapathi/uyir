@@ -78,51 +78,50 @@ campaignsRouter.get("/:id", asyncHandler(async (req: AuthedRequest, res: Respons
 
 // GET /campaigns/analytics/summary - admin analytics
 campaignsRouter.get("/analytics/summary", requireAdminOrVolunteer, asyncHandler(async (_req: AuthedRequest, res: Response) => {
-  const total = await queryOne<any>(`SELECT COUNT(*)::int as cnt FROM "Campaign"`);
-  const active = await queryOne<any>(`SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'active'`);
-  const paused = await queryOne<any>(`SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'paused'`);
-  const cancelled = await queryOne<any>(`SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'cancelled'`);
-  const completed = await queryOne<any>(`SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'completed'`);
-
-  const byDistrict = await query<any>(
-    `SELECT "district", COUNT(*)::int as cnt,
-            SUM("expectedDonors")::int as "expectedDonors",
-            SUM("collectedUnits")::int as "collectedUnits",
-            SUM("registeredDonors")::int as "registeredDonors"
-     FROM "Campaign" GROUP BY "district" ORDER BY cnt DESC`
-  );
-
-  const byPartnerType = await query<any>(
-    `SELECT "partnerType", COUNT(*)::int as cnt,
-            SUM("expectedDonors")::int as "expectedDonors",
-            SUM("collectedUnits")::int as "collectedUnits"
-     FROM "Campaign" GROUP BY "partnerType" ORDER BY cnt DESC`
-  );
-
-  const totalExpected = await queryOne<any>(`SELECT COALESCE(SUM("expectedDonors"),0)::int as cnt FROM "Campaign"`);
-  const totalCollected = await queryOne<any>(`SELECT COALESCE(SUM("collectedUnits"),0)::int as cnt FROM "Campaign"`);
-  const totalRegistered = await queryOne<any>(`SELECT COALESCE(SUM("registeredDonors"),0)::int as cnt FROM "Campaign"`);
-
-  const upcomingCount = await queryOne<any>(
-    `SELECT COUNT(*)::int as cnt FROM "Campaign" WHERE "status" = 'active' AND "endDate" >= (NOW() AT TIME ZONE 'Asia/Kolkata')`
-  );
-
-  const monthlyTrend = await query<any>(
-    `SELECT TO_CHAR("startDate", 'YYYY-MM') as month, COUNT(*)::int as cnt,
-            SUM("collectedUnits")::int as "collectedUnits"
-     FROM "Campaign" GROUP BY TO_CHAR("startDate", 'YYYY-MM') ORDER BY month DESC LIMIT 12`
-  );
+  const [summary, byDistrict, byPartnerType, monthlyTrend] = await Promise.all([
+    queryOne<any>(`
+      SELECT
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE "status" = 'active')::int as active,
+        COUNT(*) FILTER (WHERE "status" = 'paused')::int as paused,
+        COUNT(*) FILTER (WHERE "status" = 'cancelled')::int as cancelled,
+        COUNT(*) FILTER (WHERE "status" = 'completed')::int as completed,
+        COUNT(*) FILTER (WHERE "status" = 'active' AND "endDate" >= (NOW() AT TIME ZONE 'Asia/Kolkata'))::int as upcoming,
+        COALESCE(SUM("expectedDonors"),0)::int as "totalExpectedDonors",
+        COALESCE(SUM("collectedUnits"),0)::int as "totalCollectedUnits",
+        COALESCE(SUM("registeredDonors"),0)::int as "totalRegisteredDonors"
+      FROM "Campaign"
+    `),
+    query<any>(
+      `SELECT "district", COUNT(*)::int as cnt,
+              COALESCE(SUM("expectedDonors"),0)::int as "expectedDonors",
+              COALESCE(SUM("collectedUnits"),0)::int as "collectedUnits",
+              COALESCE(SUM("registeredDonors"),0)::int as "registeredDonors"
+       FROM "Campaign" GROUP BY "district" ORDER BY cnt DESC`
+    ),
+    query<any>(
+      `SELECT "partnerType", COUNT(*)::int as cnt,
+              COALESCE(SUM("expectedDonors"),0)::int as "expectedDonors",
+              COALESCE(SUM("collectedUnits"),0)::int as "collectedUnits"
+       FROM "Campaign" GROUP BY "partnerType" ORDER BY cnt DESC`
+    ),
+    query<any>(
+      `SELECT TO_CHAR("startDate", 'YYYY-MM') as month, COUNT(*)::int as cnt,
+              COALESCE(SUM("collectedUnits"),0)::int as "collectedUnits"
+       FROM "Campaign" GROUP BY TO_CHAR("startDate", 'YYYY-MM') ORDER BY month DESC LIMIT 12`
+    ),
+  ]);
 
   res.json({
-    total: total?.cnt || 0,
-    active: active?.cnt || 0,
-    paused: paused?.cnt || 0,
-    cancelled: cancelled?.cnt || 0,
-    completed: completed?.cnt || 0,
-    upcoming: upcomingCount?.cnt || 0,
-    totalExpectedDonors: totalExpected?.cnt || 0,
-    totalCollectedUnits: totalCollected?.cnt || 0,
-    totalRegisteredDonors: totalRegistered?.cnt || 0,
+    total: summary?.total || 0,
+    active: summary?.active || 0,
+    paused: summary?.paused || 0,
+    cancelled: summary?.cancelled || 0,
+    completed: summary?.completed || 0,
+    upcoming: summary?.upcoming || 0,
+    totalExpectedDonors: summary?.totalExpectedDonors || 0,
+    totalCollectedUnits: summary?.totalCollectedUnits || 0,
+    totalRegisteredDonors: summary?.totalRegisteredDonors || 0,
     byDistrict,
     byPartnerType,
     monthlyTrend,

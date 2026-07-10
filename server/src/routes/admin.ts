@@ -19,26 +19,24 @@ function asyncHandler(fn: (req: AuthedRequest, res: Response, next: NextFunction
 
 // Stats for dashboard overview
 adminRouter.get("/stats", requireAdminOrNgo, asyncHandler(async (_req: AuthedRequest, res: Response) => {
-  const users = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User"');
-  const donors = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["donor"]);
-  const requests = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest"');
-  const pending = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" = $1', ["pending_verification"]);
-  const active = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "BloodRequest" WHERE "status" NOT IN ($1,$2,$3)', ["closed", "rejected", "completed"]);
-  const completed = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "DonorResponse" WHERE "status" = $1', ["completed"]);
-  const reports = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "FraudReport"');
-  const hospitals = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "Hospital"');
-  const ngoUsers = await queryOne<any>('SELECT COUNT(*)::int as cnt FROM "User" WHERE "role" = $1', ["ngo"]);
+  const [userStats, requestStats, responseStats, reports, hospitals] = await Promise.all([
+    queryOne<any>(`SELECT COUNT(*)::int as "totalUsers", COUNT(*) FILTER (WHERE "role" = 'donor')::int as "totalDonors", COUNT(*) FILTER (WHERE "role" = 'ngo')::int as "totalNgoAdmins" FROM "User"`),
+    queryOne<any>(`SELECT COUNT(*)::int as "totalRequests", COUNT(*) FILTER (WHERE "status" = 'pending_verification')::int as "pendingVerifications", COUNT(*) FILTER (WHERE "status" NOT IN ('closed','rejected','completed'))::int as "activeRequests" FROM "BloodRequest"`),
+    queryOne<any>(`SELECT COUNT(*) FILTER (WHERE "status" = 'completed')::int as "completedDonations" FROM "DonorResponse"`),
+    queryOne<any>('SELECT COUNT(*)::int as cnt FROM "FraudReport"'),
+    queryOne<any>('SELECT COUNT(*)::int as cnt FROM "Hospital"'),
+  ]);
   res.json({
-    totalUsers: users?.cnt || 0,
-    totalDonors: donors?.cnt || 0,
-    totalRequests: requests?.cnt || 0,
-    pendingVerifications: pending?.cnt || 0,
-    activeRequests: active?.cnt || 0,
-    completedDonations: completed?.cnt || 0,
-    livesSaved: completed?.cnt || 0,
+    totalUsers: userStats?.totalUsers || 0,
+    totalDonors: userStats?.totalDonors || 0,
+    totalRequests: requestStats?.totalRequests || 0,
+    pendingVerifications: requestStats?.pendingVerifications || 0,
+    activeRequests: requestStats?.activeRequests || 0,
+    completedDonations: responseStats?.completedDonations || 0,
+    livesSaved: responseStats?.completedDonations || 0,
     fraudReports: reports?.cnt || 0,
     totalHospitals: hospitals?.cnt || 0,
-    totalNgoAdmins: ngoUsers?.cnt || 0,
+    totalNgoAdmins: userStats?.totalNgoAdmins || 0,
   });
 }));
 
