@@ -84,7 +84,12 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "hospitalType" TEXT');
   await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
+  await exec('CREATE INDEX IF NOT EXISTS idx_user_mobile ON "User" ("mobile")');
+  await exec('CREATE INDEX IF NOT EXISTS idx_user_role_created ON "User" ("role", "createdAt" DESC)');
   await exec('CREATE INDEX IF NOT EXISTS idx_blood_request_expiry ON "BloodRequest" ("expiresAt", "status") WHERE "expiresAt" IS NOT NULL');
+  await exec('CREATE INDEX IF NOT EXISTS idx_blood_request_status_created ON "BloodRequest" ("status", "createdAt" DESC)');
+  await exec('CREATE INDEX IF NOT EXISTS idx_blood_request_district_status ON "BloodRequest" ("district", "status")');
+  await exec('CREATE INDEX IF NOT EXISTS idx_donor_response_status ON "DonorResponse" ("status")');
   await exec(`
     CREATE TABLE IF NOT EXISTS "AuditLog" (
       "id" TEXT NOT NULL,
@@ -213,6 +218,8 @@ async function ensureRuntimeSchema() {
     )
   `);
   await exec('ALTER TABLE "Campaign" ADD COLUMN IF NOT EXISTS "hostLogoUrl" TEXT');
+  await exec('CREATE INDEX IF NOT EXISTS idx_campaign_status_enddate ON "Campaign" ("status", "endDate")');
+  await exec('CREATE INDEX IF NOT EXISTS idx_campaign_district_status ON "Campaign" ("district", "status")');
 }
 
 const allowedOrigins = [
