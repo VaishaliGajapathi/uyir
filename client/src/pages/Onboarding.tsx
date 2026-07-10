@@ -24,7 +24,7 @@ function dashboardPathForRole(role?: string) {
 export default function Onboarding() {
   const { login, lang, setLang } = useApp();
   const nav = useNavigate();
-  const [view, setView] = useState<"login" | "signup" | "signup-role" | "forgot" | "reset">("login");
+  const [view, setView] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -36,7 +36,6 @@ export default function Onboarding() {
   const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
   const [otpCode, setOtpCode] = useState("");
   const [signupRole, setSignupRole] = useState<"donor" | "requestor" | null>(null);
-  const [showAppreciation, setShowAppreciation] = useState(false);
 
   async function handleLogin() {
     setErr(""); setLoading(true);
@@ -49,16 +48,10 @@ export default function Onboarding() {
 
   async function handleSignup() {
     setErr("");
-    if (mobile.length < 10 || !name || !password || !consent) {
-      setErr(lang === "ta" ? "அனைத்து தகவல்களையும் உள்ளிடவும்" : "Please fill all fields");
+    if (mobile.length < 10 || !name || !password || !consent || !signupRole) {
+      setErr(lang === "ta" ? "அனைத்து தகவல்களையும் உள்ளிடவும்" : "Please fill all fields and choose your role");
       return;
     }
-    // Show role selection first
-    setView("signup-role");
-  }
-
-  async function handleRoleSelection(role: "donor" | "requestor") {
-    setSignupRole(role);
     await requestOtpAndSend();
   }
 
@@ -92,13 +85,8 @@ export default function Onboarding() {
       clearOtpReqId();
       login(r.token, r.user);
       
-      // Show appreciation for donors
-      if (signupRole === "donor") {
-        setShowAppreciation(true);
-      } else {
-        console.log("[Onboarding] Navigating to dashboard:", dashboardPathForRole(r.user.role));
-        nav(dashboardPathForRole(r.user.role));
-      }
+      console.log("[Onboarding] Navigating to dashboard:", dashboardPathForRole(r.user.role));
+      nav(dashboardPathForRole(r.user.role));
     } catch (e: any) {
       console.error("[Onboarding] Verification error:", e);
       setErr(withSupport(e.message, lang));
@@ -259,6 +247,32 @@ export default function Onboarding() {
                 </div>
               </div>
 
+              {otpStep !== "sent" && (
+                <div>
+                  <p className="mb-2 text-center text-xs font-medium text-slate-600">
+                    {lang === "ta" ? "நீங்கள் இரத்ததானம் செய்ய விரும்புகிறீர்களா அல்லது இரத்தம் கேட்க விரும்புகிறீர்களா?" : "Do you want to donate blood or request blood?"}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSignupRole("donor")}
+                      className={`rounded-xl border-2 px-3 py-3 text-center transition ${signupRole === "donor" ? "border-uyir-600 bg-uyir-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
+                    >
+                      <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்த தானம்" : "Blood Donor"}</p>
+                      <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "உயிர்களைக் காப்பாற்ற" : "Help save lives"}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignupRole("requestor")}
+                      className={`rounded-xl border-2 px-3 py-3 text-center transition ${signupRole === "requestor" ? "border-uyir-600 bg-uyir-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
+                    >
+                      <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்தம் கேட்பவர்" : "Blood Requestor"}</p>
+                      <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "இரத்தம் தேவை" : "Request blood"}</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Ethical Consent */}
               <div className="flex items-start gap-2">
                 <input type="checkbox" id="consent" checked={consent}
@@ -304,7 +318,7 @@ export default function Onboarding() {
               )}
 
               <Button className="w-full" size="md" loading={loading}
-                disabled={mobile.length < 10 || !name || !password || !consent || (otpStep === "sent" && otpCode.length < 4)}
+                disabled={mobile.length < 10 || !name || !password || !consent || !signupRole || (otpStep === "sent" && otpCode.length < 4)}
                 onClick={otpStep === "sent" ? verifySignup : handleSignup}>
                 <Phone className="h-4 w-4" />
                 {otpStep === "sent"
@@ -328,41 +342,6 @@ export default function Onboarding() {
               </div>
 
               {err && <p className="text-center text-xs text-red-500">{err}</p>}
-            </div>
-          )}
-
-          {/* Role Selection View */}
-          {view === "signup-role" && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-center">{lang === "ta" ? "உங்கள் பங்கைத் தேர்வுசெய்யவும்" : "Choose Your Role"}</h2>
-              <p className="text-center text-sm text-slate-500">
-                {lang === "ta" ? "இரத்ததானம் செய்ய விரும்புகிறீர்களா அல்லது இரத்தம் கேட்க விரும்புகிறீர்களா?" : "Do you want to donate blood or request blood?"}
-              </p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleRoleSelection("donor")}
-                  disabled={loading}
-                  className="rounded-xl border-2 border-uyir-600 bg-uyir-50 px-3 py-4 text-center transition hover:bg-uyir-100 disabled:opacity-60"
-                >
-                  <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்த தானம்" : "Blood Donor"}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "உயிர்களைக் காப்பாற்ற உதவுங்கள்" : "Help save lives"}</p>
-                </button>
-
-                <button
-                  onClick={() => handleRoleSelection("requestor")}
-                  disabled={loading}
-                  className="rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-4 text-center transition hover:bg-slate-100 disabled:opacity-60"
-                >
-                  <p className="text-sm font-bold text-slate-800">{lang === "ta" ? "இரத்தம் கேட்பவர்" : "Blood Requestor"}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{lang === "ta" ? "இரத்தம் தேவைப்படும்போது" : "Request blood"}</p>
-                </button>
-              </div>
-
-              <button onClick={() => { setView("signup"); setErr(""); }}
-                className="w-full text-xs text-slate-400">
-                {lang === "ta" ? "திரும்பு" : "Back"}
-              </button>
             </div>
           )}
 
@@ -513,38 +492,6 @@ export default function Onboarding() {
                 {lang === "ta" ? "இதை படித்ததற்கு நன்றி." : "Thank you for reading."}
               </p>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Donor Appreciation Modal */}
-      {showAppreciation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl text-center">
-            <div className="mb-4 flex justify-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-uyir-100 text-uyir-600">
-                <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="mb-2 text-2xl font-bold text-slate-800">
-              {lang === "ta" ? "🎉 நன்றி!" : "🎉 Thank You!"}
-            </h3>
-            <p className="mb-4 text-lg font-semibold text-uyir-600">
-              {lang === "ta" ? "நீங்கள் ஒரு உயிரைக் காப்பாற்றுகிறீர்கள்" : "You're Saving a Life!"}
-            </p>
-            <p className="mb-6 text-sm text-slate-600">
-              {lang === "ta"
-                ? "உங்கள் இரத்த தானம் ஒரு விலைமதிப்பற்ற பரிசு. உங்கள் தாரளம் மூலம் நீங்கள் ஒருவரின் உயிரைக் காப்பாற்றுகிறீர்கள். UYIR குடும்பத்திற்கு வரவேற்பு."
-                : "Your blood donation is a priceless gift. Through your generosity, you are saving someone's life. Welcome to the UYIR family."}
-            </p>
-            <Button className="w-full" size="md" onClick={() => {
-              setShowAppreciation(false);
-              nav(dashboardPathForRole("donor"));
-            }}>
-              {lang === "ta" ? "தொடர்க" : "Continue"}
-            </Button>
           </div>
         </div>
       )}
