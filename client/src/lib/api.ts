@@ -72,7 +72,7 @@ export interface User {
   verified: boolean; badges?: { badgeName: string; awardedDate: string }[];
   pincode?: string; // Auto-filled from geolocation
   lat?: number; lng?: number;
-  notificationsEnabled?: boolean; voiceEnabled?: boolean; locationEnabled?: boolean;
+  notificationsEnabled?: boolean; whatsappEnabled?: boolean; voiceEnabled?: boolean; locationEnabled?: boolean;
   weight?: number; height?: number; hemoglobinLevel?: number; sleepHours?: number;
   drinkingHabits?: string; smokingHabits?: string;
   documents?: DonorDocument[];

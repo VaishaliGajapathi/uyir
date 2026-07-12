@@ -73,6 +73,7 @@ export function Profile() {
       form.district !== user.district ||
       form.lastDonationDate !== user.lastDonationDate ||
       form.notificationsEnabled !== user.notificationsEnabled ||
+      form.whatsappEnabled !== user.whatsappEnabled ||
       form.voiceEnabled !== user.voiceEnabled ||
       form.locationEnabled !== user.locationEnabled;
     setHasChanges(changed);
@@ -92,6 +93,7 @@ export function Profile() {
       newForm.isPlateletDonor !== user.isPlateletDonor ||
       newForm.lastDonationDate !== user.lastDonationDate ||
       newForm.notificationsEnabled !== user.notificationsEnabled ||
+      newForm.whatsappEnabled !== user.whatsappEnabled ||
       newForm.voiceEnabled !== user.voiceEnabled ||
       newForm.locationEnabled !== user.locationEnabled;
     setHasChanges(changed);
@@ -449,6 +451,24 @@ export function Profile() {
               <div
                 className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
                   form.notificationsEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-700">{lang === "ta" ? "வாட்ஸ்அப் அறிவிப்புகள்" : "WhatsApp Alerts"}</p>
+              <p className="text-[10px] text-slate-500">{lang === "ta" ? "அருகிலுள்ள, பொருந்தும் இரத்தக் கோரிக்கைகளை வாட்ஸ்அப்பில் பெறுங்கள்" : "Get nearby & matching blood requests on WhatsApp"}</p>
+            </div>
+            <button
+              onClick={() => handleFormChange('whatsappEnabled', form.whatsappEnabled === false ? true : false)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                form.whatsappEnabled !== false ? 'bg-uyir-600' : 'bg-slate-300'
+              }`}
+            >
+              <div
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                  form.whatsappEnabled !== false ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>

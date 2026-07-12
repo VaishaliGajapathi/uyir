@@ -3,6 +3,9 @@ import { query, queryOne, exec } from "../db.js";
 import { haversineKm, districtsForRadius, RADIUS_LADDER, TN_DISTRICTS } from "../lib/districts.js";
 import { sendPushNotification as sendFirebasePush } from "../lib/firebase.js";
 import { sendPushToUser as sendWebPush } from "../lib/push.js";
+import { sendWhatsAppBloodAlert, isWhatsAppEnabled } from "../lib/whatsapp.js";
+
+const APP_PUBLIC_URL = process.env.APP_PUBLIC_URL || "https://uyirngo.in";
 
 export const bus = new EventEmitter();
 bus.setMaxListeners(0);
@@ -103,6 +106,25 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
       }
     }
 
+    if (isWhatsAppEnabled() && donor.whatsappEnabled !== false && donor.mobile) {
+      try {
+        const result = await sendWhatsAppBloodAlert(donor.mobile, {
+          donorName: donor.name || "Donor",
+          bloodGroup: request.bloodGroup,
+          componentType: request.componentType,
+          unitsRequired: request.unitsRequired,
+          hospitalName: request.hospitalName,
+          district: request.district,
+          distanceKm: distanceKm ?? undefined,
+          requestUrl: `${APP_PUBLIC_URL}/request/${request.id}`,
+        });
+        if (result.ok) console.log(`[alerts] WhatsApp sent to donor ${donor.id}`);
+        else console.warn(`[alerts] WhatsApp not sent to donor ${donor.id}: ${result.reason}`);
+      } catch (e: any) {
+        console.error(`[alerts] WhatsApp failed for donor ${donor.id}:`, e.message);
+      }
+    }
+
     emitToDonor(donor.id, { type: "alert", requestId, donorId: donor.id, payload: pushData });
     alertedDonorIds.push(donor.id);
     alertedCount++;
@@ -110,7 +132,7 @@ export async function runAlertCycle(requestId: string): Promise<{ alerted: numbe
 
   await exec(
     'INSERT INTO "AlertLog" ("id","requestId","radiusKm","donorCount","channel","createdAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,NOW())',
-    [requestId, radiusKm, alertedCount, "push"]
+    [requestId, radiusKm, alertedCount, isWhatsAppEnabled() ? "push+whatsapp" : "push"]
   );
 
   emitRequestUpdate(requestId, { type: "alert_sent", alertedCount, radiusKm });

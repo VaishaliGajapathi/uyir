@@ -25,6 +25,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     isPlateletDonor: z.boolean().optional(),
     shareLocation: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
+    whatsappEnabled: z.boolean().optional(),
     voiceEnabled: z.boolean().optional(),
     locationEnabled: z.boolean().optional(),
     pincode: z.union([z.string(), z.null()]).optional(),
@@ -38,7 +39,7 @@ usersRouter.patch("/me", requireAuth, async (req: AuthedRequest, res: any) => {
     return res.status(400).json({ error: "Invalid input", details: parse.error.flatten() });
   }
 
-  const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","notificationsEnabled","voiceEnabled","locationEnabled","pincode","lat","lng"];
+  const allowed = ["name","language","district","taluk","bloodGroup","gender","age","isPlateletDonor","shareLocation","notificationsEnabled","whatsappEnabled","voiceEnabled","locationEnabled","pincode","lat","lng"];
   const sets: string[] = [];
   const vals: any[] = [];
   for (const k of allowed) {

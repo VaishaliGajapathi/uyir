@@ -81,6 +81,7 @@ async function ensureRuntimeSchema() {
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmToken" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmPlatform" TEXT');
   await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "fcmTokenUpdatedAt" TIMESTAMP(3)');
+  await exec('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "whatsappEnabled" BOOLEAN DEFAULT true');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)');
   await exec('ALTER TABLE "BloodRequest" ADD COLUMN IF NOT EXISTS "hospitalType" TEXT');
   await exec('CREATE INDEX IF NOT EXISTS idx_donor_match ON "User" ("bloodGroup", "district", "isAvailable") WHERE "isAvailable" = true');
