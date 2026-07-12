@@ -3,7 +3,10 @@ const BASE = configuredBase.endsWith("/api") || configuredBase === "/api" ? conf
 
 let token: string | null = localStorage.getItem("uyir_token");
 const GET_CACHE_TTL_MS = 15000;
-const REQUEST_TIMEOUT_MS = 20000;
+// Render free/standby instances can cold-start in 30-60s after inactivity.
+// Use a generous default timeout so the first request after a spin-down
+// doesn't abort before the server has finished waking up.
+const REQUEST_TIMEOUT_MS = 60000;
 const getCache = new Map<string, { expires: number; promise: Promise<any> }>();
 
 export function setToken(t: string | null) {
@@ -49,7 +52,7 @@ async function req<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
       return res.status === 204 ? (null as any) : res.json();
     })
     .catch((e: any) => {
-      if (e?.name === "AbortError") throw new Error("Request timed out. Please check your network and try again.");
+      if (e?.name === "AbortError") throw new Error("The server is taking longer than usual to respond (it may be waking up). Please try again in a few seconds.");
       throw e;
     })
     .finally(() => clearTimeout(timeoutId));
@@ -132,6 +135,14 @@ export interface BloodRequest {
 }
 
 export const api = {
+  // Fire-and-forget ping to wake a cold/standby server (e.g. Render free tier).
+  // Call this early (e.g. on the login page) so the backend is warm by the
+  // time the user submits credentials. Ignores all errors.
+  warmup: () => {
+    try {
+      fetch(`${BASE}/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+    } catch { /* ignore */ }
+  },
   // auth
   requestOtp: (mobile: string, name?: string) => req<{ ok: boolean; exists: boolean; hasPassword?: boolean; user?: User }>("/auth/otp/request", { method: "POST", body: JSON.stringify({ mobile, name }) }),
   verifyOtp: (data: any) => req<{ token: string; user: User }>("/auth/otp/verify", { method: "POST", body: JSON.stringify(data) }),

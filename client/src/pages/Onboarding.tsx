@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { api } from "../lib/api";
@@ -36,6 +36,12 @@ export default function Onboarding() {
   const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verified">("idle");
   const [otpCode, setOtpCode] = useState("");
   const [signupRole, setSignupRole] = useState<"donor" | "requestor" | null>(null);
+
+  // Wake the backend early (Render free tier can cold-start after inactivity),
+  // so it's warm by the time the user submits their credentials.
+  useEffect(() => {
+    api.warmup();
+  }, []);
 
   async function handleLogin() {
     setErr(""); setLoading(true);
