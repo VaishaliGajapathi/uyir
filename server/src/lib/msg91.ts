@@ -7,6 +7,11 @@ export interface AccessTokenResult {
   mobile?: string;
 }
 
+// Cache of recently verified tokens to avoid re-calling MSG91 on retry.
+// MSG91 access tokens are single-use — a second verifyAccessToken call fails.
+const verifiedTokenCache = new Map<string, { mobile?: string; expires: number }>();
+const TOKEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function verifyAccessToken(accessToken: string): Promise<AccessTokenResult> {
   const authKey = process.env.MSG91_AUTH_KEY;
 
@@ -17,6 +22,13 @@ export async function verifyAccessToken(accessToken: string): Promise<AccessToke
 
   if (!accessToken) {
     return { ok: false };
+  }
+
+  // Check cache first — if we already verified this token, skip MSG91 API call
+  const cached = verifiedTokenCache.get(accessToken);
+  if (cached && cached.expires > Date.now()) {
+    console.log("[msg91/server] Token found in cache (already verified), mobile:", cached.mobile);
+    return { ok: true, mobile: cached.mobile };
   }
 
   try {
@@ -45,6 +57,8 @@ export async function verifyAccessToken(accessToken: string): Promise<AccessToke
       const mobile =
         typeof data.message === "string" ? data.message.replace(/\D/g, "").slice(-10) : undefined;
       console.log("[msg91/server] Token verified, mobile:", mobile);
+      // Cache the verified token so retries don't hit MSG91 again
+      verifiedTokenCache.set(accessToken, { mobile, expires: Date.now() + TOKEN_CACHE_TTL_MS });
       return { ok: true, mobile };
     }
 

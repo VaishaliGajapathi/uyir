@@ -89,7 +89,12 @@ export default function Onboarding() {
       nav(dashboardPathForRole(r.user.role));
     } catch (e: any) {
       console.error("[Onboarding] Verification error:", e);
-      setErr(withSupport(e.message, lang));
+      // If backend verification failed, the MSG91 token may be consumed.
+      // Clear cached token and reset OTP step so user can resend OTP.
+      clearOtpReqId();
+      setOtpStep("idle");
+      setOtpCode("");
+      setErr(withSupport(e.message + " Please resend OTP and try again.", lang));
     } finally { setLoading(false); }
   }
 
