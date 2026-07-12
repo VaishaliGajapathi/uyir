@@ -220,14 +220,14 @@ export function Profile() {
 
   function contactSupport() {
     const message = `Hi UYIR Support, I need help with my account.\n\nName: ${user?.name}\nMobile: ${user?.mobile}\nRole: ${user?.role}`;
-    const url = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/919940874198?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
 
   function reportBug() {
     const subject = "UYIR Bug Report";
     const body = `Describe the bug:\n\nSteps to reproduce:\n1.\n2.\n3.\n\nExpected behavior:\n\nActual behavior:\n\nDevice/Browser info:`;
-    window.location.href = `mailto:support@uyir.in?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:support@uyirngo.in?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
   return (

@@ -220,7 +220,7 @@ export default function AboutUs() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Emergency Helpline</p>
-                  <p className="font-semibold text-slate-800">+91 98765 43210</p>
+                  <p className="font-semibold text-slate-800">+91 99408 74198</p>
                 </div>
               </div>
 
@@ -230,7 +230,7 @@ export default function AboutUs() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Email</p>
-                  <p className="font-semibold text-slate-800">help@uyir.org</p>
+                  <p className="font-semibold text-slate-800">support@uyirngo.in</p>
                 </div>
               </div>
 

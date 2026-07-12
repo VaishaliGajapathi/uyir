@@ -9,7 +9,7 @@ let pushEnabled = false;
 
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(
-    "mailto:contact@uyir.org",
+    "mailto:support@uyirngo.in",
     vapidPublicKey,
     vapidPrivateKey
   );

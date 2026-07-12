@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Facebook, Instagram, MessageCircle, Heart } from "lucide-react";
 
 const SOCIAL_LINKS = {
-  whatsapp: "https://wa.me/919876543210",
+  whatsapp: "https://wa.me/919940874198",
   facebook: "https://www.facebook.com/uyirngo",
   instagram: "https://www.instagram.com/uyirngo",
 };

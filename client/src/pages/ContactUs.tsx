@@ -25,7 +25,7 @@ export default function ContactUs() {
               <Phone className="h-8 w-8 text-red-600" />
             </div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">Emergency Helpline</h3>
-            <p className="text-2xl font-extrabold text-uyir-600 mb-2">+91 98765 43210</p>
+            <p className="text-2xl font-extrabold text-uyir-600 mb-2">+91 99408 74198</p>
             <p className="text-sm text-slate-500">24/7 Available</p>
           </div>
 
@@ -77,7 +77,7 @@ export default function ContactUs() {
                 <input 
                   type="tel" 
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 focus:border-uyir-500 outline-none transition" 
-                  placeholder="+91 98765 43210" 
+                  placeholder="+91 99408 74198" 
                 />
               </div>
               
