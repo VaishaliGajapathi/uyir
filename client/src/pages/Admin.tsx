@@ -232,6 +232,14 @@ export function Admin() {
     } catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
+  async function toggleHospitalActive(id: string, currentActive: boolean) {
+    setBusy(`hosp-toggle:${id}`);
+    try {
+      await api.adminToggleHospitalActive(id);
+      await loadAll();
+    } catch (e: any) { alert(e.message); } finally { setBusy(null); }
+  }
+
   async function actionFraud(id: string) {
     if (!confirm("Mark this fraud report as actioned?")) return;
     setBusy(`fraud:${id}`);
@@ -1088,6 +1096,7 @@ export function Admin() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={h.verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}>{h.verified ? "Verified" : "Unverified"}</Badge>
+                    <Badge className={(h.active ?? true) ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"}>{(h.active ?? true) ? "Active" : "Inactive"}</Badge>
                   </div>
                 </div>
                 <div className="mt-2 flex gap-2">
@@ -1106,6 +1115,15 @@ export function Admin() {
                       <XCircle className="h-3 w-3" /> Revoke
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={busy === `hosp-toggle:${h.id}`}
+                    onClick={() => toggleHospitalActive(h.id, h.active ?? true)}
+                    className={(h.active ?? true) ? "text-red-600 border-red-300 hover:bg-red-50" : "text-emerald-600 border-emerald-300 hover:bg-emerald-50"}
+                  >
+                    {(h.active ?? true) ? "Deactivate" : "Activate"}
+                  </Button>
                 </div>
               </div>
             ))}

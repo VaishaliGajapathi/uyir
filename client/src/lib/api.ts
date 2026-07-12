@@ -238,6 +238,7 @@ export const api = {
   adminRoleHierarchy: () => req<{ byRole: any[]; ngoUsers: any[] }>("/admin/role-hierarchy"),
   adminAnalytics: () => req<{ requestsOverTime: any[]; donationsOverTime: any[]; topDonors: any[]; districtHeatmap: any[] }>("/admin/analytics"),
   adminRejectHospital: (id: string) => req(`/admin/hospitals/${id}/reject`, { method: "POST" }),
+  adminToggleHospitalActive: (id: string) => req<{ ok: boolean; active: boolean }>(`/admin/hospitals/${id}/toggle-active`, { method: "POST" }),
   adminDismissFraud: (id: string) => req(`/admin/reports/${id}/dismiss`, { method: "POST" }),
   adminApproveNgo: (id: string) => req(`/admin/ngos/${id}/approve`, { method: "POST" }),
   adminRejectNgo: (id: string) => req(`/admin/ngos/${id}/reject`, { method: "POST" }),

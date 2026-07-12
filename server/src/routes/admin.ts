@@ -93,6 +93,15 @@ adminRouter.post("/hospitals/:id/reject", requireAdminOrVolunteer, asyncHandler(
   res.json({ ok: true });
 }));
 
+// Activate / Deactivate a hospital
+adminRouter.post("/hospitals/:id/toggle-active", requireAdminOrVolunteer, asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const hospital = await queryOne<any>('SELECT "active" FROM "Hospital" WHERE "id" = $1 LIMIT 1', [req.params.id]);
+  if (!hospital) return res.status(404).json({ error: "Hospital not found" });
+  const newActive = !(hospital.active ?? true);
+  await exec('UPDATE "Hospital" SET "active" = $1 WHERE "id" = $2', [newActive, req.params.id]);
+  res.json({ ok: true, active: newActive });
+}));
+
 // Edit a hospital
 adminRouter.patch("/hospitals/:id", requireSuperAdmin, asyncHandler(async (req: AuthedRequest, res: Response) => {
   const { name, district, address, phone, registrationId, logo } = req.body;
